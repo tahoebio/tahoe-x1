@@ -406,16 +406,16 @@ if args.local_rank in [0, -1]:
     with open(save_dir / "args.json", "w") as f:
         json.dump(vars(args), f, indent=2)
     # copy all uncommitted changes to the save dir
-    os.system(
-        f"git diff > {str(save_dir / 'git_diff_')}{scg.utils.get_git_commit()}.diff"
-    )
+    # os.system(
+    #     f"git diff > {str(save_dir / 'git_diff_')}{scg.utils.get_git_commit()}.diff"
+    # )
 if IS_DATA_PARALLEL:
     torch.distributed.barrier()
 
 scg.utils.add_file_handler(logger, save_dir / "run.log")
 # log running date and current git commit
 logger.info(f"Running on {time.strftime('%Y-%m-%d %H:%M:%S')}")
-logger.info(f"Current git commit: {scg.utils.get_git_commit()}")
+# logger.info(f"Current git commit: {scg.utils.get_git_commit()}")
 
 writer = SummaryWriter(log_dir=save_dir / "tensorboard")
 if IS_DATA_PARALLEL:
@@ -503,7 +503,7 @@ elif Path(args.data_source).is_dir() and args.data_source.endswith(".scb"):
         logger.info(f"Loaded {len(raw_dataset)} examples from {cls_prefix_datatable}")
 elif Path(args.data_source).is_dir():
     # collection of parquet files
-    parquet_files = [str(f) for f in Path(args.data_source).glob("*.parquet")]
+    parquet_files = [str(f.resolve()) for f in Path(args.data_source).glob("*.parquet")]
     cache_dir = Path(args.data_source).parent / "cache"
     vocab = GeneVocab.from_file(Path(args.vocab_path))
     for s in special_tokens:
@@ -752,6 +752,8 @@ model = TransformerModel(
     use_fast_transformer=args.fast_transformer,
     fast_transformer_backend="flash",
 )
+total_params = sum(p.numel() for p in model.parameters())
+print("*** Total number of parameters: ", total_params)
 if args.load_model is not None:
     try:
         model.load_state_dict(torch.load(model_file))
