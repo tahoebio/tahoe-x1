@@ -1,26 +1,42 @@
+import composer
 import datasets
 import torch
 from composer import Trainer
 from composer.models import ComposerModel
+from composer.utils import dist
 from torch.utils.data import DataLoader
+from torchmetrics import Metric
 
 import scgpt as scg
 from scgpt import logger
 from scgpt.loss import masked_mse_loss
 from scgpt.model import TransformerModel
 from scgpt.tokenizer import GeneVocab
-from composer.utils import dist
-
-
-# import composer
 
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-raw_dataset = datasets.load_from_disk("/vevo/cellxgene/cellxgene_primary_2023-12-15_0_cls_appended.dataset")
-raw_dataset = raw_dataset.with_format("torch")
+class MaskedMseMetric(Metric):
+    def __init__(self, name, **kwargs):
+        super().__init__(**kwargs)
+        self.name = name
+        self.add_state("sum_mse", default=torch.tensor(0.0, dtype=torch.float32), dist_reduce_fx="sum")
+        self.add_state("sum_mask", default=torch.tensor(0.0, dtype=torch.float32), dist_reduce_fx="sum")
+
+    def update(self, preds: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> None:
+        if preds.shape != target.shape:
+            raise ValueError("preds and target must have the same shape")
+        mask = mask.float()
+        self.sum_mse += torch.nn.functional.mse_loss(preds * mask, target * mask, reduction="sum")
+        self.sum_mask += mask.sum()
+
+    def compute(self) -> torch.Tensor:
+        return self.sum_mse / self.sum_mask
+
+
+raw_dataset = datasets.load_from_disk("/vevo/cellxgene/cellxgene_primary_2023-12-15_merged.dataset")
 raw_dataset = raw_dataset.with_format("torch")
 raw_dataset = raw_dataset.train_test_split(
     test_size=0.03, shuffle=True
@@ -61,16 +77,17 @@ train_loader = DataLoader(
 valid_sampler = dist.get_sampler(valid_dataset, shuffle=False)
 valid_loader = DataLoader(
     valid_dataset,
-    batch_size=2048,
+    batch_size=16,
     collate_fn=collator,
-    drop_last=False,
+    drop_last=True,
     num_workers=16,
     pin_memory=True,
     sampler=valid_sampler,
+    prefetch_factor=4,
 )
 
 
-class scGPTComposer(ComposerModel):
+class ScgptComposer(ComposerModel):
     def __init__(self, vocab):
         super().__init__()
         self.criterion = masked_mse_loss
@@ -98,15 +115,19 @@ class scGPTComposer(ComposerModel):
             fast_transformer_backend="flash",
         )
         self.pad_token = "<pad>"
+        self.train_mse = MaskedMseMetric(name="MSE")
+        self.train_mvc = MaskedMseMetric(name="MVC")
+        self.train_gen = MaskedMseMetric(name="GEN")
+        self.val_mse = MaskedMseMetric(name="MSE")
+        self.val_mvc = MaskedMseMetric(name="MVC")
+        self.val_gen = MaskedMseMetric(name="GEN")
 
     def forward(self, batch):  # batch is the output of the dataloader
         # specify how batches are passed through the model
-        data_dict = batch
-        pcpt_gene = data_dict["pcpt_gene"]
-        pcpt_expr = data_dict["pcpt_expr"]
+        pcpt_gene = batch["pcpt_gene"]
+        pcpt_expr = batch["pcpt_expr"]
         pcpt_key_padding_mask = pcpt_gene.eq(self.vocab[self.pad_token])
-        gen_gene = data_dict["gen_gene"]
-        gen_expr_target = target_values = data_dict["gen_expr_target"]
+        gen_gene = batch["gen_gene"]
         gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
         output_dict = self.model(
             pcpt_gene,
@@ -133,12 +154,9 @@ class scGPTComposer(ComposerModel):
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss
-        data_dict = batch
-        pcpt_gene = data_dict["pcpt_gene"]
-        # pcpt_expr = data_dict["pcpt_expr"]
-        # pcpt_key_padding_mask = pcpt_gene.eq(self.model.vocab[self.model.pad_token])
-        gen_gene = data_dict["gen_gene"]
-        gen_expr_target = data_dict["gen_expr_target"]
+        pcpt_gene = batch["pcpt_gene"]
+        gen_gene = batch["gen_gene"]
+        gen_expr_target = batch["gen_expr_target"]
         gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
         positions_to_match = ~gen_key_padding_mask
 
@@ -156,23 +174,61 @@ class scGPTComposer(ComposerModel):
         loss_gen = self.criterion(outputs["GEPC"], gen_expr_target, positions_to_match)
 
         loss = loss_mse + loss_mvc + loss_gen
-
         return loss
 
+    def update_metric(self, batch, outputs, metric):
+        pcpt_gene = batch["pcpt_gene"]
+        gen_gene = batch["gen_gene"]
+        mask = ~gen_gene.eq(self.vocab[self.pad_token])
+        target = batch["gen_expr_target"]
+        if metric.name == "MSE":
+            preds = outputs["gen_preds"]
+        elif metric.name == "MVC":
+            preds = outputs["mvc_output"][:, pcpt_gene.shape[1]:]
+        elif metric.name == "GEN":
+            preds = outputs["GEPC"]
+        else:
+            raise ValueError(f"metric {metric.name} not recognized")
+        metric.update(preds=preds, target=target, mask=mask)
 
-model = scGPTComposer(vocab)
-logger.info(f"Total Model parameters: {count_parameters(model.model) / (10**6)} M parameters")
+    def get_metrics(self, is_train=False):
+        # defines which metrics to use in each phase of training
+        if is_train:
+            metric_dict = {
+                "MSE": self.train_mse,
+                "MVC": self.train_mvc,
+                "GEN": self.train_gen,
+            }
+        else:
+            metric_dict = {
+                "MSE": self.val_mse,
+                "MVC": self.val_mvc,
+                "GEN": self.val_gen,
+            }
+        return metric_dict
+
+
+model = ScgptComposer(vocab)
+logger.info(f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters")
 for name, sub_model in model.model.named_children():
-    logger.info(f"{name}: {count_parameters(sub_model) / (10**6)} M parameters")
+    logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
+scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(t_warmup="0.2dur", t_max="1dur", alpha_f=0.0)
 trainer = Trainer(
     model=model,
     optimizers=optimizer,
     train_dataloader=train_loader,
-    max_duration='10ep',
+    max_duration='6ep',
     device="gpu",
+    eval_dataloader=valid_loader,
+    schedulers=scheduler,
     device_train_microbatch_size="auto",
-    precision='amp_fp16'
+    precision='amp_fp16',
+    callbacks=[composer.callbacks.SpeedMonitor(window_size=10)],
+    loggers=[composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False)],
+    save_folder="/vevo/scgpt/checkpoints/{run_name}",
+    save_interval="1ep",
+    save_latest_filename="latest",
 )
 trainer.fit()
