@@ -2,12 +2,14 @@ import composer
 import datasets
 import torch
 from composer import Trainer
+
+# from composer import Event
 from composer.models import ComposerModel
 from composer.utils import dist
 from torch.utils.data import DataLoader
 from torchmetrics import Metric
 
-import scgpt as scg
+from scgpt import DataCollator
 from scgpt import logger
 from scgpt.loss import masked_mse_loss
 from scgpt.model import TransformerModel
@@ -22,24 +24,41 @@ class MaskedMseMetric(Metric):
     def __init__(self, name, **kwargs):
         super().__init__(**kwargs)
         self.name = name
-        self.add_state("sum_mse", default=torch.tensor(0.0, dtype=torch.float32), dist_reduce_fx="sum")
-        self.add_state("sum_mask", default=torch.tensor(0.0, dtype=torch.float32), dist_reduce_fx="sum")
+        self.add_state(
+            "sum_mse",
+            default=torch.tensor(0.0, dtype=torch.float32),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "sum_mask",
+            default=torch.tensor(0.0, dtype=torch.float32),
+            dist_reduce_fx="sum",
+        )
 
-    def update(self, preds: torch.Tensor, target: torch.Tensor, mask: torch.Tensor) -> None:
+    def update(
+        self, preds: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
+    ) -> None:
         if preds.shape != target.shape:
             raise ValueError("preds and target must have the same shape")
         mask = mask.float()
-        self.sum_mse += torch.nn.functional.mse_loss(preds * mask, target * mask, reduction="sum")
+        self.sum_mse += torch.nn.functional.mse_loss(
+            preds * mask, target * mask, reduction="sum"
+        )
         self.sum_mask += mask.sum()
 
     def compute(self) -> torch.Tensor:
         return self.sum_mse / self.sum_mask
 
 
-raw_dataset = datasets.load_from_disk("/vevo/cellxgene/cellxgene_primary_2023-12-15_merged.dataset")
+raw_dataset = datasets.load_from_disk(
+    "/vevo/cellxgene/cellxgene_primary_2023-12-15_merged.dataset"
+)
+raw_dataset = raw_dataset.select(range(1000))
 raw_dataset = raw_dataset.with_format("torch")
 raw_dataset = raw_dataset.train_test_split(
-    test_size=0.03, shuffle=True
+    test_size=0.03,
+    shuffle=True,
+    seed=44,
 )
 train_dataset = raw_dataset["train"]
 valid_dataset = raw_dataset["test"]
@@ -51,7 +70,7 @@ special_tokens = ["<pad>", "<cls>", "<eoc>"]
 for s in special_tokens:
     if s not in vocab:
         vocab.append_token(s)
-collator = scg.DataCollator(
+collator = DataCollator(
     do_padding=True,
     pad_token_id=vocab["<pad>"],
     pad_value=-2,
@@ -72,6 +91,7 @@ train_loader = DataLoader(
     num_workers=16,
     pin_memory=True,
     prefetch_factor=4,
+    persistent_workers=True,
     sampler=train_sampler,
 )
 valid_sampler = dist.get_sampler(valid_dataset, shuffle=False)
@@ -79,9 +99,10 @@ valid_loader = DataLoader(
     valid_dataset,
     batch_size=16,
     collate_fn=collator,
-    drop_last=True,
-    num_workers=16,
+    num_workers=1,
+    drop_last=False,
     pin_memory=True,
+    persistent_workers=True,
     sampler=valid_sampler,
     prefetch_factor=4,
 )
@@ -162,11 +183,9 @@ class ScgptComposer(ComposerModel):
 
         gen_expr_preds = outputs["gen_preds"]
 
-        loss_mse = self.criterion(
-            gen_expr_preds, gen_expr_target, positions_to_match
-        )
+        loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
         loss_mvc = self.criterion(
-            outputs["mvc_output"][:, pcpt_gene.shape[1]:],
+            outputs["mvc_output"][:, pcpt_gene.shape[1] :],
             gen_expr_target,
             positions_to_match,
         )
@@ -184,7 +203,7 @@ class ScgptComposer(ComposerModel):
         if metric.name == "MSE":
             preds = outputs["gen_preds"]
         elif metric.name == "MVC":
-            preds = outputs["mvc_output"][:, pcpt_gene.shape[1]:]
+            preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
         elif metric.name == "GEN":
             preds = outputs["GEPC"]
         else:
@@ -209,26 +228,31 @@ class ScgptComposer(ComposerModel):
 
 
 model = ScgptComposer(vocab)
-logger.info(f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters")
+logger.info(
+    f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
+)
 for name, sub_model in model.model.named_children():
     logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
 optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(t_warmup="0.2dur", t_max="1dur", alpha_f=0.0)
+scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
+    t_warmup="0.2dur", t_max="1dur", alpha_f=0.0
+)
 trainer = Trainer(
     model=model,
     optimizers=optimizer,
     train_dataloader=train_loader,
-    max_duration='6ep',
+    max_duration="6ep",
     device="gpu",
     eval_dataloader=valid_loader,
+    eval_interval="1ep",
     schedulers=scheduler,
     device_train_microbatch_size="auto",
-    precision='amp_fp16',
-    callbacks=[composer.callbacks.SpeedMonitor(window_size=10)],
+    precision="amp_fp16",
+    callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
     loggers=[composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False)],
     save_folder="/vevo/scgpt/checkpoints/{run_name}",
-    save_interval="1ep",
+    save_interval="250ba",
     save_latest_filename="latest",
 )
 trainer.fit()
