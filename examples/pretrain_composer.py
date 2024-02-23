@@ -3,7 +3,6 @@ import datasets
 import torch
 from composer import Trainer
 
-# from composer import Event
 from composer.models import ComposerModel
 from composer.utils import dist
 from torch.utils.data import DataLoader
@@ -53,7 +52,6 @@ class MaskedMseMetric(Metric):
 raw_dataset = datasets.load_from_disk(
     "/vevo/cellxgene/cellxgene_primary_2023-12-15_merged.dataset"
 )
-raw_dataset = raw_dataset.select(range(1000))
 raw_dataset = raw_dataset.with_format("torch")
 raw_dataset = raw_dataset.train_test_split(
     test_size=0.03,
@@ -245,7 +243,7 @@ trainer = Trainer(
     max_duration="6ep",
     device="gpu",
     eval_dataloader=valid_loader,
-    eval_interval="1ep",
+    eval_interval="500ba",
     schedulers=scheduler,
     device_train_microbatch_size="auto",
     precision="amp_fp16",
