@@ -1,5 +1,4 @@
 from functools import lru_cache
-import math
 from typing import Optional
 
 from einops import rearrange
@@ -8,12 +7,10 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.modules.transformer import _get_clones
-
-from flash_attn.flash_attn_interface import flash_attn_unpadded_qkvpacked_func
-from flash_attn.bert_padding import unpad_input, pad_input
-from flash_attn.flash_attention import FlashAttention
-from flash_attn.modules.mha import FlashCrossAttention
-from .layers import MultiheadAttention
+from llmfoundry.models.layers.attention import (
+    is_flash_v2_installed,
+    triton_flash_attn_fn,
+)
 
 
 class FlashscGPTMHA(nn.Module):
@@ -49,20 +46,10 @@ class FlashscGPTMHA(nn.Module):
         ), "Only support head_dim <= 128 and divisible by 8"
 
         self.Wqkv = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, **factory_kwargs)
-        self.self_attn = FlashAttention(attention_dropout=attention_dropout)
-        self.cross_attn = MultiheadAttention(
-            embed_dim,
-            num_heads,
-            dropout=attention_dropout,
-            batch_first=batch_first,
-            **factory_kwargs,
-        )
-        # self.cross_attn = FlashCrossAttention(attention_dropout=attention_dropout)
-        # for cross attetion, launch multiple queries in parallel, each query is just
-        # a single gen gene. Then each kv is the entire set of pect genes plus this gen
-        # gene together.
-        # In practice, we can simply put these queries in the batch dimension, and then
-        # they can be processed in parallel.
+        if not is_flash_v2_installed():
+            raise ImportError("Flash-Attention V2 is not installed.")
+        self.self_attn = triton_flash_attn_fn
+        self.cross_attn = triton_flash_attn_fn
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, **factory_kwargs)
 
     def forward(
@@ -71,7 +58,6 @@ class FlashscGPTMHA(nn.Module):
         gen_total_embs: Tensor,
         pcpt_key_padding_mask: Optional[Tensor] = None,
         gen_key_padding_mask: Optional[Tensor] = None,
-        need_weights=False,
     ):
         """
         pcpt_total_embs: (batch, pcpt_len, hidden_dim) (where hidden_dim = num heads * head dim)
@@ -80,26 +66,28 @@ class FlashscGPTMHA(nn.Module):
         gen_key_padding_mask: bool tensor of shape (batch, gen_len), 1 means valid and 0 means not valid.
         """
         pcpt_qkv = self.Wqkv(pcpt_total_embs)
-
         pcpt_qkv = rearrange(
-            pcpt_qkv, "b s (three h d) -> b s three h d", three=3, h=self.num_heads
+            pcpt_qkv, "b s (three h d) -> b s three (h d)", three=3, h=self.num_heads
         )
-
-        # full self attention on pcpt genes
-        pcpt_context, pcpt_attn_weights = self.self_attn(
-            pcpt_qkv,
+        pcpt_context,_,_ = self.self_attn(
+            query=pcpt_qkv[:, :, 0, :],
+            key=pcpt_qkv[:, :, 1, :],
+            value=pcpt_qkv[:, :, 2, :],
             key_padding_mask=pcpt_key_padding_mask,
-            need_weights=need_weights,
-            causal=self.causal,
+            n_heads=self.num_heads,
+            kv_n_heads=self.num_heads,
         )
-        pcpt_context = self.out_proj(rearrange(pcpt_context, "b s h d -> b s (h d)"))
+        pcpt_context = self.out_proj(pcpt_context)
 
         if gen_total_embs is None:
-            return (pcpt_context, None), (pcpt_attn_weights, None)
+            return (pcpt_context, None)
 
         gen_qkv = self.Wqkv(gen_total_embs)
         gen_qkv = rearrange(
             gen_qkv, "b s (three h d) -> b s three h d", three=3, h=self.num_heads
+        )
+        pcpt_qkv = rearrange(
+            pcpt_qkv, "b s three (h d) -> b s three h d", three=3, h=self.num_heads
         )
 
         # CROSS ATTENTION USING RAW PYTORCH IMPLEMENTATION
@@ -142,50 +130,23 @@ class FlashscGPTMHA(nn.Module):
             key_padding_mask = ~torch.cat(
                 [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
             )
-        cross_context, _ = self.cross_attn(
+        attn_bias = torch.zeros_like(attention_mask, dtype=cross_q.dtype).masked_fill(
+            attention_mask, torch.finfo(cross_q.dtype).min
+        )  # Matrix with -inf at the place of masked values and 0
+        attn_bias = attn_bias.unsqueeze(0).unsqueeze(
+            1
+        )  # Broadcastable to (B,H, S_Q, S_K) dimensions
+        cross_context,_,_ = self.cross_attn(
             cross_q,
             cross_kv[:, :, 0, :],
             cross_kv[:, :, 1, :],
             key_padding_mask=key_padding_mask,
-            attn_mask=attention_mask,
+            attn_bias=attn_bias,
+            n_heads=self.num_heads,
+            kv_n_heads=self.num_heads,
         )
-        gen_context = cross_context  # (batch, gen_len, hidden_dim)
-        gen_attn_weights = None
-
-        # # CROSS ATTENTION ON GEN GENES
-        # # prepare cross_q, where each query is per only one gen gene
-        # cross_q = gen_qkv[:, :, 0, :, :]  # (batch, gen_len, nheads, head_dim)
-        # cross_q = rearrange(cross_q, "b s h d -> b s (h d)")
-        # cross_q_unpad, indices_q, cu_seq_len_q, max_seqlen_q = unpad_input(
-        #     cross_q, gen_key_padding_mask
-        # )
-        # # if not care about padding (b gen_s) 1 (h d)
-
-        # # the input to cross attention, q needs to be (total_q, nheads, head_dim)
-
-        # # prepare gen_kv, where each kv is this gen gene plus the entire set of pect genes
-        # # if not care about padding (b gen_s) pcpt_seq+1 (h d)
-
-        # # call cross attention
-        # gen_context, gen_attn_weights = self.cross_attn(
-        #     gen_q,
-        #     gen_kv,
-        #     q_padding_mask=gen_key_padding_mask,
-        #     kv_padding_mask=pcpt_key_padding_mask,
-        #     need_weights=need_weights,
-        # )
-        # # rearrange output to (batch, gen_len, hidden_dim)
-
-        # # TEMP TEST
-        # gen_context, gen_attn_weights = self.self_attn(
-        #     gen_qkv,
-        #     key_padding_mask=gen_key_padding_mask,
-        #     need_weights=need_weights,
-        #     causal=self.causal,
-        # )
-        # gen_context = self.out_proj(rearrange(gen_context, "b s h d -> b s (h d)"))
-
-        return (pcpt_context, gen_context), (pcpt_attn_weights, gen_attn_weights)
+        gen_context = self.out_proj(cross_context)  # (batch, gen_len, hidden_dim)
+        return pcpt_context, gen_context
 
 
 class FlashscGPTLayer(nn.Module):
@@ -310,7 +271,7 @@ class FlashscGPTLayer(nn.Module):
                 gen_total_embs,
                 pcpt_key_padding_mask=pcpt_key_padding_mask_,
                 gen_key_padding_mask=gen_key_padding_mask_,
-            )[0]
+            )
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm2(pcpt_total_embs)
             pcpt_total_embs2 = self.linear2(
@@ -331,7 +292,7 @@ class FlashscGPTLayer(nn.Module):
                 gen_total_embs,
                 pcpt_key_padding_mask=pcpt_key_padding_mask_,
                 gen_key_padding_mask=gen_key_padding_mask_,
-            )[0]
+            )
             pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
             pcpt_total_embs = self.norm1(pcpt_total_embs)
             pcpt_total_embs2 = self.linear2(
