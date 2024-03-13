@@ -1,19 +1,14 @@
-import gc
 import math
-from typing import Dict, Mapping, Optional, Tuple, Any, Union
-import warnings
-
-import torch
 import numpy as np
-from torch import nn, Tensor
-import torch.distributed as dist
+import torch
 import torch.nn.functional as F
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
+from torch import nn, Tensor
 from torch.distributions import Bernoulli
+from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from tqdm import trange
+from typing import Dict, Mapping, Optional, Tuple, Any, Union
 
 try:
-    from flash_attn.flash_attention import FlashMHA
     from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
 except ImportError:
     import warnings
@@ -163,10 +158,6 @@ class TransformerModel(nn.Module):
                 n_cls=num_batch_labels,
                 reverse_grad=True,
             )
-
-        # self.sim = Similarity(temp=0.5)  # TODO: auto set temp
-        # self.creterion_cce = nn.CrossEntropyLoss()
-
         self.init_weights()
 
     def init_weights(self) -> None:
@@ -229,8 +220,7 @@ class TransformerModel(nn.Module):
                 [pcpt_token_embs, gen_token_embs], dim=1
             )
             gen_flags = self.flag_encoder(
-                torch.tensor(1).to(pcpt_values.device)
-            ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
+                torch.tensor(1, device=pcpt_values.device)).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
 
             gen_total_embs = gen_token_embs + gen_flags
         else:

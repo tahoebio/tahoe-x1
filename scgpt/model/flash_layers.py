@@ -15,8 +15,7 @@ from llmfoundry.models.layers.attention import (
 
 class FlashscGPTMHA(nn.Module):
     """
-    Custom MHA layer for scGPT. This takes two separate forward passes on the pect
-    genes, and on the gen genes.
+    Custom MHA layer for scGPT. This takes full forward call within one pass of MHA.
     """
 
     def __init__(
@@ -25,7 +24,6 @@ class FlashscGPTMHA(nn.Module):
         num_heads,
         bias=True,
         batch_first=True,
-        attention_dropout=0.0,
         causal=False,
         device=None,
         dtype=None,
@@ -46,107 +44,28 @@ class FlashscGPTMHA(nn.Module):
         ), "Only support head_dim <= 128 and divisible by 8"
 
         self.Wqkv = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, **factory_kwargs)
-        if not is_flash_v2_installed():
-            raise ImportError("Flash-Attention V2 is not installed.")
-        self.self_attn = triton_flash_attn_fn
-        self.cross_attn = triton_flash_attn_fn
         self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, **factory_kwargs)
+        self.self_attn = triton_flash_attn_fn
 
-    def forward(
-        self,
-        pcpt_total_embs: Tensor,
-        gen_total_embs: Tensor,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
-    ):
+    def forward(self, total_embs: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
         """
         pcpt_total_embs: (batch, pcpt_len, hidden_dim) (where hidden_dim = num heads * head dim)
         gen_total_embs: (batch, gen_len, hidden_dim)
         pcpt_key_padding_mask: bool tensor of shape (batch, pcpt_len), 1 means valid and 0 means not valid.
         gen_key_padding_mask: bool tensor of shape (batch, gen_len), 1 means valid and 0 means not valid.
         """
-        pcpt_qkv = self.Wqkv(pcpt_total_embs)
-        pcpt_qkv = rearrange(
-            pcpt_qkv, "b s (three h d) -> b s three (h d)", three=3, h=self.num_heads
-        )
-        pcpt_context,_,_ = self.self_attn(
-            query=pcpt_qkv[:, :, 0, :],
-            key=pcpt_qkv[:, :, 1, :],
-            value=pcpt_qkv[:, :, 2, :],
-            key_padding_mask=pcpt_key_padding_mask,
+        total_qkv = self.Wqkv(total_embs)  # (batch, pcpt_len + gen_len, 3 * hidden_dim)
+        total_qkv = rearrange(total_qkv, "b s (three E) -> b s three E", three=3)
+        total_context, _, _ = self.self_attn(
+            query=total_qkv[:, :, 0, :],  # (B, S_Q, E)
+            key=total_qkv[:, :, 1, :],  # (B, S_K, E)
+            value=total_qkv[:, :, 2, :],  # (B, S_V, E)
+            attn_bias=attn_bias,  # (B, H, S_Q, S_K)
             n_heads=self.num_heads,
             kv_n_heads=self.num_heads,
         )
-        pcpt_context = self.out_proj(pcpt_context)
-
-        if gen_total_embs is None:
-            return (pcpt_context, None)
-
-        gen_qkv = self.Wqkv(gen_total_embs)
-        gen_qkv = rearrange(
-            gen_qkv, "b s (three h d) -> b s three h d", three=3, h=self.num_heads
-        )
-        pcpt_qkv = rearrange(
-            pcpt_qkv, "b s three (h d) -> b s three h d", three=3, h=self.num_heads
-        )
-
-        # CROSS ATTENTION USING RAW PYTORCH IMPLEMENTATION
-        cross_q = gen_qkv[:, :, 0, :, :]  # (batch, gen_len, nheads, head_dim)
-        cross_q = rearrange(cross_q, "b gen_s h d -> b gen_s (h d)")
-        cross_kv = torch.cat(
-            [pcpt_qkv[:, :, 1:, :, :], gen_qkv[:, :, 1:, :, :]], dim=1
-        )  # (batch, pcpt_seq+gen_seq, 2, nheads, head_dim)
-        cross_kv = rearrange(cross_kv, "b pcpt_gen_s two h d -> b pcpt_gen_s two (h d)")
-
-        # make the attention mask, for pytorch implementation, true means attention is not allowed
-        @lru_cache(maxsize=1)
-        def make_mask(q_len, k_len, device):
-            attention_mask = torch.zeros(
-                (q_len, k_len), device=device, dtype=torch.bool
-            )  # (gen_len, pcpt_len+gen_len)
-            # make the last gen_len by gen_gen to be true, only the diagonal is allowed with false
-            attention_mask[:, -q_len:] = ~torch.eye(
-                q_len, device=device, dtype=torch.bool
-            )
-            return attention_mask
-
-        attention_mask = make_mask(cross_q.shape[1], cross_kv.shape[1], cross_q.device)
-
-        if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
-            key_padding_mask = None
-        else:
-            if pcpt_key_padding_mask is None:
-                pcpt_key_padding_mask = torch.ones(
-                    (pcpt_qkv.shape[0], pcpt_qkv.shape[1]),
-                    device=pcpt_qkv.device,
-                    dtype=torch.bool,
-                )
-            elif gen_key_padding_mask is None:
-                gen_key_padding_mask = torch.ones(
-                    (gen_qkv.shape[0], gen_qkv.shape[1]),
-                    device=gen_qkv.device,
-                    dtype=torch.bool,
-                )
-            key_padding_mask = ~torch.cat(
-                [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-            )
-        attn_bias = torch.zeros_like(attention_mask, dtype=cross_q.dtype).masked_fill(
-            attention_mask, torch.finfo(cross_q.dtype).min
-        )  # Matrix with -inf at the place of masked values and 0
-        attn_bias = attn_bias.unsqueeze(0).unsqueeze(
-            1
-        )  # Broadcastable to (B,H, S_Q, S_K) dimensions
-        cross_context,_,_ = self.cross_attn(
-            cross_q,
-            cross_kv[:, :, 0, :],
-            cross_kv[:, :, 1, :],
-            key_padding_mask=key_padding_mask,
-            attn_bias=attn_bias,
-            n_heads=self.num_heads,
-            kv_n_heads=self.num_heads,
-        )
-        gen_context = self.out_proj(cross_context)  # (batch, gen_len, hidden_dim)
-        return pcpt_context, gen_context
+        total_context = self.out_proj(total_context)
+        return total_context
 
 
 class FlashscGPTLayer(nn.Module):
@@ -195,7 +114,6 @@ class FlashscGPTLayer(nn.Module):
             embed_dim=d_model,
             num_heads=nhead,
             batch_first=batch_first,
-            attention_dropout=dropout,
             **factory_kwargs,
         )
         # Implementation of Feedforward model
@@ -227,26 +145,10 @@ class FlashscGPTLayer(nn.Module):
             state["activation"] = F.relu
         super().__setstate__(state)
 
-    def _reverse_key_padding_mask(self, src_key_padding_mask):
-        """
-        Reverse the true false values of the key padding mask. This is because
-        we follow pytorch rule that the mask is True for padded tokens, but
-        in the inner flash MHA, it assumes the mask is False for padded tokens.
-        """
-        if src_key_padding_mask is None:
-            return None
-
-        if not src_key_padding_mask.any().item():
-            # no padding tokens in src
-            return None
-        return ~src_key_padding_mask
-
     def forward(
         self,
-        pcpt_total_embs: Tensor,
-        gen_total_embs: Tensor,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
+        x: Tensor,
+        attn_bias: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Pass the input through the encoder layer.
 
@@ -259,58 +161,21 @@ class FlashscGPTLayer(nn.Module):
             see the docs in Transformer class.
         """
 
-        pcpt_key_padding_mask_ = self._reverse_key_padding_mask(pcpt_key_padding_mask)
-        gen_key_padding_mask_ = self._reverse_key_padding_mask(gen_key_padding_mask)
-
         if self.norm_scheme == "pre":
-            pcpt_total_embs = self.norm1(pcpt_total_embs)
-            if gen_total_embs is not None:
-                gen_total_embs = self.norm1(gen_total_embs)
-            pcpt_total_embs2, gen_total_embs2 = self.self_attn(
-                pcpt_total_embs,
-                gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask_,
-                gen_key_padding_mask=gen_key_padding_mask_,
-            )
-            pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
-            pcpt_total_embs = self.norm2(pcpt_total_embs)
-            pcpt_total_embs2 = self.linear2(
-                self.dropout(self.activation(self.linear1(pcpt_total_embs)))
-            )
-            pcpt_total_embs = pcpt_total_embs + self.dropout2(pcpt_total_embs2)
-
-            if gen_total_embs is not None:
-                gen_total_embs = gen_total_embs + self.dropout1(gen_total_embs2)
-                gen_total_embs = self.norm2(gen_total_embs)
-                gen_total_embs2 = self.linear2(
-                    self.dropout(self.activation(self.linear1(gen_total_embs)))
-                )
-                gen_total_embs = gen_total_embs + self.dropout2(gen_total_embs2)
+            x = x + self._sa_block(self.norm1(x), attn_bias=attn_bias)
+            x = x + self._ff_block(self.norm2(x))
         else:
-            pcpt_total_embs2, gen_total_embs2 = self.self_attn(
-                pcpt_total_embs,
-                gen_total_embs,
-                pcpt_key_padding_mask=pcpt_key_padding_mask_,
-                gen_key_padding_mask=gen_key_padding_mask_,
-            )
-            pcpt_total_embs = pcpt_total_embs + self.dropout1(pcpt_total_embs2)
-            pcpt_total_embs = self.norm1(pcpt_total_embs)
-            pcpt_total_embs2 = self.linear2(
-                self.dropout(self.activation(self.linear1(pcpt_total_embs)))
-            )
-            pcpt_total_embs = pcpt_total_embs + self.dropout2(pcpt_total_embs2)
-            pcpt_total_embs = self.norm2(pcpt_total_embs)
+            x = self.norm1(x + self._sa_block(x, attn_bias=attn_bias))
+            x = self.norm2(x + self._ff_block(x))
+        return x
 
-            if gen_total_embs is not None:
-                gen_total_embs = gen_total_embs + self.dropout1(gen_total_embs2)
-                gen_total_embs = self.norm1(gen_total_embs)
-                gen_total_embs2 = self.linear2(
-                    self.dropout(self.activation(self.linear1(gen_total_embs)))
-                )
-                gen_total_embs = gen_total_embs + self.dropout2(gen_total_embs2)
-                gen_total_embs = self.norm2(gen_total_embs)
+    def _sa_block(self, x: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
+        x = self.self_attn(x, attn_bias=attn_bias)
+        return self.dropout1(x)
 
-        return pcpt_total_embs, gen_total_embs
+    def _ff_block(self, x: Tensor) -> Tensor:
+        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
+        return self.dropout2(x)
 
 
 class FlashscGPTGenerator(nn.Module):
@@ -364,25 +229,69 @@ class FlashscGPTGenerator(nn.Module):
         Shape:
             see the docs in Transformer class.
         """
-        if pcpt_key_padding_mask is not None:
-            _skpm_dtype = pcpt_key_padding_mask.dtype
-            if _skpm_dtype != torch.bool and not torch.is_floating_point(
-                pcpt_key_padding_mask
-            ):
-                raise AssertionError(
-                    "only bool and floating types of key_padding_mask are supported"
+
+        total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
+        if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
+            key_padding_mask = None
+        else:
+            if pcpt_key_padding_mask is None:
+                pcpt_key_padding_mask = torch.ones(
+                    (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
+                    device=pcpt_total_embs.device,
+                    dtype=torch.bool,
                 )
+            elif gen_key_padding_mask is None:
+                gen_key_padding_mask = torch.ones(
+                    (gen_total_embs.shape[0], gen_total_embs.shape[1]),
+                    device=gen_total_embs.device,
+                    dtype=torch.bool,
+                )
+            key_padding_mask = ~torch.cat(
+                [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
+            )  # (B, S)
+        p_len = pcpt_total_embs.shape[1]
+        total_len = total_embs.shape[1]
+        g_len = total_len - p_len
+        attention_mask = _make_mask(p_len, g_len, total_embs.device)
+        attn_bias = torch.zeros_like(
+            attention_mask, dtype=total_embs.dtype, device=attention_mask.device
+        ).masked_fill(
+            attention_mask, torch.finfo(total_embs.dtype).min
+        )  # Matrix with -inf at the place of masked values and 0 elsewhere
+        # FIXME: verify what should be 1 in the triton key_padding_mask
+        attn_bias = attn_bias.unsqueeze(0).unsqueeze(
+            1
+        )  # Broadcastable to (B,H, S_Q, S_K) dimensions
+
+        # Merge the key_padding_mask into attn_bias
+        b_size, s_k = key_padding_mask.shape[:2]
+        attn_bias = attn_bias.masked_fill(
+            ~key_padding_mask.view((b_size, 1, 1, s_k)),
+            torch.finfo(total_embs.dtype).min,
+        )
 
         for mod in self.layers:
-            pcpt_total_embs, gen_total_embs = mod(
-                pcpt_total_embs,
-                gen_total_embs,
-                pcpt_key_padding_mask,
-                gen_key_padding_mask,
-            )
+            total_embs = mod(total_embs, attn_bias=attn_bias)
 
         if self.norm is not None:
-            pcpt_total_embs = self.norm(pcpt_total_embs)
-            gen_total_embs = self.norm(gen_total_embs)
+            total_embs = self.norm(total_embs)
 
+        pcpt_total_embs = total_embs[:, :p_len, :]
+        gen_total_embs = total_embs[:, p_len:, :]
         return pcpt_total_embs, gen_total_embs
+
+@lru_cache(maxsize=1)
+def _make_mask(p_len, g_len, device):
+    total_len = p_len + g_len
+    attention_mask = torch.zeros(
+        (g_len, total_len), device=device, dtype=torch.bool
+    )  # (gen_len, pcpt_len+gen_len)
+    # make the last gen_len by gen_gen to be true, only the diagonal is allowed with false
+    attention_mask[:, -g_len:] = ~torch.eye(g_len, device=device, dtype=torch.bool)
+    upper_mask = torch.zeros(
+        (p_len, total_len), device=device, dtype=torch.bool
+    )  # (pcpt_len, pcpt_len+gen_len)
+    upper_mask[:, -g_len:] = True
+
+    attention_mask = torch.cat([upper_mask, attention_mask], dim=0)
+    return attention_mask
