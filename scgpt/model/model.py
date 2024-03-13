@@ -663,6 +663,12 @@ class TransformerModel(nn.Module):
 
         return outputs
 
+    def fsdp_wrap_fn(self, module):
+        return isinstance(module, FlashscGPTLayer)
+
+    def activation_checkpointing_fn(self, module):
+        return isinstance(module, FlashscGPTLayer)
+
 
 def generate_square_subsequent_mask(sz: int) -> Tensor:
     """Generates an upper-triangular matrix of -inf, with zeros on diag."""
