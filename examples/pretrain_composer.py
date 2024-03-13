@@ -1,19 +1,18 @@
 import composer
-import datasets
 import torch
 from composer import Trainer
 
 from composer.models import ComposerModel
 from composer.utils import dist
-from torch.utils.data import DataLoader
 from torchmetrics import Metric
+from streaming import StreamingDataset, StreamingDataLoader
 
 from scgpt import DataCollator
 from scgpt import logger
 from scgpt.loss import masked_mse_loss
 from scgpt.model import TransformerModel
 from scgpt.tokenizer import GeneVocab
-
+from scgpt.utils import download_file_from_s3_url
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -47,23 +46,28 @@ class MaskedMseMetric(Metric):
 
     def compute(self) -> torch.Tensor:
         return self.sum_mse / self.sum_mask
-
-
-raw_dataset = datasets.load_from_disk(
-    "/vevo/cellxgene/cellxgene_primary_2023-12-15_merged.dataset"
-)
-raw_dataset = raw_dataset.with_format("torch")
-raw_dataset = raw_dataset.train_test_split(
-    test_size=0.03,
+train_dataset = StreamingDataset(
+    remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+    # local="/vevo/cellxgene/tmp/train",
+    split="train",
+    allow_unsafe_types=True,
     shuffle=True,
-    seed=44,
+    cache_limit="1gb",
 )
-train_dataset = raw_dataset["train"]
-valid_dataset = raw_dataset["test"]
+valid_dataset = StreamingDataset(
+    remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+    # local="/vevo/cellxgene/tmp/val",
+    split="val",
+    allow_unsafe_types=True,
+    shuffle=False,
+    cache_limit="1gb",
+)
 logger.info(f"train set number of samples: {len(train_dataset)}, ")
 logger.info(f"valid set number of samples: {len(valid_dataset)}, ")
 
-vocab = GeneVocab.from_file("/vevo/cellxgene/cellxgene_primary_2023-12-15_vocab.json")
+download_file_from_s3_url("s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
+                          "vocab.json")
+vocab = GeneVocab.from_file("vocab.json")
 special_tokens = ["<pad>", "<cls>", "<eoc>"]
 for s in special_tokens:
     if s not in vocab:
@@ -81,7 +85,7 @@ collator = DataCollator(
     data_style="both",
 )
 train_sampler = dist.get_sampler(train_dataset, shuffle=True)
-train_loader = DataLoader(
+train_loader = StreamingDataLoader(
     train_dataset,
     batch_size=2048,
     collate_fn=collator,
@@ -90,10 +94,10 @@ train_loader = DataLoader(
     pin_memory=True,
     prefetch_factor=4,
     persistent_workers=True,
-    sampler=train_sampler,
+    # sampler=train_sampler,
 )
 valid_sampler = dist.get_sampler(valid_dataset, shuffle=False)
-valid_loader = DataLoader(
+valid_loader = StreamingDataLoader(
     valid_dataset,
     batch_size=16,
     collate_fn=collator,
@@ -101,7 +105,7 @@ valid_loader = DataLoader(
     drop_last=False,
     pin_memory=True,
     persistent_workers=True,
-    sampler=valid_sampler,
+    # sampler=valid_sampler,
     prefetch_factor=4,
 )
 
@@ -248,9 +252,13 @@ trainer = Trainer(
     device_train_microbatch_size="auto",
     precision="amp_fp16",
     callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
-    loggers=[composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False)],
-    save_folder="/vevo/scgpt/checkpoints/{run_name}",
+    loggers=[
+        composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
+    ],
+    progress_bar=False,
+    save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
     save_interval="250ba",
     save_latest_filename="latest",
+    log_to_console=True,
 )
 trainer.fit()
