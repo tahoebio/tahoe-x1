@@ -1,20 +1,18 @@
+import boto3
 import functools
 import json
 import logging
+import numpy as np
 import os
-from pathlib import Path
 import random
 import subprocess
-from typing import Dict, List, Optional, Tuple, Union
-
-import numpy as np
 import torch
-import pandas as pd
-from anndata import AnnData
-import scib
-from matplotlib import pyplot as plt
-from matplotlib import axes
 from IPython import get_ipython
+from matplotlib import axes
+from matplotlib import pyplot as plt
+from pathlib import Path
+from typing import Dict, List, Optional, Tuple, Union
+from urllib.parse import urlparse
 
 from .. import logger
 
@@ -75,7 +73,6 @@ def isnotebook() -> bool:
 
 def get_free_gpu():
     import subprocess
-    import sys
     from io import StringIO
     import pandas as pd
 
@@ -156,33 +153,6 @@ def histogram(
         fig.savefig(save, bbox_inches="tight")
 
     return ax
-
-
-def _indicate_col_name(adata: AnnData, promt_str: str) -> Optional[str]:
-    """
-    Indicate the column name of the data.
-
-    Args:
-        adata (AnnData): The AnnData object.
-        promt_str (str): The prompt string.
-
-    Returns:
-        Optional[str]: The column name.
-    """
-    while True:
-        col_name = input(promt_str)
-        if col_name == "":
-            col_name = None
-            break
-        elif col_name in adata.var.columns:
-            break
-        elif col_name in adata.obs.columns:
-            break
-        else:
-            print(f"The column {col_name} is not in the data. " f"Please input again.")
-
-    return col_name
-
 
 def find_required_colums(
     adata: AnnData,
@@ -382,3 +352,38 @@ class MainProcessOnly:
             attr = main_process_only(attr)
 
         return attr
+
+
+def download_file_from_s3_url(s3_url, local_file_path):
+    """
+    Downloads a file from an S3 URL to the specified local path.
+
+    :param s3_url: S3 URL of the file in the format "s3://bucket_name/path/to/file".
+    :param local_file_path: Local path where the file will be saved.
+    :return: The local path to the downloaded file.
+    """
+    # Validate the S3 URL format
+    assert s3_url.startswith("s3://"), "URL must start with 's3://'"
+
+    # Parse the S3 URL
+    parsed_url = urlparse(s3_url)
+    assert parsed_url.scheme == "s3", "URL scheme must be 's3'"
+
+    bucket_name = parsed_url.netloc
+    s3_file_key = parsed_url.path.lstrip("/")
+
+    # Ensure bucket name and file key are not empty
+    assert bucket_name, "Bucket name cannot be empty"
+    assert s3_file_key, "S3 file key cannot be empty"
+
+    # Create an S3 client
+    s3 = boto3.client("s3")
+
+    try:
+        # Download the file
+        s3.download_file(bucket_name, s3_file_key, local_file_path)
+        print(f"File downloaded successfully to {local_file_path}")
+        return local_file_path
+    except Exception as e:
+        print(f"Error downloading the file from {s3_url}: {e}")
+        return None
