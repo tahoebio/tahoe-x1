@@ -13,6 +13,7 @@ from matplotlib import pyplot as plt
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple, Union
 from urllib.parse import urlparse
+from anndata import AnnData
 
 from .. import logger
 
