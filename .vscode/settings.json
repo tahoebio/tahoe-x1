@@ -1,8 +1,0 @@
-{
-  "python.formatting.provider": "black",
-  "files.watcherExclude": {
-    "**/__pycache__/**": true,
-    "**/save/**": true,
-    "**/wandb/**": true
-  }
-}
