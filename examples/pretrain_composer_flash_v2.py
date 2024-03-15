@@ -94,9 +94,9 @@ train_loader = DataLoader(
 valid_sampler = dist.get_sampler(valid_dataset, shuffle=False)
 valid_loader = DataLoader(
     valid_dataset,
-    batch_size=64,
+    batch_size=256*6,
     collate_fn=collator,
-    num_workers=1,
+    num_workers=16,
     drop_last=False,
     pin_memory=True,
     persistent_workers=True,

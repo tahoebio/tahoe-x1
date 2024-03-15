@@ -3,9 +3,9 @@ import torch
 from composer import Trainer
 
 from composer.models import ComposerModel
-from composer.utils import dist
 from torchmetrics import Metric
 from streaming import StreamingDataset, StreamingDataLoader
+import streaming
 
 from scgpt import DataCollator
 from scgpt import logger
@@ -13,6 +13,7 @@ from scgpt.loss import masked_mse_loss
 from scgpt.model import TransformerModel
 from scgpt.tokenizer import GeneVocab
 from scgpt.utils import download_file_from_s3_url
+
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -46,68 +47,6 @@ class MaskedMseMetric(Metric):
 
     def compute(self) -> torch.Tensor:
         return self.sum_mse / self.sum_mask
-train_dataset = StreamingDataset(
-    remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
-    # local="/vevo/cellxgene/tmp/train",
-    split="train",
-    allow_unsafe_types=True,
-    shuffle=True,
-    cache_limit="1gb",
-)
-valid_dataset = StreamingDataset(
-    remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
-    # local="/vevo/cellxgene/tmp/val",
-    split="val",
-    allow_unsafe_types=True,
-    shuffle=False,
-    cache_limit="1gb",
-)
-logger.info(f"train set number of samples: {len(train_dataset)}, ")
-logger.info(f"valid set number of samples: {len(valid_dataset)}, ")
-
-download_file_from_s3_url("s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
-                          "vocab.json")
-vocab = GeneVocab.from_file("vocab.json")
-special_tokens = ["<pad>", "<cls>", "<eoc>"]
-for s in special_tokens:
-    if s not in vocab:
-        vocab.append_token(s)
-collator = DataCollator(
-    do_padding=True,
-    pad_token_id=vocab["<pad>"],
-    pad_value=-2,
-    do_mlm=True,
-    do_binning=True,
-    mlm_probability=0.40,
-    mask_value=-1,
-    max_length=1024,
-    sampling=True,
-    data_style="both",
-)
-train_sampler = dist.get_sampler(train_dataset, shuffle=True)
-train_loader = StreamingDataLoader(
-    train_dataset,
-    batch_size=2048,
-    collate_fn=collator,
-    drop_last=False,
-    num_workers=16,
-    pin_memory=True,
-    prefetch_factor=4,
-    persistent_workers=True,
-    # sampler=train_sampler,
-)
-valid_sampler = dist.get_sampler(valid_dataset, shuffle=False)
-valid_loader = StreamingDataLoader(
-    valid_dataset,
-    batch_size=16,
-    collate_fn=collator,
-    num_workers=1,
-    drop_last=False,
-    pin_memory=True,
-    persistent_workers=True,
-    # sampler=valid_sampler,
-    prefetch_factor=4,
-)
 
 
 class ScgptComposer(ComposerModel):
@@ -118,11 +57,11 @@ class ScgptComposer(ComposerModel):
         ntokens = len(vocab)
         self.model = TransformerModel(
             ntokens,
-            d_model=512,
-            nhead=8,
-            d_hid=512,
-            nlayers=12,
-            nlayers_cls=3,
+            d_model=2048,
+            nhead=16,
+            d_hid=2048 * 4,
+            nlayers=24,
+            nlayers_cls=2,
             n_cls=1,
             vocab=vocab,
             dropout=0.1,
@@ -136,6 +75,7 @@ class ScgptComposer(ComposerModel):
             use_generative_training=True,
             use_fast_transformer=True,
             fast_transformer_backend="flash",
+            pre_norm=True,
         )
         self.pad_token = "<pad>"
         self.train_mse = MaskedMseMetric(name="MSE")
@@ -161,18 +101,19 @@ class ScgptComposer(ComposerModel):
             MVC=True,
             generative_training=True,
         )
-        previous_cell_embs = output_dict["cell_emb"].detach()
-        preds = self.model(
-            pcpt_gene,
-            pcpt_expr,
-            pcpt_key_padding_mask,
-            gen_gene,
-            gen_key_padding_mask,
-            MVC=False,
-            input_cell_emb=previous_cell_embs,
-            generative_training=True,
-        )["gen_preds"]
-        output_dict["GEPC"] = preds
+        # previous_cell_embs = output_dict["cell_emb"].detach()
+        # preds = self.model(
+        #     pcpt_gene,
+        #     pcpt_expr,
+        #     pcpt_key_padding_mask,
+        #     gen_gene,
+        #     gen_key_padding_mask,
+        #     MVC=False,
+        #     input_cell_emb=previous_cell_embs,
+        #     generative_training=True,
+        # )["gen_preds"]
+        # output_dict["GEPC"] = preds
+        output_dict["GEPC"] = output_dict["gen_preds"]
         return output_dict
 
     def loss(self, outputs, batch):
@@ -229,36 +170,103 @@ class ScgptComposer(ComposerModel):
         return metric_dict
 
 
-model = ScgptComposer(vocab)
-logger.info(
-    f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
-)
-for name, sub_model in model.model.named_children():
-    logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
+def main():
+    streaming.base.util.clean_stale_shared_memory()
+    train_dataset = StreamingDataset(
+        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+        local="mds-data-folder/train",
+        predownload=48*24*6,
+        # local="/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/",
+        split="train",
+        allow_unsafe_types=True,
+        shuffle=True,
+    )
+    valid_dataset = StreamingDataset(
+        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+        local="mds-data-folder/val",
+        predownload=48*24*6,
+        # local="/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS",
+        split="val",
+        allow_unsafe_types=True,
+        shuffle=False,
+    )
+    logger.info(f"train set number of samples: {len(train_dataset)}, ")
+    logger.info(f"valid set number of samples: {len(valid_dataset)}, ")
 
-optimizer = torch.optim.Adam(model.parameters(), lr=0.0001)
-scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
-    t_warmup="0.2dur", t_max="1dur", alpha_f=0.0
-)
-trainer = Trainer(
-    model=model,
-    optimizers=optimizer,
-    train_dataloader=train_loader,
-    max_duration="6ep",
-    device="gpu",
-    eval_dataloader=valid_loader,
-    eval_interval="500ba",
-    schedulers=scheduler,
-    device_train_microbatch_size="auto",
-    precision="amp_fp16",
-    callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
-    loggers=[
-        composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
-    ],
-    progress_bar=False,
-    save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
-    save_interval="250ba",
-    save_latest_filename="latest",
-    log_to_console=True,
-)
-trainer.fit()
+    download_file_from_s3_url(
+        "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
+        "vocab.json",
+    )
+    vocab = GeneVocab.from_file("vocab.json")
+    special_tokens = ["<pad>", "<cls>", "<eoc>"]
+    for s in special_tokens:
+        if s not in vocab:
+            vocab.append_token(s)
+    collator = DataCollator(
+        do_padding=True,
+        pad_token_id=vocab["<pad>"],
+        pad_value=-2,
+        do_mlm=True,
+        do_binning=True,
+        mlm_probability=0.40,
+        mask_value=-1,
+        max_length=1024,
+        sampling=True,
+        data_style="both",
+    )
+    train_loader = StreamingDataLoader(
+        train_dataset,
+        batch_size=24 * 6,
+        collate_fn=collator,
+        drop_last=False,
+        num_workers=8,
+        pin_memory=True,
+        prefetch_factor=48,
+        persistent_workers=True,
+    )
+    valid_loader = StreamingDataLoader(
+        valid_dataset,
+        batch_size=24 * 6,
+        collate_fn=collator,
+        num_workers=8,
+        drop_last=False,
+        pin_memory=True,
+        persistent_workers=True,
+        prefetch_factor=48,
+    )
+
+    model = ScgptComposer(vocab)
+    logger.info(
+        f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
+    )
+    for name, sub_model in model.model.named_children():
+        logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
+
+    optimizer = composer.optim.DecoupledAdamW(model.parameters(), lr=0.0001)
+    scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
+        t_warmup="0.05dur", t_max="1dur", alpha_f=0.0
+    )
+    trainer = Trainer(
+        model=model,
+        optimizers=optimizer,
+        train_dataloader=train_loader,
+        max_duration="6ep",
+        device="gpu",
+        eval_dataloader=valid_loader,
+        eval_interval="500ba",
+        schedulers=scheduler,
+        device_train_microbatch_size=24,
+        precision="amp_bf16",
+        callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
+        loggers=[
+            composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
+        ],
+        save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
+        save_interval="250ba",
+        save_latest_filename="latest",
+    )
+    trainer.fit()
+
+
+if __name__ == "__main__":
+    main()
