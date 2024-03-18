@@ -5,7 +5,7 @@ from composer import Trainer
 from composer.models import ComposerModel
 from torchmetrics import Metric
 from streaming import StreamingDataset, StreamingDataLoader
-import streaming
+from composer.utils import dist, get_device
 
 from scgpt import DataCollator
 from scgpt import logger
@@ -101,18 +101,6 @@ class ScgptComposer(ComposerModel):
             MVC=True,
             generative_training=True,
         )
-        # previous_cell_embs = output_dict["cell_emb"].detach()
-        # preds = self.model(
-        #     pcpt_gene,
-        #     pcpt_expr,
-        #     pcpt_key_padding_mask,
-        #     gen_gene,
-        #     gen_key_padding_mask,
-        #     MVC=False,
-        #     input_cell_emb=previous_cell_embs,
-        #     generative_training=True,
-        # )["gen_preds"]
-        # output_dict["GEPC"] = preds
         output_dict["GEPC"] = output_dict["gen_preds"]
         return output_dict
 
@@ -171,27 +159,31 @@ class ScgptComposer(ComposerModel):
 
 
 def main():
-    streaming.base.util.clean_stale_shared_memory()
+    # streaming.base.util.clean_stale_shared_memory()
+    dist_timeout = 600.0
+    dist.initialize_dist(get_device(None), timeout=dist_timeout)
     train_dataset = StreamingDataset(
-        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train",
         local="mds-data-folder/train",
-        predownload=48*24*6,
-        # local="/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/",
-        split="train",
+        predownload=48 * 32 * 6,
+        download_timeout=300,
+        # split="train",
         allow_unsafe_types=True,
         shuffle=True,
     )
+    composer.utils.dist.barrier()
     valid_dataset = StreamingDataset(
-        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/",
+        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val",
         local="mds-data-folder/val",
-        predownload=48*24*6,
-        # local="/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS",
-        split="val",
+        predownload=48 * 32 * 6,
+        download_timeout=300,
+        # split="val",
         allow_unsafe_types=True,
         shuffle=False,
     )
-    logger.info(f"train set number of samples: {len(train_dataset)}, ")
-    logger.info(f"valid set number of samples: {len(valid_dataset)}, ")
+    composer.utils.dist.barrier()
+    logger.info(f"train set number of samples: {(train_dataset.size)}, ")
+    logger.info(f"valid set number of samples: {(valid_dataset.size)}, ")
 
     download_file_from_s3_url(
         "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
@@ -216,7 +208,7 @@ def main():
     )
     train_loader = StreamingDataLoader(
         train_dataset,
-        batch_size=24 * 6,
+        batch_size=32 * 8,
         collate_fn=collator,
         drop_last=False,
         num_workers=8,
@@ -226,7 +218,7 @@ def main():
     )
     valid_loader = StreamingDataLoader(
         valid_dataset,
-        batch_size=24 * 6,
+        batch_size=32 * 8,
         collate_fn=collator,
         num_workers=8,
         drop_last=False,
@@ -255,11 +247,21 @@ def main():
         eval_dataloader=valid_loader,
         eval_interval="500ba",
         schedulers=scheduler,
-        device_train_microbatch_size=24,
+        device_train_microbatch_size=32,
         precision="amp_bf16",
+        deepspeed_config={
+            "zero_optimization": {
+                "stage": 2,
+                "overlap_comm": "true",
+                "reduce_scatter": "true",
+            },
+            "precision": "amp_bf16",
+            "bf16": {"enabled": "true"},
+        },
         callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
         loggers=[
             composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
+            composer.callbacks.RuntimeEstimator(skip_batches=10, time_unit="hours"),
         ],
         save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
         save_interval="250ba",

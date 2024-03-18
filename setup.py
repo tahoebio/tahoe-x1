@@ -25,7 +25,7 @@ setup(
         'vevo-scgpt': ['py.typed'],
     },
     packages=setuptools.find_packages(
-        exclude=['.github*', 'envs*', 'tutorials*', 'tests*','examples*',]),
+        exclude=['.github*', 'envs*', 'tutorials*', 'tests*','examples*','mcli*']),
     install_requires=install_requires,
     python_requires='>=3.9',
 )
