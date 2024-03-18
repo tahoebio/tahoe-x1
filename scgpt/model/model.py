@@ -12,7 +12,6 @@ try:
     from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
 except ImportError:
     import warnings
-
     warnings.warn("flash_attn is not installed")
 
 from .dsbn import DomainSpecificBatchNorm1d
