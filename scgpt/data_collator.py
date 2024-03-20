@@ -1,8 +1,7 @@
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
-
-import torch
 import numpy as np
+import torch
+from dataclasses import dataclass, field
+from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 
 @dataclass
@@ -38,6 +37,8 @@ class DataCollator:
             tokens are provided, but not the expression values, for pure generative
             training setting. If "both", the output will contain both fields above.
             Choices: "pcpt", "gen", "both". Default to "pcpt".
+        num_bins (:obj:`int`): the number of bins to use for binning the expression
+        right_binning (:obj:`bool`): whether to use right sided-binning. Torch default is False
     """
 
     do_padding: bool = True
@@ -52,6 +53,8 @@ class DataCollator:
     reserve_keys: List[str] = field(default_factory=lambda: [])
     keep_first_n_tokens: int = 1
     data_style: str = "pcpt"
+    num_bins: int = 51
+    right_binning: bool = False
 
     def __post_init__(self):
         if self.do_padding:
@@ -154,7 +157,8 @@ class DataCollator:
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
-                    n_bins=51,
+                    n_bins=self.num_bins,
+                    right=self.right_binning,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes, expressions, _max_length
@@ -222,7 +226,8 @@ class DataCollator:
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
-                    n_bins=51,  # FIXME: replace with self.n_bins
+                    n_bins=self.num_bins,
+                    right=self.right_binning,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes, expressions, _max_length
@@ -310,7 +315,8 @@ class DataCollator:
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
-                    n_bins=51,
+                    n_bins=self.num_bins,
+                    right=self.right_binning,
                 )
 
             (
@@ -509,56 +515,41 @@ class DataCollator:
         return genes, expressions
 
 
-def _digitize(x: np.ndarray, bins: np.ndarray, side="one") -> np.ndarray:
-    """
-    Digitize the data into bins. This method spreads data uniformly when bins
-    have same values.
-
-    Args:
-
-    x (:class:`np.ndarray`):
-        The data to digitize.
-    bins (:class:`np.ndarray`):
-        The bins to use for digitization, in increasing order.
-    side (:class:`str`, optional):
-        The side to use for digitization. If "one", the left side is used. If
-        "both", the left and right side are used. Default to "one".
-
-    Returns:
-
-    :class:`np.ndarray`:
-        The digitized data.
-    """
-    assert x.ndim == 1 and bins.ndim == 1
-
-    left_digits = np.digitize(x, bins)
-    if side == "one":
-        return left_digits
-
-    right_difits = np.digitize(x, bins, right=True)
-
-    rands = np.random.rand(len(x))  # uniform random numbers
-
-    digits = rands * (right_difits - left_digits) + left_digits
-    digits = np.ceil(digits).astype(np.int64)
-    return digits
+@torch.no_grad()
 def binning(
-    row: Union[np.ndarray, torch.Tensor], n_bins: int
+    row: Union[np.ndarray, torch.Tensor], n_bins: int, right=False
 ) -> Union[np.ndarray, torch.Tensor]:
-    """Binning the row into n_bins."""
+    """Binning the row into n_bins.
+    Args:
+        row (Union[np.ndarray, torch.Tensor]):
+            The row to be binned.
+        n_bins (int):
+            The number of bins.
+        right (bool, optional):
+            Argument passed to `torch.bucketize`. if False, return the first suitable location that is found.
+            If True, return the last such index.
+            If no suitable index found, return 0 for non-numerical value (eg. nan, inf) or the size of boundaries
+            (one pass the last index). In other words, if False, gets the lower bound index for each value
+            in input from boundaries. If True, gets the upper bound index instead. Default value is False.
+    .
+    Returns:
+        Union[np.ndarray, torch.Tensor]:
+            The binned row.
+    """
     dtype = row.dtype
     return_np = False if isinstance(row, torch.Tensor) else True
-    row = row.cpu().numpy() if isinstance(row, torch.Tensor) else row
-    # TODO: use torch.quantile and torch.bucketize
-
+    row = torch.as_tensor(row)
+    GRADES = torch.linspace(0, 1, n_bins - 1, dtype=torch.float32, requires_grad=False)
     if row.min() <= 0:
         non_zero_ids = row.nonzero()
         non_zero_row = row[non_zero_ids]
-        bins = np.quantile(non_zero_row, np.linspace(0, 1, n_bins - 1))
-        non_zero_digits = _digitize(non_zero_row, bins)
-        binned_row = np.zeros_like(row, dtype=np.int64)
+        bins = torch.quantile(non_zero_row, GRADES)
+        non_zero_digits = torch.bucketize(non_zero_row, bins, right=right)
+        binned_row = torch.zeros_like(row, dtype=non_zero_digits.dtype)
         binned_row[non_zero_ids] = non_zero_digits
     else:
-        bins = np.quantile(row, np.linspace(0, 1, n_bins - 1))
-        binned_row = _digitize(row, bins)
-    return torch.from_numpy(binned_row) if not return_np else binned_row.astype(dtype)
+        bins = torch.quantile(row, GRADES)
+        binned_row = torch.bucketize(row, bins, right=right)
+    if return_np:
+        binned_row = binned_row.astype(dtype)
+    return binned_row
