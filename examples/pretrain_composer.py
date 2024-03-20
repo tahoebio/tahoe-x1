@@ -261,7 +261,7 @@ def main():
         callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
         loggers=[
             composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
-            composer.callbacks.RuntimeEstimator(skip_batches=10, time_unit="hours"),
+            # composer.callbacks.RuntimeEstimator(skip_batches=10, time_unit="hours"),
         ],
         save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
         save_interval="250ba",
