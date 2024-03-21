@@ -23,10 +23,10 @@ env_variables:
 name: scgpt-1b-gpus-8
 
 compute:
-  gpus: 24  # Number of GPUs to use
+  gpus: 8  # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 0.25 # Maximum duration of the run in hours
+  max_duration: 0.1 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster: # TODO # Name of the cluster to use for this run

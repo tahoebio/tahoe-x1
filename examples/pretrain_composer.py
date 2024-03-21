@@ -57,12 +57,11 @@ class ScgptComposer(ComposerModel):
         ntokens = len(vocab)
         self.model = TransformerModel(
             ntokens,
-            d_model=2048,
-            nhead=16,
-            d_hid=2048 * 4,
-            nlayers=24,
-            nlayers_cls=2,
-            n_cls=1,
+            d_model=512,
+            nhead=8,
+            d_hid=512,
+            nlayers=12,
+            nlayers_cls=3,
             vocab=vocab,
             dropout=0.1,
             pad_token="<pad>",
@@ -165,7 +164,7 @@ def main():
     train_dataset = StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train",
         local="mds-data-folder/train",
-        predownload=48 * 32 * 6,
+        # predownload=48 * 32 * 6,
         download_timeout=300,
         # split="train",
         allow_unsafe_types=True,
@@ -175,7 +174,7 @@ def main():
     valid_dataset = StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val",
         local="mds-data-folder/val",
-        predownload=48 * 32 * 6,
+        # predownload=48 * 32 * 6,
         download_timeout=300,
         # split="val",
         allow_unsafe_types=True,
@@ -208,7 +207,7 @@ def main():
     )
     train_loader = StreamingDataLoader(
         train_dataset,
-        batch_size=32 * 8,
+        batch_size=8 * 512,
         collate_fn=collator,
         drop_last=False,
         num_workers=8,
@@ -218,7 +217,7 @@ def main():
     )
     valid_loader = StreamingDataLoader(
         valid_dataset,
-        batch_size=32 * 8,
+        batch_size=8 * 512,
         collate_fn=collator,
         num_workers=8,
         drop_last=False,
@@ -234,7 +233,8 @@ def main():
     for name, sub_model in model.model.named_children():
         logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
-    optimizer = composer.optim.DecoupledAdamW(model.parameters(), lr=0.0001)
+    optimizer = composer.optim.DecoupledAdamW(model.parameters(), lr=2e-4,
+                                              betas=(0.9, 0.95), eps=1e-8)
     scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
         t_warmup="0.05dur", t_max="1dur", alpha_f=0.0
     )
@@ -247,7 +247,7 @@ def main():
         eval_dataloader=valid_loader,
         eval_interval="500ba",
         schedulers=scheduler,
-        device_train_microbatch_size=32,
+        device_train_microbatch_size=512,
         precision="amp_bf16",
         deepspeed_config={
             "zero_optimization": {
