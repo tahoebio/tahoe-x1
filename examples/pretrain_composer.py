@@ -207,7 +207,7 @@ def main():
     )
     train_loader = StreamingDataLoader(
         train_dataset,
-        batch_size=8 * 512,
+        batch_size=8 * 256,
         collate_fn=collator,
         drop_last=False,
         num_workers=8,
@@ -217,7 +217,7 @@ def main():
     )
     valid_loader = StreamingDataLoader(
         valid_dataset,
-        batch_size=8 * 512,
+        batch_size=8 * 256,
         collate_fn=collator,
         num_workers=8,
         drop_last=False,
@@ -247,7 +247,7 @@ def main():
         eval_dataloader=valid_loader,
         eval_interval="500ba",
         schedulers=scheduler,
-        device_train_microbatch_size=512,
+        device_train_microbatch_size=256,
         precision="amp_bf16",
         deepspeed_config={
             "zero_optimization": {
