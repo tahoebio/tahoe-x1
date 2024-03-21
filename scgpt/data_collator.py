@@ -538,7 +538,8 @@ def binning(
     """
     dtype = row.dtype
     return_np = False if isinstance(row, torch.Tensor) else True
-    row = torch.as_tensor(row)
+    if not isinstance(row, torch.Tensor):
+        row = torch.as_tensor(row)
     GRADES = torch.linspace(0, 1, n_bins - 1, dtype=torch.float32, requires_grad=False)
     if row.min() <= 0:
         non_zero_ids = row.nonzero()
