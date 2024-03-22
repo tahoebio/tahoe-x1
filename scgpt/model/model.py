@@ -1,23 +1,20 @@
-import math
-import numpy as np
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch.distributions import Bernoulli
 from torch.nn import TransformerEncoder, TransformerEncoderLayer
-from tqdm import trange
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
+from composer.models import ComposerModel
+from scgpt.loss import masked_mse_loss, MaskedMseMetric
 
 try:
     from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
 except ImportError:
     import warnings
+
     warnings.warn("flash_attn is not installed")
 
-from .dsbn import DomainSpecificBatchNorm1d
 
-
-class TransformerModel(nn.Module):
+class SCGPTModel(nn.Module):
     def __init__(
         self,
         ntoken: int,
@@ -25,79 +22,46 @@ class TransformerModel(nn.Module):
         nhead: int,
         d_hid: int,
         nlayers: int,
-        nlayers_cls: int = 3,
-        n_cls: int = 1,
-        vocab: Any = None,
+        pad_token_id: int,
+        pad_value: int,
         dropout: float = 0.5,
-        pad_token: str = "<pad>",
-        pad_value: int = 0,
         do_mvc: bool = False,
-        do_dab: bool = False,
-        use_batch_labels: bool = False,
-        num_batch_labels: Optional[int] = None,
-        domain_spec_batchnorm: Union[bool, str] = False,
         input_emb_style: str = "continuous",
         n_input_bins: Optional[int] = None,
         cell_emb_style: str = "cls",
         mvc_decoder_style: str = "inner product",
-        ecs_threshold: float = 0.3,
-        explicit_zero_prob: bool = False,
         use_generative_training=False,
         use_fast_transformer: bool = False,
         fast_transformer_backend: str = "flash",
         pre_norm: bool = False,
-        use_sim_decoder: bool = False,
     ):
         super().__init__()
         self.model_type = "Transformer"
         self.d_model = d_model
-        self.do_dab = do_dab
-        self.ecs_threshold = ecs_threshold
-        self.use_batch_labels = use_batch_labels
-        self.domain_spec_batchnorm = domain_spec_batchnorm
         self.input_emb_style = input_emb_style
         self.cell_emb_style = cell_emb_style
-        self.explicit_zero_prob = explicit_zero_prob
+        self.pad_token_id = pad_token_id
         self.norm_scheme = "pre" if pre_norm else "post"
-        if self.input_emb_style not in ["category", "continuous", "scaling"]:
+        if self.input_emb_style not in ["category", "continuous"]:
             raise ValueError(
-                f"input_emb_style should be one of category, continuous, scaling, "
+                f"input_emb_style should be one of category or continuous"
                 f"got {input_emb_style}"
             )
         if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
 
         # TODO: add dropout in the GeneEncoder
-        self.encoder = GeneEncoder(ntoken, d_model, padding_idx=vocab[pad_token])
+        self.gene_encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
         self.flag_encoder = nn.Embedding(2, d_model)
-
-        # Value Encoder, NOTE: the scaling style is also handled in _encode method
         if input_emb_style == "continuous":
-            self.value_encoder = ContinuousValueEncoder(d_model, dropout)
+            self.expression_encoder = ContinuousValueEncoder(d_model, dropout)
         elif input_emb_style == "category":
             assert n_input_bins > 0
-            self.value_encoder = CategoryValueEncoder(
+            self.expression_encoder = CategoryValueEncoder(
                 n_input_bins, d_model, padding_idx=pad_value
             )
         else:
-            self.value_encoder = nn.Identity()  # nn.Softmax(dim=1)
-            # TODO: consider row-wise normalization or softmax
-            # TODO: Correct handle the mask_value when using scaling
-
-        # Batch Encoder
-        if use_batch_labels:
-            self.batch_encoder = BatchLabelEncoder(num_batch_labels, d_model)
-
-        if domain_spec_batchnorm:
-            use_affine = True if domain_spec_batchnorm == "do_affine" else False
-            print(f"Use domain specific batchnorm with affine={use_affine}")
-            self.dsbn = DomainSpecificBatchNorm1d(
-                d_model, num_batch_labels, eps=6.1e-5, affine=use_affine
-            )
-        # else:
-        #     print("Using simple batchnorm instead of domain specific batchnorm")
-        #     self.bn = nn.BatchNorm1d(d_model, eps=6.1e-5)
-        # bug
+            raise ValueError(f"Unknown input_emb_style: {input_emb_style}")
 
         if use_generative_training:
             encoder_layers = FlashscGPTLayer(
@@ -110,11 +74,7 @@ class TransformerModel(nn.Module):
             )
             self.transformer_encoder = FlashscGPTGenerator(encoder_layers, nlayers)
         elif use_fast_transformer:
-            if fast_transformer_backend == "linear":
-                self.transformer_encoder = FastTransformerEncoderWrapper(
-                    d_model, nhead, d_hid, nlayers, dropout
-                )
-            elif fast_transformer_backend == "flash":
+            if fast_transformer_backend == "flash":
                 encoder_layers = FlashTransformerEncoderLayer(
                     d_model,
                     nhead,
@@ -124,30 +84,22 @@ class TransformerModel(nn.Module):
                     norm_scheme=self.norm_scheme,
                 )
                 self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+            else:
+                raise ValueError(f"Unknown fast_transformer_backend: {fast_transformer_backend}")
         else:
             encoder_layers = TransformerEncoderLayer(
                 d_model, nhead, d_hid, dropout, batch_first=True
             )
             self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
 
-        self.decoder = ExprDecoder(
+        self.expression_decoder = ExprDecoder(
             d_model,
-            explicit_zero_prob=explicit_zero_prob,
-            use_batch_labels=use_batch_labels,
         )
-
-        if n_cls > 1:
-            if use_sim_decoder:
-                self.cls_decoder = SimDecoder(d_model, n_cls, nlayers=nlayers_cls)
-            else:
-                self.cls_decoder = ClsDecoder(d_model, n_cls, nlayers=nlayers_cls)
 
         if do_mvc:
             self.mvc_decoder = MVCDecoder(
                 d_model,
                 arch_style=mvc_decoder_style,
-                explicit_zero_prob=explicit_zero_prob,
-                use_batch_labels=use_batch_labels,
             )
 
         self.init_weights()
@@ -155,7 +107,7 @@ class TransformerModel(nn.Module):
     def init_weights(self) -> None:
         initrange = 0.1
         # TODO: check if this initialization is helpful and shall we apply to all?
-        self.encoder.embedding.weight.data.uniform_(-initrange, initrange)
+        self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
 
     def _encode(
         self,
@@ -166,23 +118,11 @@ class TransformerModel(nn.Module):
     ) -> Tensor:
         self._check_batch_labels(batch_labels)
 
-        src = self.encoder(src)  # (batch, seq_len, embsize)
+        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
         self.cur_gene_token_embs = src
 
-        values = self.value_encoder(values)  # (batch, seq_len, embsize)
-        if self.input_emb_style == "scaling":
-            values = values.unsqueeze(2)
-            total_embs = src * values
-        else:
-            total_embs = src + values
-
-        if self.domain_spec_batchnorm:
-            batch_label = int(batch_labels[0].item())
-            total_embs = self.dsbn(total_embs.permute(0, 2, 1), batch_label).permute(
-                0, 2, 1
-            )  # the batch norm always works on dim 1
-        # else:
-        #     total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
+        values = self.expression_encoder(values)  # (batch, seq_len, embsize)
+        total_embs = src + values
 
         output = self.transformer_encoder(
             total_embs, src_key_padding_mask=src_key_padding_mask
@@ -201,39 +141,22 @@ class TransformerModel(nn.Module):
     ) -> Tuple[Tensor, Tensor]:
         self._check_batch_labels(batch_labels)
 
-        pcpt_token_embs = self.encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
-        pcpt_values = self.value_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
+        pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
+        pcpt_values = self.expression_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
         pcpt_total_embs = pcpt_token_embs + pcpt_values
-
-        assert self.input_emb_style != "scaling"
         if gen_genes is not None:
-            gen_token_embs = self.encoder(gen_genes)  # (batch, gen_len, embsize)
+            gen_token_embs = self.gene_encoder(gen_genes)  # (batch, gen_len, embsize)
             self.cur_gene_token_embs = torch.cat(
                 [pcpt_token_embs, gen_token_embs], dim=1
             )
             gen_flags = self.flag_encoder(
-                torch.tensor(1, device=pcpt_values.device)).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
+                torch.tensor(1, device=pcpt_values.device)
+            ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
 
             gen_total_embs = gen_token_embs + gen_flags
         else:
             self.cur_gene_token_embs = pcpt_token_embs
             gen_total_embs = None
-
-        if self.domain_spec_batchnorm:
-            batch_label = int(batch_labels[0].item())
-            pcpt_total_embs = self.dsbn(
-                pcpt_total_embs.permute(0, 2, 1), batch_label
-            ).permute(0, 2, 1)
-            if gen_genes is not None:
-                gen_total_embs = self.dsbn(
-                    gen_total_embs.permute(0, 2, 1), batch_label
-                ).permute(0, 2, 1)
-        # else:
-        #     pcpt_total_embs = self.bn(pcpt_total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-        #     if gen_genes is not None:
-        #         gen_total_embs = self.bn(gen_total_embs.permute(0, 2, 1)).permute(
-        #             0, 2, 1
-        #         )
 
         if input_cell_emb is not None:
             pcpt_total_embs[:, 0, :] = input_cell_emb
@@ -273,23 +196,12 @@ class TransformerModel(nn.Module):
 
         return cell_emb
 
-    def _check_batch_labels(self, batch_labels: Tensor) -> None:
-        if self.use_batch_labels or self.domain_spec_batchnorm:
-            assert batch_labels is not None
-        elif batch_labels is not None:
-            raise ValueError(
-                "batch_labels should only be provided when `self.use_batch_labels`"
-                " or `self.domain_spec_batchnorm` is True"
-            )
-
     def generate(
         self,
         cell_emb: Tensor,
         src: Tensor,
         values: Optional[Tensor] = None,
         src_key_padding_mask: Optional[Tensor] = None,
-        gen_iters: int = 1,
-        batch_labels: Optional[Tensor] = None,  # (batch,)
     ) -> Tensor:
         """
         Args:
@@ -297,40 +209,18 @@ class TransformerModel(nn.Module):
             src(:obj:`Tensor`): shape (batch, seq_len)
             values(:obj:`Tensor`): shape (batch, seq_len), optional
             src_key_padding_mask(:obj:`Tensor`): shape (batch, seq_len), optional
-            gen_iters(:obj:`int`): number of generation iterations
-            batch_labels(:obj:`Tensor`): shape (batch,), optional
         """
         # TODO: should have a tag indicate the generation mode
         # TODO: if gen_iters > 1, should have a tag indicate the current iteration
-        try:
-            self._check_batch_labels(batch_labels)
-        except:
-            warnings.warn(
-                "batch_labels is required but not provided, using zeros instead"
-            )
-            batch_labels = torch.zeros(
-                cell_emb.shape[0], dtype=torch.long, device=cell_emb.device
-            )
 
-        src = self.encoder(src)  # (batch, seq_len, embsize)
-
+        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
         if values is not None:
-            values = self.value_encoder(values)  # (batch, seq_len, embsize)
-            if self.input_emb_style == "scaling":
-                values = values.unsqueeze(2)
-                total_embs = src * values
-            else:
-                total_embs = src + values
+            values = self.expression_encoder(values)  # (batch, seq_len, embsize)
+            total_embs = src + values
         else:
             total_embs = src
 
-        if self.domain_spec_batchnorm:
-            batch_label = int(batch_labels[0].item())
-            total_embs = self.dsbn(total_embs.permute(0, 2, 1), batch_label).permute(
-                0, 2, 1
-            )  # the batch norm always works on dim 1
-        else:
-            total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
+        total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
 
         total_embs[:, 0, :] = cell_emb
 
@@ -342,20 +232,7 @@ class TransformerModel(nn.Module):
             total_embs, src_key_padding_mask=src_key_padding_mask
         )
 
-        if self.use_batch_labels:
-            batch_emb = self.batch_encoder(batch_labels)  # (batch, embsize)
-        mlm_output = self.decoder(
-            transformer_output
-            if not self.use_batch_labels
-            else torch.cat(
-                [
-                    transformer_output,
-                    batch_emb.unsqueeze(1).repeat(1, transformer_output.shape[1], 1),
-                ],
-                dim=2,
-            ),
-            # else transformer_output + batch_emb.unsqueeze(1),
-        )
+        mlm_output = self.expression_decoder(transformer_output)
         output = mlm_output["pred"]  # (batch, seq_len)
 
         return output  # (batch, seq_len)
@@ -364,11 +241,8 @@ class TransformerModel(nn.Module):
         self,
         output: Mapping[str, Tensor],
         transformer_output: Tensor,
-        batch_emb: Optional[Tensor] = None,
         CLS: bool = False,
         MVC: bool = False,
-        ECS: bool = False,
-        do_sample: bool = False,
     ) -> Mapping[str, Tensor]:
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
@@ -376,38 +250,8 @@ class TransformerModel(nn.Module):
         if CLS:
             output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
         if MVC:
-            mvc_output = self.mvc_decoder(
-                cell_emb
-                if not self.use_batch_labels
-                else torch.cat([cell_emb, batch_emb], dim=1),
-                # else cell_emb + batch_emb,
-                self.cur_gene_token_embs,
-            )
-            if self.explicit_zero_prob and do_sample:
-                bernoulli = Bernoulli(probs=mvc_output["zero_probs"])
-                output["mvc_output"] = bernoulli.sample() * mvc_output["pred"]
-            else:
-                output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
-            if self.explicit_zero_prob:
-                output["mvc_zero_probs"] = mvc_output["zero_probs"]
-        if ECS:
-            # Here using customized cosine similarity instead of F.cosine_similarity
-            # to avoid the pytorch issue of similarity larger than 1.0, pytorch # 78064
-            # normalize the embedding
-            cell_emb_normed = F.normalize(cell_emb, p=2, dim=1)
-            cos_sim = torch.mm(cell_emb_normed, cell_emb_normed.t())  # (batch, batch)
-
-            # mask out diagnal elements
-            mask = torch.eye(cos_sim.size(0)).bool().to(cos_sim.device)
-            cos_sim = cos_sim.masked_fill(mask, 0.0)
-            # only optimize positive similarities
-            cos_sim = F.relu(cos_sim)
-
-            output["loss_ecs"] = torch.mean(1 - (cos_sim - self.ecs_threshold) ** 2)
-
-        if self.do_dab:
-            output["dab_output"] = self.grad_reverse_discriminator(cell_emb)
-
+            mvc_output = self.mvc_decoder(cell_emb)
+            output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
         return output
 
     def forward(
@@ -441,12 +285,8 @@ class TransformerModel(nn.Module):
         pcpt_key_padding_mask: Tensor,
         gen_genes: Tensor,
         gen_key_padding_mask: Tensor,
-        batch_labels: Optional[Tensor] = None,
         CLS: bool = False,
-        CCE: bool = False,
         MVC: bool = False,
-        ECS: bool = False,
-        do_sample: bool = False,
         input_cell_emb: Optional[Tensor] = None,
     ) -> Mapping[str, Tensor]:
         """
@@ -462,8 +302,6 @@ class TransformerModel(nn.Module):
             gen_key_padding_mask (:obj:`Tensor`): mask for gen_genes, shape
                 [batch_size, seq_len]
             batch_labels (:obj:`Tensor`): batch labels, shape [batch_size]
-            do_sample (:obj:`bool`): whether to do sampling from bernoulli for
-                generated zero predictions.
             input_cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
                 embsize]
 
@@ -480,48 +318,24 @@ class TransformerModel(nn.Module):
             pcpt_key_padding_mask,
             gen_genes,
             gen_key_padding_mask,
-            batch_labels,
             input_cell_emb=input_cell_emb,
         )
         if gen_output is None:
             transformer_output = pcpt_output
         else:
             transformer_output = torch.cat([pcpt_output, gen_output], dim=1)
-        if self.use_batch_labels:
-            batch_emb = self.batch_encoder(batch_labels)
 
         output = {}
-        decoder_output = self.decoder(
-            transformer_output
-            if not self.use_batch_labels
-            else torch.cat(
-                [
-                    transformer_output,
-                    batch_emb.unsqueeze(1).repeat(1, transformer_output.shape[1], 1),
-                ],
-                dim=2,
-            ),
-        )
-        if self.explicit_zero_prob and do_sample:
-            bernoulli = Bernoulli(probs=decoder_output["zero_probs"])
-            full_preds = bernoulli.sample() * decoder_output["pred"]
-            output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
-            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
-        else:
-            full_preds = decoder_output["pred"]  # (batch, seq_len)
-            output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
-            output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
-        if self.explicit_zero_prob:
-            output["zero_probs"] = decoder_output["zero_probs"]
+        decoder_output = self.expression_decoder(transformer_output)
+        full_preds = decoder_output["pred"]  # (batch, seq_len)
+        output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
+        output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
 
         output = self._extend_output(
             output,
             transformer_output,
-            batch_emb=batch_emb if self.use_batch_labels else None,
             CLS=CLS,
             MVC=MVC,
-            ECS=ECS,
-            do_sample=do_sample,
         )
 
         return output
@@ -531,12 +345,8 @@ class TransformerModel(nn.Module):
         src: Tensor,
         values: Tensor,
         src_key_padding_mask: Tensor,
-        batch_labels: Optional[Tensor] = None,
         CLS: bool = False,
-        CCE: bool = False,
         MVC: bool = False,
-        ECS: bool = False,
-        do_sample: bool = False,
     ) -> Mapping[str, Tensor]:
         """
         Args:
@@ -544,215 +354,34 @@ class TransformerModel(nn.Module):
             values (:obj:`Tensor`): token values, shape [batch_size, seq_len]
             src_key_padding_mask (:obj:`Tensor`): mask for src, shape [batch_size,
                 seq_len]
-            batch_labels (:obj:`Tensor`): batch labels, shape [batch_size]
             CLS (:obj:`bool`): if True, return the celltype classification objective
                 (CLS) output
-            CCE (:obj:`bool`): if True, return the contrastive cell embedding objective
-                (CCE) output
             MVC (:obj:`bool`): if True, return the masked value prediction for cell
                 embedding MVC output
-            ECS (:obj:`bool`): if True, return the elastic cell similarity objective
-                (ECS) output.
 
         Returns:
             dict of output Tensors.
         """
-        transformer_output = self._encode(
-            src, values, src_key_padding_mask, batch_labels
-        )
-        if self.use_batch_labels:
-            batch_emb = self.batch_encoder(batch_labels)  # (batch, embsize)
+        transformer_output = self._encode(src, values, src_key_padding_mask)
 
         output = {}
-        mlm_output = self.decoder(
-            transformer_output
-            if not self.use_batch_labels
-            else torch.cat(
-                [
-                    transformer_output,
-                    batch_emb.unsqueeze(1).repeat(1, transformer_output.shape[1], 1),
-                ],
-                dim=2,
-            ),
-            # else transformer_output + batch_emb.unsqueeze(1),
-        )
-        if self.explicit_zero_prob and do_sample:
-            bernoulli = Bernoulli(probs=mlm_output["zero_probs"])
-            output["mlm_output"] = bernoulli.sample() * mlm_output["pred"]
-        else:
-            output["mlm_output"] = mlm_output["pred"]  # (batch, seq_len)
-        if self.explicit_zero_prob:
-            output["mlm_zero_probs"] = mlm_output["zero_probs"]
+        mlm_output = self.expression_decoder(transformer_output)
+        output["mlm_output"] = mlm_output["pred"]  # (batch, seq_len)
 
         output = self._extend_output(
             output,
             transformer_output,
-            batch_emb=batch_emb if self.use_batch_labels else None,
             CLS=CLS,
             MVC=MVC,
-            ECS=ECS,
-            do_sample=do_sample,
         )
 
         return output
-
-    def encode_batch(
-        self,
-        src: Tensor,
-        values: Tensor,
-        src_key_padding_mask: Tensor,
-        batch_size: int,
-        batch_labels: Optional[Tensor] = None,
-        output_to_cpu: bool = True,
-        time_step: Optional[int] = None,
-        return_np: bool = False,
-    ) -> Tensor:
-        """
-        Args:
-            src (Tensor): shape [N, seq_len]
-            values (Tensor): shape [N, seq_len]
-            src_key_padding_mask (Tensor): shape [N, seq_len]
-            batch_size (int): batch size for encoding
-            batch_labels (Tensor): shape [N, n_batch_labels]
-            output_to_cpu (bool): whether to move the output to cpu
-            time_step (int): the time step index in the transformer output to return.
-                The time step is along the second dimenstion. If None, return all.
-            return_np (bool): whether to return numpy array
-
-        Returns:
-            output Tensor of shape [N, seq_len, embsize]
-        """
-        N = src.size(0)
-        device = next(self.parameters()).device
-
-        # initialize the output tensor
-        array_func = np.zeros if return_np else torch.zeros
-        float32_ = np.float32 if return_np else torch.float32
-        shape = (
-            (N, self.d_model)
-            if time_step is not None
-            else (N, src.size(1), self.d_model)
-        )
-        outputs = array_func(shape, dtype=float32_)
-
-        for i in trange(0, N, batch_size):
-            raw_output = self._encode(
-                src[i : i + batch_size].to(device),
-                values[i : i + batch_size].to(device),
-                src_key_padding_mask[i : i + batch_size].to(device),
-                batch_labels[i : i + batch_size].to(device)
-                if batch_labels is not None
-                else None,
-            )
-            output = raw_output.detach()
-            if output_to_cpu:
-                output = output.cpu()
-            if return_np:
-                output = output.numpy()
-            if time_step is not None:
-                output = output[:, time_step, :]
-            outputs[i : i + batch_size] = output
-
-        return outputs
 
     def fsdp_wrap_fn(self, module):
         return isinstance(module, FlashscGPTLayer)
 
     def activation_checkpointing_fn(self, module):
         return isinstance(module, FlashscGPTLayer)
-
-
-def generate_square_subsequent_mask(sz: int) -> Tensor:
-    """Generates an upper-triangular matrix of -inf, with zeros on diag."""
-    return torch.triu(torch.ones(sz, sz) * float("-inf"), diagonal=1)
-
-
-class FastTransformerEncoderWrapper(nn.Module):
-    def __init__(
-        self,
-        d_model: int,
-        nhead: int,
-        d_hid: int,
-        nlayers: int,
-        dropout: float = 0.5,
-    ):
-        super().__init__()
-        self.fast_transformer_encoder = self.build_fast_transformer_encoder(
-            d_model, nhead, d_hid, nlayers, dropout
-        )
-
-    @staticmethod
-    def build_fast_transformer_encoder(
-        d_model: int, nhead: int, d_hid: int, nlayers: int, dropout: float
-    ) -> nn.Module:
-        from fast_transformers.builders import TransformerEncoderBuilder
-
-        if d_model % nhead != 0:
-            raise ValueError(
-                f"d_model must be divisible by nhead, "
-                f"got d_model={d_model} and nhead={nhead}"
-            )
-        builder = TransformerEncoderBuilder.from_kwargs(
-            n_layers=nlayers,
-            n_heads=nhead,
-            query_dimensions=d_model // nhead,
-            value_dimensions=d_model // nhead,
-            feed_forward_dimensions=d_hid,
-            attention_type="linear",
-            attention_dropout=dropout,
-            dropout=dropout,
-            activation="gelu",
-        )
-        assert builder.attention_type == "linear"
-        return builder.get()
-
-    @staticmethod
-    def build_length_mask(
-        src: Tensor,
-        src_key_padding_mask: torch.BoolTensor,
-    ) -> "LengthMask":
-        from fast_transformers.masking import LengthMask
-
-        seq_len = src.shape[1]
-        num_paddings = src_key_padding_mask.sum(dim=1)
-        actual_seq_len = seq_len - num_paddings  # (N,)
-        length_mask = LengthMask(actual_seq_len, max_len=seq_len, device=src.device)
-
-        if src_key_padding_mask[length_mask.bool_matrix].sum() != 0:
-            raise ValueError(
-                "Found padding tokens in the middle of the sequence. "
-                "src_key_padding_mask and length_mask are not compatible."
-            )
-        return length_mask
-
-    def forward(
-        self,
-        src: Tensor,
-        src_key_padding_mask: torch.BoolTensor,
-    ) -> Tensor:
-        """
-        Args:
-            src: Tensor, shape [N, seq_len, embsize]
-            src_key_padding_mask: Tensor, shape [N, seq_len]
-
-        Returns:
-            output Tensor of shape [N, seq_len, embsize]
-        """
-        if src_key_padding_mask.shape != src.shape[:2]:
-            raise ValueError(
-                f"src_key_padding_mask shape {src_key_padding_mask.shape} "
-                f"does not match first two dims of src shape {src.shape[:2]}"
-            )
-
-        if src_key_padding_mask.dtype != torch.bool:
-            raise ValueError(
-                f"src_key_padding_mask needs to be of type torch.bool, "
-                f"got {src_key_padding_mask.dtype}"
-            )
-
-        length_mask = self.build_length_mask(src, src_key_padding_mask)
-        output = self.fast_transformer_encoder(src, length_mask=length_mask)
-        return output
 
 
 class FlashTransformerEncoderLayer(nn.Module):
@@ -899,29 +528,6 @@ class GeneEncoder(nn.Module):
         return x
 
 
-class PositionalEncoding(nn.Module):
-    def __init__(self, d_model: int, dropout: float = 0.1, max_len: int = 5000):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-
-        position = torch.arange(max_len).unsqueeze(1)
-        div_term = torch.exp(
-            torch.arange(0, d_model, 2) * (-math.log(10000.0) / d_model)
-        )
-        pe = torch.zeros(max_len, 1, d_model)
-        pe[:, 0, 0::2] = torch.sin(position * div_term)
-        pe[:, 0, 1::2] = torch.cos(position * div_term)
-        self.register_buffer("pe", pe)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Args:
-            x: Tensor, shape [seq_len, batch_size, embedding_dim]
-        """
-        x = x + self.pe[: x.size(0)]
-        return self.dropout(x)
-
-
 class ContinuousValueEncoder(nn.Module):
     """
     Encode real number values to a vector using neural nets projection.
@@ -972,48 +578,13 @@ class CategoryValueEncoder(nn.Module):
         return x
 
 
-class BatchLabelEncoder(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        padding_idx: Optional[int] = None,
-    ):
-        super().__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings, embedding_dim, padding_idx=padding_idx
-        )
-        self.enc_norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, embsize)
-        x = self.enc_norm(x)
-        return x
-
-
-class Similarity(nn.Module):
-    """
-    Dot product or cosine similarity
-    """
-
-    def __init__(self, temp):
-        super().__init__()
-        self.temp = temp
-        self.cos = nn.CosineSimilarity(dim=-1)
-
-    def forward(self, x, y):
-        return self.cos(x, y) / self.temp
-
-
 class ExprDecoder(nn.Module):
     def __init__(
         self,
         d_model: int,
-        explicit_zero_prob: bool = False,
-        use_batch_labels: bool = False,
     ):
         super().__init__()
-        d_in = d_model * 2 if use_batch_labels else d_model
+        d_in = d_model
         self.fc = nn.Sequential(
             nn.Linear(d_in, d_model),
             nn.LeakyReLU(),
@@ -1021,114 +592,11 @@ class ExprDecoder(nn.Module):
             nn.LeakyReLU(),
             nn.Linear(d_model, 1),
         )
-        self.explicit_zero_prob = explicit_zero_prob
-        if explicit_zero_prob:
-            self.zero_logit = nn.Sequential(
-                nn.Linear(d_in, d_model),
-                nn.LeakyReLU(),
-                nn.Linear(d_model, d_model),
-                nn.LeakyReLU(),
-                nn.Linear(d_model, 1),
-            )
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
         pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
-
-        if not self.explicit_zero_prob:
-            return dict(pred=pred_value)
-        zero_logits = self.zero_logit(x).squeeze(-1)  # (batch, seq_len)
-        zero_probs = torch.sigmoid(zero_logits)
-        return dict(pred=pred_value, zero_probs=zero_probs)
-        # TODO: note that the return currently is only for training. Since decoder
-        # is not used in the test setting for the integration task, the eval/inference
-        # logic is not implemented yet. However, remember to implement it when
-        # the decoder is used in any test setting. The inference logic will need
-        # to sample from the bernoulli distribution with the zero_probs.
-
-
-class ClsDecoder(nn.Module):
-    """
-    Decoder for classification task.
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        n_cls: int,
-        nlayers: int = 3,
-        activation: callable = nn.ReLU,
-    ):
-        super().__init__()
-        # module list
-        self._decoder = nn.ModuleList()
-        for i in range(nlayers - 1):
-            self._decoder.append(nn.Linear(d_model, d_model))
-            self._decoder.append(activation())
-            self._decoder.append(nn.LayerNorm(d_model))
-        self.out_layer = nn.Linear(d_model, n_cls)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Args:
-            x: Tensor, shape [batch_size, embsize]
-        """
-        for layer in self._decoder:
-            x = layer(x)
-        return self.out_layer(x)
-
-
-class SimDecoder(nn.Module):
-    """
-    Decoder for classification task with similarity matrix.
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        n_cls: int,
-        nlayers: int = 3,
-        activation: callable = nn.ReLU,
-        projection_dim: int = 2048,
-    ):
-        super().__init__()
-        # module list
-        self._decoder = nn.ModuleList()
-        for i in range(nlayers - 1):
-            self._decoder.append(nn.Linear(d_model, d_model))
-            self._decoder.append(activation())
-            self._decoder.append(nn.LayerNorm(d_model))
-        self.out_layer = nn.Linear(d_model, projection_dim)
-
-        self.cls_token_matrix = nn.Parameter(torch.randn(n_cls, projection_dim))
-        self.embed_norm = nn.LayerNorm(projection_dim)
-        self.token_norm = nn.LayerNorm(projection_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Args:
-            x: Tensor, shape [batch_size, embsize]
-        """
-        for layer in self._decoder:
-            x = layer(x)
-        x = self.out_layer(x)
-        x = self.embed_norm(x)
-
-        sim = self.sim_matrix(x, self.cls_token_matrix)
-
-        return sim
-
-    def get_sim_matrix(self):
-        return self.cls_token_matrix
-
-    def sim_matrix(self, a, b, eps=1e-8):
-        # b = self.token_norm(b)
-        a_n, b_n = a.norm(dim=1)[:, None], b.norm(dim=1)[:, None]
-        a_norm = a / torch.max(a_n, eps * torch.ones_like(a_n))
-        b_norm = b / torch.max(b_n, eps * torch.ones_like(b_n))
-        sim_mt = torch.mm(a_norm, b_norm.transpose(0, 1))
-        # sim_mt = torch.mm(a, b.transpose(0, 1))
-        return sim_mt
+        return dict(pred=pred_value)
 
 
 class MVCDecoder(nn.Module):
@@ -1142,8 +610,6 @@ class MVCDecoder(nn.Module):
         arch_style: str = "inner product",
         query_activation: nn.Module = nn.Sigmoid,
         hidden_activation: nn.Module = nn.PReLU,
-        explicit_zero_prob: bool = False,
-        use_batch_labels: bool = False,
     ) -> None:
         """
         Args:
@@ -1156,13 +622,11 @@ class MVCDecoder(nn.Module):
                 layers.
         """
         super().__init__()
-        d_in = d_model * 2 if use_batch_labels else d_model
+        d_in = d_model
         if arch_style in ["inner product", "inner product, detach"]:
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
             self.W = nn.Linear(d_model, d_in, bias=False)
-            if explicit_zero_prob:  # by default, gene-wise prob rate
-                self.W_zero_logit = nn.Linear(d_model, d_in)
         elif arch_style == "concat query":
             self.gene2query = nn.Linear(d_model, 64)
             self.query_activation = query_activation()
@@ -1180,7 +644,6 @@ class MVCDecoder(nn.Module):
 
         self.arch_style = arch_style
         self.do_detach = arch_style.endswith("detach")
-        self.explicit_zero_prob = explicit_zero_prob
 
     def forward(
         self, cell_emb: Tensor, gene_embs: Tensor
@@ -1196,12 +659,7 @@ class MVCDecoder(nn.Module):
             cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
             # the pred gene expr values, # (batch, seq_len)
             pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(2)
-            if not self.explicit_zero_prob:
-                return dict(pred=pred_value)
-            # zero logits need to based on the cell_emb, because of input exprs
-            zero_logits = torch.bmm(self.W_zero_logit(query_vecs), cell_emb).squeeze(2)
-            zero_probs = torch.sigmoid(zero_logits)
-            return dict(pred=pred_value, zero_probs=zero_probs)
+            return dict(pred=pred_value)
         elif self.arch_style == "concat query":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
             # expand cell_emb to (batch, seq_len, embsize)
@@ -1210,14 +668,113 @@ class MVCDecoder(nn.Module):
             h = self.hidden_activation(
                 self.fc1(torch.cat([cell_emb, query_vecs], dim=2))
             )
-            if self.explicit_zero_prob:
-                raise NotImplementedError
             return self.fc2(h).squeeze(2)  # (batch, seq_len)
         elif self.arch_style == "sum query":
             query_vecs = self.query_activation(self.gene2query(gene_embs))
             cell_emb = cell_emb.unsqueeze(1)
-
             h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
-            if self.explicit_zero_prob:
-                raise NotImplementedError
             return self.fc2(h).squeeze(2)  # (batch, seq_len)
+
+
+class ComposerSCGPTModel(ComposerModel):
+    def __init__(self, vocab):
+        super().__init__()
+        self.criterion = masked_mse_loss
+        self.vocab = vocab
+        self.pad_token_id = vocab[self.pad_token]
+        ntokens = len(vocab)
+        self.model = SCGPTModel(
+            ntokens,
+            d_model=512,
+            nhead=8,
+            d_hid=512,
+            nlayers=12,
+            dropout=0.1,
+            pad_token_id=self.pad_token_id,
+            pad_value=-2,
+            do_mvc=True,
+            input_emb_style="continuous",
+            n_input_bins=51,
+            use_generative_training=True,
+            use_fast_transformer=True,
+            fast_transformer_backend="flash",
+            pre_norm=True,
+        )
+        self.train_mse = MaskedMseMetric(name="MSE")
+        self.train_mvc = MaskedMseMetric(name="MVC")
+        self.train_gen = MaskedMseMetric(name="GEN")
+        self.val_mse = MaskedMseMetric(name="MSE")
+        self.val_mvc = MaskedMseMetric(name="MVC")
+        self.val_gen = MaskedMseMetric(name="GEN")
+
+    def forward(self, batch):  # batch is the output of the dataloader
+        # specify how batches are passed through the model
+        pcpt_gene = batch["pcpt_gene"]
+        pcpt_expr = batch["pcpt_expr"]
+        pcpt_key_padding_mask = pcpt_gene.eq(self.vocab[self.pad_token])
+        gen_gene = batch["gen_gene"]
+        gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
+        output_dict = self.model(
+            pcpt_gene,
+            pcpt_expr,
+            pcpt_key_padding_mask,
+            gen_gene,
+            gen_key_padding_mask,
+            MVC=True,
+            generative_training=True,
+        )
+        output_dict["GEPC"] = output_dict["gen_preds"]
+        return output_dict
+
+    def loss(self, outputs, batch):
+        # pass batches and `forward` outputs to the loss
+        pcpt_gene = batch["pcpt_gene"]
+        gen_gene = batch["gen_gene"]
+        gen_expr_target = batch["gen_expr_target"]
+        gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
+        positions_to_match = ~gen_key_padding_mask
+
+        gen_expr_preds = outputs["gen_preds"]
+
+        loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
+        loss_mvc = self.criterion(
+            outputs["mvc_output"][:, pcpt_gene.shape[1] :],
+            gen_expr_target,
+            positions_to_match,
+        )
+
+        loss_gen = self.criterion(outputs["GEPC"], gen_expr_target, positions_to_match)
+
+        loss = loss_mse + loss_mvc + loss_gen
+        return loss
+
+    def update_metric(self, batch, outputs, metric):
+        pcpt_gene = batch["pcpt_gene"]
+        gen_gene = batch["gen_gene"]
+        mask = ~gen_gene.eq(self.vocab[self.pad_token])
+        target = batch["gen_expr_target"]
+        if metric.name == "MSE":
+            preds = outputs["gen_preds"]
+        elif metric.name == "MVC":
+            preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
+        elif metric.name == "GEN":
+            preds = outputs["GEPC"]
+        else:
+            raise ValueError(f"metric {metric.name} not recognized")
+        metric.update(preds=preds, target=target, mask=mask)
+
+    def get_metrics(self, is_train=False):
+        # defines which metrics to use in each phase of training
+        if is_train:
+            metric_dict = {
+                "MSE": self.train_mse,
+                "MVC": self.train_mvc,
+                "GEN": self.train_gen,
+            }
+        else:
+            metric_dict = {
+                "MSE": self.val_mse,
+                "MVC": self.val_mvc,
+                "GEN": self.val_gen,
+            }
+        return metric_dict

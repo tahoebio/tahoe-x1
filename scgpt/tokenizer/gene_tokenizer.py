@@ -6,18 +6,9 @@ from typing import Dict, Iterable, List, Optional, Tuple, Union
 from typing_extensions import Self
 
 import numpy as np
-import pandas as pd
 import torch
 import torchtext.vocab as torch_vocab
 from torchtext.vocab import Vocab
-from transformers.tokenization_utils import PreTrainedTokenizer
-from transformers import AutoTokenizer, BertTokenizer
-
-from .. import logger
-
-
-class GeneTokenizer(PreTrainedTokenizer):
-    pass
 
 
 class GeneVocab(Vocab):
@@ -197,56 +188,6 @@ class GeneVocab(Vocab):
         if default_token not in self:
             raise ValueError(f"{default_token} is not in the vocabulary.")
         self.set_default_index(self[default_token])
-
-
-def get_default_gene_vocab() -> GeneVocab:
-    """
-    Get the default gene vocabulary, consisting of gene symbols and ids.
-    """
-    vocab_file = Path(__file__).parent / "default_gene_vocab.json"
-    if not vocab_file.exists():
-        logger.info(
-            f"No existing default vocab, will build one and save to {vocab_file}"
-        )
-        return _build_default_gene_vocab(save_vocab_to=vocab_file)
-    logger.info(f"Loading gene vocabulary from {vocab_file}")
-    return GeneVocab.from_file(vocab_file)
-
-
-def _build_default_gene_vocab(
-    download_source_to: str = "/tmp",
-    save_vocab_to: Union[Path, str, None] = None,
-) -> GeneVocab:
-    """
-    Build the default gene vocabulary from HGNC gene symbols.
-
-    Args:
-        download_source_to (str): Directory to download the source data.
-        save_vocab_to (Path or str): Path to save the vocabulary. If None,
-            the vocabulary will not be saved. Default to None.
-    """
-    gene_collection_file = (
-        Path(download_source_to) / "human.gene_name_symbol.from_genenames.org.tsv"
-    )
-    if not gene_collection_file.exists():
-        # download and save file from url
-        url = (
-            "https://www.genenames.org/cgi-bin/download/custom?col=gd_app_sym&"
-            "col=md_ensembl_id&status=Approved&status=Entry%20Withdrawn&hgnc_dbtag"
-            "=on&order_by=gd_app_sym_sort&format=text&submit=submit"
-        )
-        import requests
-
-        r = requests.get(url)
-        gene_collection_file.write_text(r.text)
-
-    logger.info(f"Building gene vocabulary from {gene_collection_file}")
-    df = pd.read_csv(gene_collection_file, sep="\t")
-    gene_list = df["Approved symbol"].dropna().unique().tolist()
-    gene_vocab = GeneVocab(gene_list)  # no special tokens set in default vocab
-    if save_vocab_to is not None:
-        gene_vocab.save_json(Path(save_vocab_to))
-    return gene_vocab
 
 
 def tokenize_batch(

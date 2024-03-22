@@ -1,5 +1,6 @@
 from .model import (
-    TransformerModel,
+    SCGPTModel,
+    ComposerSCGPTModel,
     FlashTransformerEncoderLayer,
     GeneEncoder,
     MVCDecoder,
