@@ -5,7 +5,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
 from composer.models import ComposerModel
 from scgpt.loss import masked_mse_loss, MaskedMseMetric
-from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
+from .flash_layers import SCGPTBlock, FlashscGPTGenerator
 
 
 class SCGPTModel(nn.Module):
@@ -58,7 +58,7 @@ class SCGPTModel(nn.Module):
             raise ValueError(f"Unknown input_emb_style: {input_emb_style}")
 
         if use_generative_training:
-            encoder_layers = FlashscGPTLayer(
+            encoder_layers = SCGPTBlock(
                 d_model,
                 nhead,
                 d_hid,
@@ -364,10 +364,10 @@ class SCGPTModel(nn.Module):
         return output
 
     def fsdp_wrap_fn(self, module):
-        return isinstance(module, FlashscGPTLayer)
+        return isinstance(module, SCGPTBlock)
 
     def activation_checkpointing_fn(self, module):
-        return isinstance(module, FlashscGPTLayer)
+        return isinstance(module, SCGPTBlock)
 
 
 class FlashTransformerEncoderLayer(nn.Module):

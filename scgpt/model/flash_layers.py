@@ -1,74 +1,15 @@
 from functools import lru_cache
 from typing import Optional
-
-from einops import rearrange
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.modules.transformer import _get_clones
-from llmfoundry.models.layers.attention import (
-    is_flash_v2_installed,
-    triton_flash_attn_fn,
-)
+from llmfoundry.models.layers.attention import GroupedQueryAttention
 
 
-class FlashscGPTMHA(nn.Module):
-    """
-    Custom MHA layer for scGPT. This takes full forward call within one pass of MHA.
-    """
 
-    def __init__(
-        self,
-        embed_dim,
-        num_heads,
-        bias=True,
-        batch_first=True,
-        causal=False,
-        device=None,
-        dtype=None,
-    ) -> None:
-        assert batch_first
-        factory_kwargs = {"device": device, "dtype": dtype}
-        super().__init__()
-        self.embed_dim = embed_dim
-        self.causal = causal
-
-        self.num_heads = num_heads
-        assert (
-            self.embed_dim % num_heads == 0
-        ), "self.kdim must be divisible by num_heads"
-        self.head_dim = self.embed_dim // num_heads
-        assert (
-            self.head_dim % 8 == 0 and self.head_dim <= 128
-        ), "Only support head_dim <= 128 and divisible by 8"
-
-        self.Wqkv = nn.Linear(embed_dim, 3 * embed_dim, bias=bias, **factory_kwargs)
-        self.out_proj = nn.Linear(embed_dim, embed_dim, bias=bias, **factory_kwargs)
-        self.self_attn = triton_flash_attn_fn
-
-    def forward(self, total_embs: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
-        """
-        pcpt_total_embs: (batch, pcpt_len, hidden_dim) (where hidden_dim = num heads * head dim)
-        gen_total_embs: (batch, gen_len, hidden_dim)
-        pcpt_key_padding_mask: bool tensor of shape (batch, pcpt_len), 1 means valid and 0 means not valid.
-        gen_key_padding_mask: bool tensor of shape (batch, gen_len), 1 means valid and 0 means not valid.
-        """
-        total_qkv = self.Wqkv(total_embs)  # (batch, pcpt_len + gen_len, 3 * hidden_dim)
-        total_qkv = rearrange(total_qkv, "b s (three E) -> b s three E", three=3)
-        total_context, _, _ = self.self_attn(
-            query=total_qkv[:, :, 0, :],  # (B, S_Q, E)
-            key=total_qkv[:, :, 1, :],  # (B, S_K, E)
-            value=total_qkv[:, :, 2, :],  # (B, S_V, E)
-            attn_bias=attn_bias,  # (B, H, S_Q, S_K)
-            n_heads=self.num_heads,
-            kv_n_heads=self.num_heads,
-        )
-        total_context = self.out_proj(total_context)
-        return total_context
-
-
-class FlashscGPTLayer(nn.Module):
+class SCGPTBlock(nn.Module):
     r"""TransformerEncoderLayer is made up of self-attn and feedforward network.
     The class is modified from torch.nn.TransformerEncoderLayer to support the
     FlashAttention.
@@ -103,17 +44,17 @@ class FlashscGPTLayer(nn.Module):
         dropout=0.1,
         activation="relu",
         layer_norm_eps=1e-5,
-        batch_first=True,
         device=None,
         dtype=None,
         norm_scheme="post",  # "pre" or "post"
     ) -> None:
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
-        self.self_attn = FlashscGPTMHA(
-            embed_dim=d_model,
-            num_heads=nhead,
-            batch_first=batch_first,
+        self.self_attn = GroupedQueryAttention(
+            d_model=d_model,
+            n_heads=nhead,
+            kv_n_heads=nhead,
+            attn_impl="triton",
             **factory_kwargs,
         )
         # Implementation of Feedforward model
