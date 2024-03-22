@@ -237,7 +237,7 @@ class SCGPTModel(nn.Module):
         if CLS:
             output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
         if MVC:
-            mvc_output = self.mvc_decoder(cell_emb)
+            mvc_output = self.mvc_decoder(cell_emb, self.cur_gene_token_embs,)
             output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
         return output
 
@@ -595,7 +595,6 @@ class MVCDecoder(nn.Module):
         d_model: int,
         arch_style: str = "inner product",
         query_activation: nn.Module = nn.Sigmoid,
-        hidden_activation: nn.Module = nn.PReLU,
     ) -> None:
         """
         Args:
@@ -609,27 +608,14 @@ class MVCDecoder(nn.Module):
         """
         super().__init__()
         d_in = d_model
-        if arch_style in ["inner product", "inner product, detach"]:
+        if arch_style ==  "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = query_activation()
             self.W = nn.Linear(d_model, d_in, bias=False)
-        elif arch_style == "concat query":
-            self.gene2query = nn.Linear(d_model, 64)
-            self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model + 64, 64)
-            self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 1)
-        elif arch_style == "sum query":
-            self.gene2query = nn.Linear(d_model, d_model)
-            self.query_activation = query_activation()
-            self.fc1 = nn.Linear(d_model, 64)
-            self.hidden_activation = hidden_activation()
-            self.fc2 = nn.Linear(64, 1)
         else:
             raise ValueError(f"Unknown arch_style: {arch_style}")
 
         self.arch_style = arch_style
-        self.do_detach = arch_style.endswith("detach")
 
     def forward(
         self, cell_emb: Tensor, gene_embs: Tensor
@@ -639,27 +625,13 @@ class MVCDecoder(nn.Module):
             cell_emb: Tensor, shape (batch, embsize=d_model)
             gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
         """
-        gene_embs = gene_embs.detach() if self.do_detach else gene_embs
-        if self.arch_style in ["inner product", "inner product, detach"]:
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
+        if self.arch_style == "inner product":
+            query_vecs = self.query_activation(self.gene2query(gene_embs)) # (batch, seq_len, embsize)
             cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
-            # the pred gene expr values, # (batch, seq_len)
-            pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(2)
+            pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(2) # (batch, seq_len)
             return dict(pred=pred_value)
-        elif self.arch_style == "concat query":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
-            # expand cell_emb to (batch, seq_len, embsize)
-            cell_emb = cell_emb.unsqueeze(1).expand(-1, gene_embs.shape[1], -1)
-
-            h = self.hidden_activation(
-                self.fc1(torch.cat([cell_emb, query_vecs], dim=2))
-            )
-            return self.fc2(h).squeeze(2)  # (batch, seq_len)
-        elif self.arch_style == "sum query":
-            query_vecs = self.query_activation(self.gene2query(gene_embs))
-            cell_emb = cell_emb.unsqueeze(1)
-            h = self.hidden_activation(self.fc1(cell_emb + query_vecs))
-            return self.fc2(h).squeeze(2)  # (batch, seq_len)
+        else:
+            raise ValueError(f"Unknown arch_style: {self.arch_style}")
 
 
 class ComposerSCGPTModel(ComposerModel):
