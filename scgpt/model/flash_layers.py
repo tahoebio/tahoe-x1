@@ -55,7 +55,7 @@ class SCGPTBlock(nn.Module):
             n_heads=nhead,
             kv_n_heads=nhead,
             attn_impl="triton",
-            **factory_kwargs,
+            device=device,
         )
         # Implementation of Feedforward model
         self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
