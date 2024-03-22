@@ -111,7 +111,8 @@ class SCGPTBlock(nn.Module):
         return x
 
     def _sa_block(self, x: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
-        x = self.self_attn(x, attn_bias=attn_bias)
+        x,_,_ = self.self_attn(x, attn_bias=attn_bias,
+                               is_causal=False)
         return self.dropout1(x)
 
     def _ff_block(self, x: Tensor) -> Tensor:
