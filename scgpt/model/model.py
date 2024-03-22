@@ -5,13 +5,7 @@ from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
 from composer.models import ComposerModel
 from scgpt.loss import masked_mse_loss, MaskedMseMetric
-
-try:
-    from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
-except ImportError:
-    import warnings
-
-    warnings.warn("flash_attn is not installed")
+from .flash_layers import FlashscGPTLayer, FlashscGPTGenerator
 
 
 class SCGPTModel(nn.Module):
@@ -114,16 +108,11 @@ class SCGPTModel(nn.Module):
         src: Tensor,
         values: Tensor,
         src_key_padding_mask: Tensor,
-        batch_labels: Optional[Tensor] = None,  # (batch,)
     ) -> Tensor:
-        self._check_batch_labels(batch_labels)
-
         src = self.gene_encoder(src)  # (batch, seq_len, embsize)
         self.cur_gene_token_embs = src
-
         values = self.expression_encoder(values)  # (batch, seq_len, embsize)
         total_embs = src + values
-
         output = self.transformer_encoder(
             total_embs, src_key_padding_mask=src_key_padding_mask
         )
@@ -136,10 +125,8 @@ class SCGPTModel(nn.Module):
         pcpt_key_padding_mask: Tensor,
         gen_genes: Tensor,
         gen_key_padding_mask: Tensor,
-        batch_labels: Optional[Tensor] = None,  # (batch,)
         input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
     ) -> Tuple[Tensor, Tensor]:
-        self._check_batch_labels(batch_labels)
 
         pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
         pcpt_values = self.expression_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
@@ -301,7 +288,6 @@ class SCGPTModel(nn.Module):
                 [batch_size, seq_len]
             gen_key_padding_mask (:obj:`Tensor`): mask for gen_genes, shape
                 [batch_size, seq_len]
-            batch_labels (:obj:`Tensor`): batch labels, shape [batch_size]
             input_cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
                 embsize]
 
