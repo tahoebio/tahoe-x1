@@ -63,7 +63,6 @@ class SCGPTModel(nn.Module):
                 nhead,
                 d_hid,
                 dropout,
-                batch_first=True,
                 norm_scheme=self.norm_scheme,
             )
             self.transformer_encoder = FlashscGPTGenerator(encoder_layers, nlayers)
