@@ -1,8 +1,5 @@
 import composer
-from composer import Trainer
-from composer.utils import dist, get_device
-from streaming import StreamingDataset, StreamingDataLoader
-
+import streaming
 from scgpt import DataCollator
 from scgpt import logger
 from scgpt.model import ComposerSCGPTModel
@@ -17,8 +14,8 @@ def count_parameters(model):
 def main():
     streaming.base.util.clean_stale_shared_memory()
     dist_timeout = 600.0
-    dist.initialize_dist(get_device(None), timeout=dist_timeout)
-    train_dataset = StreamingDataset(
+    composer.utils.dist.initialize_dist(composer.utils.get_device(None), timeout=dist_timeout)
+    train_dataset = streaming.StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train",
         local="mds-data-folder/train",
         download_timeout=300,
@@ -26,7 +23,7 @@ def main():
         shuffle=True,
     )
     composer.utils.dist.barrier()
-    valid_dataset = StreamingDataset(
+    valid_dataset = streaming.StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val",
         local="mds-data-folder/val",
         download_timeout=300,
@@ -62,7 +59,7 @@ def main():
         sampling=True,
         data_style="both",
     )
-    train_loader = StreamingDataLoader(
+    train_loader = streaming.StreamingDataLoader(
         train_dataset,
         batch_size=8 * 256,
         collate_fn=collator,
@@ -72,7 +69,7 @@ def main():
         prefetch_factor=48,
         persistent_workers=True,
     )
-    valid_loader = StreamingDataLoader(
+    valid_loader = streaming.StreamingDataLoader(
         valid_dataset,
         batch_size=8 * 256,
         collate_fn=collator,
@@ -98,7 +95,7 @@ def main():
     scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
         t_warmup="0.05dur", t_max="1dur", alpha_f=0.0
     )
-    trainer = Trainer(
+    trainer = composer.Trainer(
         model=model,
         optimizers=optimizer,
         train_dataloader=train_loader,
