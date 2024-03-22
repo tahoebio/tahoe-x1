@@ -12,7 +12,6 @@ def count_parameters(model):
 
 
 def main():
-    streaming.base.util.clean_stale_shared_memory()
     dist_timeout = 600.0
     composer.utils.dist.initialize_dist(composer.utils.get_device(None), timeout=dist_timeout)
     train_dataset = streaming.StreamingDataset(
