@@ -105,6 +105,7 @@ def main():
         eval_interval="500ba",
         schedulers=scheduler,
         device_train_microbatch_size=256,
+        algorithms=[composer.algorithms.LowPrecisionLayerNorm()],
         precision="amp_bf16",
         deepspeed_config={
             "zero_optimization": {
