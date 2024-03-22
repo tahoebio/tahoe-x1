@@ -2,6 +2,7 @@ integrations:
 - integration_type: pip_packages
   packages:
     - llm-foundry==0.6.0
+    - mosaicml[deepspeed]
 - integration_type: git_repo
   git_repo: vevotx/vevo-scGPT
   git_branch: dev-temp
@@ -14,13 +15,16 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/README.md`
 # to convert and host the full 'train' dataset.
 command: |
-  sleep infinity
+  cd vevo-scGPT/examples
+  composer pretrain_composer.py
 image: mosaicml/llm-foundry:2.2.1_cu121_flash2-latest
+env_variables:
+  MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
 name: scgpt-1b-gpus-8
 
 compute:
   gpus: 8  # Number of GPUs to use
-  cluster: r14z3
+  cluster: r4z8
 scheduling:
   max_duration: 0.1 # Maximum duration of the run in hours
 

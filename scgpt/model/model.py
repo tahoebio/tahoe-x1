@@ -677,21 +677,19 @@ class MVCDecoder(nn.Module):
 
 
 class ComposerSCGPTModel(ComposerModel):
-    def __init__(self, vocab):
+    def __init__(self, ntoken, pad_token_id, pad_value):
         super().__init__()
         self.criterion = masked_mse_loss
-        self.vocab = vocab
-        self.pad_token_id = vocab[self.pad_token]
-        ntokens = len(vocab)
+        self.pad_token_id = pad_token_id
         self.model = SCGPTModel(
-            ntokens,
+            ntoken=ntoken,
             d_model=512,
             nhead=8,
             d_hid=512,
             nlayers=12,
             dropout=0.1,
             pad_token_id=self.pad_token_id,
-            pad_value=-2,
+            pad_value=pad_value,
             do_mvc=True,
             input_emb_style="continuous",
             n_input_bins=51,
@@ -711,9 +709,9 @@ class ComposerSCGPTModel(ComposerModel):
         # specify how batches are passed through the model
         pcpt_gene = batch["pcpt_gene"]
         pcpt_expr = batch["pcpt_expr"]
-        pcpt_key_padding_mask = pcpt_gene.eq(self.vocab[self.pad_token])
+        pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
         gen_gene = batch["gen_gene"]
-        gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
+        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
         output_dict = self.model(
             pcpt_gene,
             pcpt_expr,
@@ -731,7 +729,7 @@ class ComposerSCGPTModel(ComposerModel):
         pcpt_gene = batch["pcpt_gene"]
         gen_gene = batch["gen_gene"]
         gen_expr_target = batch["gen_expr_target"]
-        gen_key_padding_mask = gen_gene.eq(self.vocab[self.pad_token])
+        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
         positions_to_match = ~gen_key_padding_mask
 
         gen_expr_preds = outputs["gen_preds"]
@@ -751,7 +749,7 @@ class ComposerSCGPTModel(ComposerModel):
     def update_metric(self, batch, outputs, metric):
         pcpt_gene = batch["pcpt_gene"]
         gen_gene = batch["gen_gene"]
-        mask = ~gen_gene.eq(self.vocab[self.pad_token])
+        mask = ~gen_gene.eq(self.pad_token_id)
         target = batch["gen_expr_target"]
         if metric.name == "MSE":
             preds = outputs["gen_preds"]

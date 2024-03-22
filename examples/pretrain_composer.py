@@ -1,7 +1,7 @@
 import composer
 from composer import Trainer
-from streaming import StreamingDataset, StreamingDataLoader
 from composer.utils import dist, get_device
+from streaming import StreamingDataset, StreamingDataLoader
 
 from scgpt import DataCollator
 from scgpt import logger
@@ -15,15 +15,13 @@ def count_parameters(model):
 
 
 def main():
-    # streaming.base.util.clean_stale_shared_memory()
+    streaming.base.util.clean_stale_shared_memory()
     dist_timeout = 600.0
     dist.initialize_dist(get_device(None), timeout=dist_timeout)
     train_dataset = StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train",
         local="mds-data-folder/train",
-        # predownload=48 * 32 * 6,
         download_timeout=300,
-        # split="train",
         allow_unsafe_types=True,
         shuffle=True,
     )
@@ -31,9 +29,7 @@ def main():
     valid_dataset = StreamingDataset(
         remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val",
         local="mds-data-folder/val",
-        # predownload=48 * 32 * 6,
         download_timeout=300,
-        # split="val",
         allow_unsafe_types=True,
         shuffle=False,
     )
@@ -50,14 +46,18 @@ def main():
     for s in special_tokens:
         if s not in vocab:
             vocab.append_token(s)
+
+    PAD_VALUE=-2
+    MASK_VALUE=-1
+    PAD_TOKEN_ID = vocab["<pad>"]
     collator = DataCollator(
         do_padding=True,
         pad_token_id=vocab["<pad>"],
-        pad_value=-2,
+        pad_value=PAD_VALUE,
         do_mlm=True,
         do_binning=True,
         mlm_probability=0.40,
-        mask_value=-1,
+        mask_value=MASK_VALUE,
         max_length=1024,
         sampling=True,
         data_style="both",
@@ -83,15 +83,18 @@ def main():
         prefetch_factor=48,
     )
 
-    model = ComposerSCGPTModel(vocab)
+    model = ComposerSCGPTModel(ntoken=len(vocab),
+                               pad_token_id=PAD_TOKEN_ID,
+                               pad_value=PAD_VALUE)
     logger.info(
         f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
     )
     for name, sub_model in model.model.named_children():
         logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
-    optimizer = composer.optim.DecoupledAdamW(model.parameters(), lr=2e-4,
-                                              betas=(0.9, 0.95), eps=1e-8)
+    optimizer = composer.optim.DecoupledAdamW(
+        model.parameters(), lr=2e-4, betas=(0.9, 0.95), eps=1e-8
+    )
     scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
         t_warmup="0.05dur", t_max="1dur", alpha_f=0.0
     )
@@ -118,7 +121,6 @@ def main():
         callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
         loggers=[
             composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
-            # composer.callbacks.RuntimeEstimator(skip_batches=10, time_unit="hours"),
         ],
         save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
         save_interval="250ba",
