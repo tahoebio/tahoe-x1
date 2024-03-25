@@ -93,6 +93,7 @@ class FlashscGPTLayer(nn.Module):
         >>> src = torch.rand(32, 10, 512)
         >>> out = encoder_layer(src)
     """
+
     __constants__ = ["batch_first"]
 
     def __init__(
@@ -254,7 +255,10 @@ class FlashscGPTGenerator(nn.Module):
         g_len = total_len - p_len
         attention_mask = _make_mask(p_len, g_len, total_embs.device)
         attn_bias = torch.zeros_like(
-            attention_mask, dtype=total_embs.dtype, device=attention_mask.device, requires_grad=False
+            attention_mask,
+            dtype=total_embs.dtype,
+            device=attention_mask.device,
+            requires_grad=False,
         ).masked_fill(
             attention_mask, torch.finfo(total_embs.dtype).min
         )  # Matrix with -inf at the place of masked values and 0 elsewhere
@@ -279,6 +283,7 @@ class FlashscGPTGenerator(nn.Module):
         pcpt_total_embs = total_embs[:, :p_len, :]
         gen_total_embs = total_embs[:, p_len:, :]
         return pcpt_total_embs, gen_total_embs
+
 
 @torch.no_grad()
 @lru_cache(maxsize=1)
