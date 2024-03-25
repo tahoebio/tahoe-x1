@@ -70,11 +70,12 @@ parameters:
     persistent_workers: True
   valid_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/valid"
-      local: "mds-data-folder/valid"
+      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val"
+      local: "mds-data-folder/val"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: False
+      shuffle_seed: ${global_seed}
     collator:
       do_padding: True
       pad_value: -2
