@@ -16,4 +16,4 @@ if not logger.hasHandlers() or len(logger.handlers) == 0:
     logger.addHandler(handler)
 
 from . import model, tokenizer
-from .data_collator import DataCollator
+from scgpt.data.collator import DataCollator

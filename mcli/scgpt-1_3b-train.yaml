@@ -16,7 +16,7 @@ integrations:
 # to convert and host the full 'train' dataset.
 command: |
   cd vevo-scGPT/examples
-  composer pretrain_composer.py
+  composer pretrain_composer.py /mnt/config/parameters.yaml
 image: mosaicml/llm-foundry:2.2.1_cu121_flash2-latest
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
@@ -24,7 +24,7 @@ name: scgpt-1b-gpus-8
 
 compute:
   gpus: 8  # Number of GPUs to use
-  cluster: r14z3
+  cluster: r4z8
 scheduling:
   max_duration: 0.1 # Maximum duration of the run in hours
 
@@ -35,4 +35,91 @@ scheduling:
 
 # The below is injected as a YAML file: /mnt/config/parameters.yaml
 # but is not used in this example.
-parameters: {}
+parameters:
+  global_seed: 777
+  seed: ${global_seed}
+  device_train_batch_size: 2048
+  device_eval_batch_size: 2048
+  device_train_microbatch_size: 256
+  train_loader:
+    dataset:
+      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
+      local: "mds-data-folder/train"
+      download_timeout: 300
+      allow_unsafe_types: True
+      shuffle: True
+      shuffle_seed: ${global_seed}
+    collator:
+      do_padding: True
+      pad_value: -2
+      do_mlm: True
+      do_binning: True
+      mlm_probability: 0.40
+      mask_value: -1
+      max_length: 1024
+      sampling: True
+      data_style: "both"
+    drop_last: False
+    num_workers: 8
+    pin_memory: True
+    prefetch_factor: 48
+    persistent_workers: True
+  valid_loader:
+    dataset:
+      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/valid"
+      local: "mds-data-folder/valid"
+      download_timeout: 300
+      allow_unsafe_types: True
+      shuffle: False
+    collator:
+      do_padding: True
+      pad_value: -2
+      do_mlm: True
+      do_binning: True
+      mlm_probability: 0.40
+      mask_value: -1
+      max_length: 1024
+      sampling: True
+      data_style: "both"
+    drop_last: False
+    num_workers: 8
+    pin_memory: True
+    prefetch_factor: 48
+    persistent_workers: True
+  optimizer:
+    name: decoupled_adamw
+    lr: 2.0e-4
+    betas:
+      - 0.9
+      - 0.95
+    eps: 1.0e-08
+  scheduler:
+    name: cosine_with_warmup
+    t_warmup: "0.05dur"
+    t_max: "1dur"
+    alpha_f: 0.0
+  algorithms:
+    low_precision_layernorm: {}
+    gradient_clipping:
+      clipping_type: norm
+      clipping_threshold: 1.0
+  precision: amp_bf16
+  eval_interval: "500ba"
+  max_duration: "6ep"
+  deepspeed_config:
+    zero_optimization:
+      stage: 2
+      overlap_comm: True
+      reduce_scatter: True
+    precision: amp_bf16
+    bf_16:
+      enabled: True
+  callbacks:
+    speed_monitor:
+      window_size: 20
+  loggers:
+    wandb:
+      project: vevo-scgpt
+      log_artifacts: False
+  save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+  save_interval: 250ba

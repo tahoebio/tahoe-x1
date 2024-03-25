@@ -1,7 +1,26 @@
 import composer
-import streaming
-from scgpt import DataCollator
+import copy
+import gc
+import torch
+from composer.core.callback import Callback
+from llmfoundry.utils.builders import (
+    build_algorithm,
+    build_callback,
+    build_logger,
+    build_optimizer,
+    build_scheduler,
+)
+from llmfoundry.utils.config_utils import (
+    log_config,
+    pop_config,
+    update_batch_size_info,
+)
+from omegaconf import DictConfig
+from omegaconf import OmegaConf as om
+from typing import Any, Dict, List, Optional, Union
+
 from scgpt import logger
+from scgpt.data import build_dataloader
 from scgpt.model import ComposerSCGPTModel
 from scgpt.tokenizer import GeneVocab
 from scgpt.utils import download_file_from_s3_url
@@ -11,120 +30,329 @@ def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
 
-def main():
-    dist_timeout = 600.0
-    composer.utils.dist.initialize_dist(composer.utils.get_device(None), timeout=dist_timeout)
-    train_dataset = streaming.StreamingDataset(
-        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train",
-        local="mds-data-folder/train",
-        download_timeout=300,
-        allow_unsafe_types=True,
-        shuffle=True,
-    )
-    composer.utils.dist.barrier()
-    valid_dataset = streaming.StreamingDataset(
-        remote="s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val",
-        local="mds-data-folder/val",
-        download_timeout=300,
-        allow_unsafe_types=True,
-        shuffle=False,
-    )
-    composer.utils.dist.barrier()
-    logger.info(f"train set number of samples: {(train_dataset.size)}, ")
-    logger.info(f"valid set number of samples: {(valid_dataset.size)}, ")
+def main(cfg: DictConfig) -> composer.Trainer:
+    # Resolve all interpolation variables as early as possible
+    om.resolve(cfg)
 
+    # Create copy of config for logging
+    logged_cfg: DictConfig = copy.deepcopy(cfg)
+
+    # Set seed first
+    seed: int = pop_config(cfg, "seed", must_exist=True)
+    composer.utils.reproducibility.seed_all(seed)
+
+    # Initialize pytorch distributed training process groups
+    dist_timeout: Union[int, float] = pop_config(
+        cfg, "dist_timeout", must_exist=False, default_value=600.0
+    )
+    composer.utils.dist.initialize_dist(
+        composer.utils.get_device(None), timeout=dist_timeout
+    )
+
+    # Get global and device batch size information from distributed/single node setting
+    cfg = update_batch_size_info(cfg)
+    logged_cfg.update(cfg, merge=True)
+
+    # Mandatory model training configs
+    model_config: DictConfig = pop_config(cfg, "model", must_exist=True)
+    optimizer_config: Dict[str, Any] = pop_config(
+        cfg, "optimizer", must_exist=True, convert=True
+    )
+    scheduler_config: Dict[str, Any] = pop_config(
+        cfg, "scheduler", must_exist=True, convert=True
+    )
+    train_loader_config: DictConfig = pop_config(cfg, "train_loader", must_exist=True)
+    valid_loader_config: DictConfig = pop_config(cfg, "valid_loader", must_exist=True)
+
+    # Optional deepspeed, FSDP, and torch-compile config
+    deepspeed_config: Optional[Dict[str, Any]] = pop_config(
+        cfg, "deepspeed", must_exist=False, default_value=None, convert=True
+    )
+    compile_config: Optional[Dict[str, Any]] = pop_config(
+        cfg, "compile_config", must_exist=False, default_value=None
+    )
+    fsdp_config: Optional[Dict[str, Any]] = pop_config(
+        cfg, "fsdp_config", must_exist=False, default_value=None, convert=True
+    )
+    if (fsdp_config is not None) and (deepspeed_config is not None):
+        raise ValueError("FSDP and DeepSpeed cannot be used together.")
+
+    # Optional logging, evaluation and callback configs
+    logger_configs: Optional[DictConfig] = pop_config(
+        cfg, "loggers", must_exist=False, default_value=None, convert=True
+    )
+    callback_configs: Optional[DictConfig] = pop_config(
+        cfg, "callbacks", must_exist=False, default_value=None, convert=True
+    )
+    algorithm_configs: Optional[DictConfig] = pop_config(
+        cfg, "algorithms", must_exist=False, default_value=None
+    )
+
+    # Mandatory hyperparameters for training
+    device_train_batch_size: int = pop_config(
+        cfg, "device_train_batch_size", must_exist=True
+    )
+    device_eval_batch_size: int = pop_config(
+        cfg, "device_eval_batch_size", must_exist=True
+    )
+    max_duration: Union[int, str] = pop_config(cfg, "max_duration", must_exist=True)
+    eval_interval: Union[int, str] = pop_config(
+        cfg, "eval_interval", default_value="500ba", must_exist=False
+    )
+    precision: str = pop_config(cfg, "precision", must_exist=True)
+
+    # Optional parameters will be set to default values if not specified.
+    default_run_name: str = os.environ.get("RUN_NAME", "scgpt")
+    run_name: str = pop_config(
+        cfg, "run_name", must_exist=False, default_value=default_run_name
+    )
+    save_folder: Optional[str] = pop_config(
+        cfg,
+        "save_folder",
+        must_exist=False,
+        default_value=f"s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
+    )
+    is_state_dict_sharded: bool = (
+        (fsdp_config.get("state_dict_type", "full") == "sharded")
+        if fsdp_config
+        else False
+    )
+
+    save_latest_filename: str = pop_config(
+        cfg,
+        "save_latest_filename",
+        must_exist=False,
+        default_value="latest-sharded-rank{rank}"
+        if is_state_dict_sharded
+        else "latest-rank{rank}.pt",
+    )
+
+    save_overwrite: bool = pop_config(
+        cfg, "save_overwrite", must_exist=False, default_value=False
+    )
+    save_weights_only: bool = pop_config(
+        cfg, "save_weights_only", must_exist=False, default_value=False
+    )
+    save_filename: str = pop_config(
+        cfg,
+        "save_filename",
+        must_exist=False,
+        default_value="ep{epoch}-ba{batch}-rank{rank}.pt",
+    )
+
+    save_interval: Union[str, int] = pop_config(
+        cfg, "save_interval", must_exist=False, default_value="250ba"
+    )
+
+    save_num_checkpoints_to_keep: int = pop_config(
+        cfg, "save_num_checkpoints_to_keep", must_exist=False, default_value=-1
+    )
+
+    progress_bar = pop_config(
+        cfg, "progress_bar", must_exist=False, default_value=False
+    )
+    log_to_console: bool = pop_config(
+        cfg, "log_to_console", must_exist=False, default_value=True
+    )
+    console_log_interval: Union[int, str] = pop_config(
+        cfg, "console_log_interval", must_exist=False, default_value="1ba"
+    )
+    device_train_microbatch_size: Union[str, int] = pop_config(
+        cfg, "device_train_microbatch_size", must_exist=False, default_value="auto"
+    )
+
+    load_path: str = pop_config(cfg, "load_path", must_exist=False, default_value=None)
+    load_weights_only: bool = pop_config(
+        cfg, "load_weights_only", must_exist=False, default_value=False
+    )
+    load_strict_model_weights: bool = pop_config(
+        cfg, "load_strict_model_weights", must_exist=False, default_value=True
+    )
+    load_ignore_keys: Optional[List[str]] = pop_config(
+        cfg, "load_ignore_keys", must_exist=False, default_value=None
+    )
+    should_log_config: bool = pop_config(
+        cfg, "log_config", must_exist=False, default_value=True
+    )
+    # Enable autoresume from model checkpoints if possible
+    autoresume_default: bool = False
+    if (
+        logged_cfg.get("run_name", None) is not None
+        and save_folder is not None
+        and not save_overwrite
+        and not save_weights_only
+    ):
+        autoresume_default = True
+
+    if cfg.get("autoresume") is None and autoresume_default:
+        log.info(
+            "As run_name, save_folder, and save_latest_filename are set, \
+                    changing autoresume default to True..."
+        )
+
+    autoresume: bool = pop_config(
+        cfg, "autoresume", must_exist=False, default_value=autoresume_default
+    )
+
+    # Pop known unused parameters that are used as interpolation variables or
+    # created by update_batch_size_info.
+    pop_config(cfg, "data_local", must_exist=False)
+    pop_config(cfg, "data_remote", must_exist=False)
+    pop_config(cfg, "global_seed", must_exist=False)
+    pop_config(cfg, "global_train_batch_size", must_exist=False)
+    pop_config(cfg, "n_gpus", must_exist=False)
+    pop_config(cfg, "device_train_grad_accum", must_exist=False)
+
+    # Warn users for unused parameters
+    for key in cfg:
+        warnings.warn(
+            f"Unused parameter {key} found in cfg. Please check your yaml to ensure this parameter is necessary."
+        )
+
+    # Warn if fsdp is enabled but user only has 1 GPU
+    if dist.get_world_size() == 1 and fsdp_config is not None:
+        warnings.warn(
+            "FSDP is not applicable for single-GPU training. Reverting to DDP."
+        )
+        fsdp_config = None
+
+    logger.info("Downloading vocab...")
     download_file_from_s3_url(
         "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
         "vocab.json",
     )
+
+    # Build vocab
     vocab = GeneVocab.from_file("vocab.json")
     special_tokens = ["<pad>", "<cls>", "<eoc>"]
+
     for s in special_tokens:
         if s not in vocab:
             vocab.append_token(s)
 
-    PAD_VALUE=-2
-    MASK_VALUE=-1
-    PAD_TOKEN_ID = vocab["<pad>"]
-    collator = DataCollator(
-        do_padding=True,
-        pad_token_id=vocab["<pad>"],
-        pad_value=PAD_VALUE,
-        do_mlm=True,
-        do_binning=True,
-        mlm_probability=0.40,
-        mask_value=MASK_VALUE,
-        max_length=1024,
-        sampling=True,
-        data_style="both",
-    )
-    train_loader = streaming.StreamingDataLoader(
-        train_dataset,
-        batch_size=8 * 256,
-        collate_fn=collator,
-        drop_last=False,
-        num_workers=8,
-        pin_memory=True,
-        prefetch_factor=48,
-        persistent_workers=True,
-    )
-    valid_loader = streaming.StreamingDataLoader(
-        valid_dataset,
-        batch_size=8 * 256,
-        collate_fn=collator,
-        num_workers=8,
-        drop_last=False,
-        pin_memory=True,
-        persistent_workers=True,
-        prefetch_factor=48,
+    # Scheduler
+    scheduler_name: str = scheduler_config.pop("name")
+    scheduler = build_scheduler(scheduler_name, scheduler_config)
+
+    # Loggers
+    loggers = (
+        [
+            build_logger(str(name), logger_cfg)
+            for name, logger_cfg in logger_configs.items()
+        ]
+        if logger_configs
+        else []
     )
 
-    model = ComposerSCGPTModel(ntoken=len(vocab),
-                               pad_token_id=PAD_TOKEN_ID,
-                               pad_value=PAD_VALUE)
+    # Callbacks
+    callbacks: List[Callback] = (
+        [
+            build_callback(str(name), callback_cfg, om.to_container(logged_cfg))
+            for name, callback_cfg in callback_configs.items()
+        ]
+        if callback_configs
+        else []
+    )
+
+    # Algorithms
+    algorithms = (
+        [
+            build_algorithm(str(name), algorithm_cfg)
+            for name, algorithm_cfg in algorithm_configs.items()
+        ]
+        if algorithm_configs
+        else None
+    )
+
+    # Build DataLoaders
+    logger.info("Building DataLoaders...")
+    train_loader = build_dataloader(
+        loader_cfg=train_loader_config,
+        vocab=vocab,
+        device_batch_size=device_train_batch_size,
+    )
+
+    valid_loader = build_dataloader(
+        loader_cfg=valid_loader_config,
+        vocab=vocab,
+        device_batch_size=device_eval_batch_size,
+    )
+
+    # Build Model
+    PAD_VALUE = -2
+    PAD_TOKEN_ID = vocab["<pad>"]
+    model = ComposerSCGPTModel(
+        ntoken=len(vocab), pad_token_id=PAD_TOKEN_ID, pad_value=PAD_VALUE
+    )
     logger.info(
         f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
     )
     for name, sub_model in model.model.named_children():
         logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
-    optimizer = composer.optim.DecoupledAdamW(
-        model.parameters(), lr=2e-4, betas=(0.9, 0.95), eps=1e-8
-    )
-    scheduler = composer.optim.scheduler.CosineAnnealingWithWarmupScheduler(
-        t_warmup="0.05dur", t_max="1dur", alpha_f=0.0
-    )
+    # Optimizer
+    optimizer_name: str = optimizer_config.pop("name")
+    optimizer = build_optimizer(model, optimizer_name, optimizer_config)
+
+    # Build the Trainer
+    logger.info("Building Trainer...")
     trainer = composer.Trainer(
+        run_name=run_name,
+        seed=seed,
         model=model,
-        optimizers=optimizer,
         train_dataloader=train_loader,
-        max_duration="6ep",
-        device="gpu",
         eval_dataloader=valid_loader,
-        eval_interval="500ba",
+        optimizers=optimizer,
         schedulers=scheduler,
-        device_train_microbatch_size=256,
-        algorithms=[composer.algorithms.LowPrecisionLayerNorm()],
-        precision="amp_bf16",
-        deepspeed_config={
-            "zero_optimization": {
-                "stage": 2,
-                "overlap_comm": "true",
-                "reduce_scatter": "true",
-            },
-            "precision": "amp_bf16",
-            "bf16": {"enabled": "true"},
-        },
-        callbacks=[composer.callbacks.SpeedMonitor(window_size=20)],
-        loggers=[
-            composer.loggers.WandBLogger(project="vevo-scgpt", log_artifacts=False),
-        ],
-        save_folder="s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
-        save_interval="250ba",
-        save_latest_filename="latest",
+        max_duration=max_duration,
+        eval_interval=eval_interval,
+        progress_bar=progress_bar,
+        log_to_console=log_to_console,
+        console_log_interval=console_log_interval,
+        loggers=loggers,
+        callbacks=callbacks,
+        precision=precision,
+        algorithms=algorithms,
+        device_train_microbatch_size=device_train_microbatch_size,
+        fsdp_config=fsdp_config,
+        deepspeed_config=deepspeed_config,
+        save_folder=save_folder,
+        save_filename=save_filename,
+        save_latest_filename=save_latest_filename,
+        save_interval=save_interval,
+        save_num_checkpoints_to_keep=save_num_checkpoints_to_keep,
+        save_overwrite=save_overwrite,
+        save_weights_only=save_weights_only,
+        load_path=load_path,
+        load_weights_only=load_weights_only,
+        load_strict_model_weights=load_strict_model_weights,
+        load_ignore_keys=load_ignore_keys,
+        autoresume=autoresume,
+        dist_timeout=dist_timeout,
+        compile_config=compile_config,
     )
+
+    if should_log_config:
+        logger.info("Logging config")
+        log_config(logged_cfg)
+    torch.cuda.empty_cache()
+    gc.collect()
+
+    logger.info("Starting training...")
     trainer.fit()
+    logger.info("Training finished.")
+    return trainer
 
 
 if __name__ == "__main__":
-    main()
+    yaml_path, args_list = sys.argv[1], sys.argv[2:]
+    # Disable resolving environment variables through omegaconf.
+    om.clear_resolver("oc.env")
+    # Load yaml and cli arguments.
+    with open(yaml_path) as f:
+        yaml_cfg = om.load(f)
+    cli_cfg = om.from_cli(args_list)
+    cfg = om.merge(yaml_cfg, cli_cfg)
+    om.resolve(cfg)
+    assert isinstance(cfg, DictConfig)
+    main(cfg)
