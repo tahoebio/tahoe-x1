@@ -2,7 +2,10 @@ import composer
 import copy
 import gc
 import torch
+import sys
+import os
 from composer.core.callback import Callback
+import warnings
 from llmfoundry.utils.builders import (
     build_algorithm,
     build_callback,
@@ -18,8 +21,9 @@ from llmfoundry.utils.config_utils import (
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from typing import Any, Dict, List, Optional, Union
-import sys
-import os
+from rich.traceback import install
+
+install()
 
 from scgpt import logger
 from scgpt.data import build_dataloader
