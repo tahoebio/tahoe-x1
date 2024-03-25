@@ -3,6 +3,7 @@ import copy
 import gc
 import torch
 import sys
+import logging
 import os
 from composer.core.callback import Callback
 from composer.utils import dist, reproducibility, get_device
@@ -26,12 +27,13 @@ from rich.traceback import install
 
 install()
 
-from scgpt import logger
 from scgpt.data import build_dataloader
 from scgpt.model import ComposerSCGPTModel
 from scgpt.tokenizer import GeneVocab
 from scgpt.utils import download_file_from_s3_url
 
+
+log = logging.getLogger(__name__)
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -161,6 +163,10 @@ def main(cfg: DictConfig) -> composer.Trainer:
     log_to_console: bool = pop_config(
         cfg, "log_to_console", must_exist=False, default_value=True
     )
+    python_log_level: Optional[str] = pop_config(cfg,
+                                                 'python_log_level',
+                                                 must_exist=False,
+                                                 default_value='debug')
     console_log_interval: Union[int, str] = pop_config(
         cfg, "console_log_interval", must_exist=False, default_value="1ba"
     )
@@ -223,7 +229,20 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )
         fsdp_config = None
 
-    logger.info("Downloading vocab...")
+    # Set logging level
+    if python_log_level is not None:
+        logging.basicConfig(
+            # Example of format string
+            # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
+            format=
+            f'%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s'
+        )
+        logging.getLogger('scgpt').setLevel(
+            python_log_level.upper())  # vevo-scGPT module
+        logging.getLogger(__name__).setLevel(
+            python_log_level.upper())  # Train script
+
+    log.info("Downloading vocab...")
     if dist.get_local_rank() == 0:
         download_file_from_s3_url(
             "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
@@ -275,7 +294,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
 
     # Build DataLoaders
-    logger.info("Building DataLoaders...")
+    log.info("Building DataLoaders...")
     train_loader = build_dataloader(
         loader_cfg=train_loader_config,
         vocab=vocab,
@@ -294,18 +313,18 @@ def main(cfg: DictConfig) -> composer.Trainer:
     model = ComposerSCGPTModel(
         ntoken=len(vocab), pad_token_id=PAD_TOKEN_ID, pad_value=PAD_VALUE
     )
-    logger.info(
+    log.info(
         f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
     )
     for name, sub_model in model.model.named_children():
-        logger.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
+        log.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 
     # Optimizer
     optimizer_name: str = optimizer_config.pop("name")
     optimizer = build_optimizer(model, optimizer_name, optimizer_config)
 
     # Build the Trainer
-    logger.info("Building Trainer...")
+    log.info("Building Trainer...")
     trainer = composer.Trainer(
         run_name=run_name,
         seed=seed,
@@ -343,14 +362,14 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
 
     if should_log_config:
-        logger.info("Logging config")
+        log.info("Logging config")
         log_config(logged_cfg)
     torch.cuda.empty_cache()
     gc.collect()
 
-    logger.info("Starting training...")
+    log.info("Starting training...")
     trainer.fit()
-    logger.info("Training finished.")
+    log.info("Training finished.")
     return trainer
 
 

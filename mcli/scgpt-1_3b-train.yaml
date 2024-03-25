@@ -38,10 +38,10 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 2048
-  global_train_batch_size: 16384
-  device_eval_batch_size: 2048
-  device_train_microbatch_size: 256
+  device_train_batch_size: 2000
+  global_train_batch_size: 16000
+  device_eval_batch_size: 2000
+  device_train_microbatch_size: 400
   model:
     name: vevo_scgpt
     d_model: 512
