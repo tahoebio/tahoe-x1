@@ -5,6 +5,7 @@ import torch
 import sys
 import os
 from composer.core.callback import Callback
+from composer.utils import dist, reproducibility, get_device
 import warnings
 from llmfoundry.utils.builders import (
     build_algorithm,
@@ -45,14 +46,14 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     # Set seed first
     seed: int = pop_config(cfg, "seed", must_exist=True)
-    composer.utils.reproducibility.seed_all(seed)
+    reproducibility.seed_all(seed)
 
     # Initialize pytorch distributed training process groups
     dist_timeout: Union[int, float] = pop_config(
         cfg, "dist_timeout", must_exist=False, default_value=600.0
     )
-    composer.utils.dist.initialize_dist(
-        composer.utils.get_device(None), timeout=dist_timeout
+    dist.initialize_dist(
+        get_device(None), timeout=dist_timeout
     )
 
     # Get global and device batch size information from distributed/single node setting
@@ -72,7 +73,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     # Optional deepspeed, FSDP, and torch-compile config
     deepspeed_config: Optional[Dict[str, Any]] = pop_config(
-        cfg, "deepspeed", must_exist=False, default_value=None, convert=True
+        cfg, "deepspeed_config", must_exist=False, default_value=None, convert=True
     )
     compile_config: Optional[Dict[str, Any]] = pop_config(
         cfg, "compile_config", must_exist=False, default_value=None
@@ -216,17 +217,20 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )
 
     # Warn if fsdp is enabled but user only has 1 GPU
-    if composer.utils.dist.get_world_size() == 1 and fsdp_config is not None:
+    if dist.get_world_size() == 1 and fsdp_config is not None:
         warnings.warn(
             "FSDP is not applicable for single-GPU training. Reverting to DDP."
         )
         fsdp_config = None
 
     logger.info("Downloading vocab...")
-    download_file_from_s3_url(
-        "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
-        "vocab.json",
-    )
+    if dist.get_local_rank() == 0:
+        download_file_from_s3_url(
+            "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
+            "vocab.json",
+        )
+    with dist.local_rank_zero_download_and_wait("vocab.json"):
+        dist.barrier()
 
     # Build vocab
     vocab = GeneVocab.from_file("vocab.json")
