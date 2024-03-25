@@ -18,6 +18,7 @@ from llmfoundry.utils.config_utils import (
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from typing import Any, Dict, List, Optional, Union
+import sys
 
 from scgpt import logger
 from scgpt.data import build_dataloader
@@ -210,7 +211,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )
 
     # Warn if fsdp is enabled but user only has 1 GPU
-    if dist.get_world_size() == 1 and fsdp_config is not None:
+    if composer.utils.dist.get_world_size() == 1 and fsdp_config is not None:
         warnings.warn(
             "FSDP is not applicable for single-GPU training. Reverting to DDP."
         )
