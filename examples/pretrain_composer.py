@@ -19,6 +19,7 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from typing import Any, Dict, List, Optional, Union
 import sys
+import os
 
 from scgpt import logger
 from scgpt.data import build_dataloader

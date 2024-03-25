@@ -39,8 +39,12 @@ parameters:
   global_seed: 777
   seed: ${global_seed}
   device_train_batch_size: 2048
+  global_train_batch_size: 16384
   device_eval_batch_size: 2048
   device_train_microbatch_size: 256
+  model:
+    name: vevo_scgpt
+    d_model: 512
   train_loader:
     dataset:
       remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
