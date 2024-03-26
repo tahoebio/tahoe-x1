@@ -36,12 +36,6 @@ class SCGPTModel(nn.Module):
 
         self.attn_config = model_config.get("attn_config", None)
         self.norm_config = model_config.get("norm_config", None)
-
-        if self.input_emb_style not in ["category", "continuous"]:
-            raise ValueError(
-                f"input_emb_style should be one of category or continuous"
-                f"got {self.input_emb_style}"
-            )
         if self.cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
 
@@ -53,6 +47,11 @@ class SCGPTModel(nn.Module):
 
         expression_encoder_config = model_config.expression_encoder
         self.input_emb_style = expression_encoder_config.get("input_emb_style", "continuous")
+        if self.input_emb_style not in ["category", "continuous"]:
+            raise ValueError(
+                f"input_emb_style should be one of category or continuous"
+                f"got {self.input_emb_style}"
+            )
         if self.input_emb_style == "continuous":
             self.expression_encoder = ContinuousValueEncoder(
                 d_model=self.d_model,
