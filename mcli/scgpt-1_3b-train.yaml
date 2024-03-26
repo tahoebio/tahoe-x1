@@ -59,6 +59,11 @@ parameters:
     norm_config:
       norm_type: "low_precision_layernorm"
       eps: 1e-5
+    expression_encoder:
+      input_emb_style: "continuous"
+      dropout: 0.1
+      max_value: 512
+      activation: relu
     mvc:
       arch_style: "inner product"
       query_activation: "sigmoid"

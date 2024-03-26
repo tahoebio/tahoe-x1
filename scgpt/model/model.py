@@ -37,8 +37,6 @@ class SCGPTModel(nn.Module):
         self.attn_config = model_config.get("attn_config", None)
         self.norm_config = model_config.get("norm_config", None)
 
-        value_encoder_config = model_config.value_encoder
-        self.input_emb_style = value_encoder_config.get("input_emb_style", "continuous")
         if self.input_emb_style not in ["category", "continuous"]:
             raise ValueError(
                 f"input_emb_style should be one of category or continuous"
@@ -52,9 +50,15 @@ class SCGPTModel(nn.Module):
             self.vocab_size, self.d_model, padding_idx=self.pad_token_id
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
+
+        expression_encoder_config = model_config.expression_encoder
+        self.input_emb_style = expression_encoder_config.get("input_emb_style", "continuous")
         if self.input_emb_style == "continuous":
             self.expression_encoder = ContinuousValueEncoder(
-                self.d_model, value_encoder_config.get("dropout", 0.1)
+                d_model=self.d_model,
+                dropout=expression_encoder_config.get("dropout", 0.1),
+                max_value=expression_encoder_config.get("max_value", 512),
+                activation=expression_encoder_config.get("activation", "relu"),
             )
         elif self.input_emb_style == "category":
             assert self.n_input_bins > 0
@@ -522,11 +526,15 @@ class ContinuousValueEncoder(nn.Module):
     Encode real number values to a vector using neural nets projection.
     """
 
-    def __init__(self, d_model: int, dropout: float = 0.1, max_value: int = 512):
+    def __init__(self,
+                 d_model: int,
+                 dropout: float = 0.1,
+                 max_value: int = 512,
+                 activation: str = "relu"):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
-        self.activation = nn.ReLU()
+        self.activation = resolve_ffn_act_fn(activation)
         self.linear2 = nn.Linear(d_model, d_model)
         self.norm = nn.LayerNorm(d_model)
         self.max_value = max_value
