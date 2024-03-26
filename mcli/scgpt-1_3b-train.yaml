@@ -63,6 +63,8 @@ parameters:
       max_length: 1024
       sampling: True
       data_style: "both"
+      num_bins: 51
+      right_binning: False
     drop_last: False
     num_workers: 8
     pin_memory: True
@@ -86,6 +88,8 @@ parameters:
       max_length: 1024
       sampling: True
       data_style: "both"
+      num_bins: 51
+      right_binning: False
     drop_last: False
     num_workers: 8
     pin_memory: True

@@ -42,6 +42,9 @@ def build_dataloader(loader_cfg: DictConfig,
         max_length=collator_cfg.max_length,
         sampling=collator_cfg.sampling,
         data_style=collator_cfg.data_style,
+        num_bins=collator_cfg.get("num_bins", 51),
+        right_binning=collator_cfg.get("right_binning", False),
+
     )
 
     data_loader = StreamingDataLoader(
