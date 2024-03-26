@@ -302,17 +302,17 @@ def main(cfg: DictConfig) -> composer.Trainer:
         vocab=vocab,
         device_batch_size=device_train_batch_size,
     )
-    log.info(f"train set number of samples: {(train_loader.dataset.size)}")
+    log.info(f"train set number of samples: {(train_loader.num_samples)}")
     valid_loader = build_dataloader(
         loader_cfg=valid_loader_config,
         vocab=vocab,
         device_batch_size=device_eval_batch_size,
     )
-    log.info(f"Validation set number of samples: {(valid_loader.dataset.size)}")
+    log.info(f"Validation set number of samples: {(valid_loader.num_samples)}")
     logged_cfg.update(
         {
-            "train_dataset_size": train_loader.dataset.size,
-            "valid_dataset_size": valid_loader.dataset.size,
+            "train_dataset_size": train_loader.num_samples,
+            "valid_dataset_size": valid_loader.num_samples,
         }
     )
 
