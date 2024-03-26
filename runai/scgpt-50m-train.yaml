@@ -1,0 +1,127 @@
+global_seed: 777
+seed: ${global_seed}
+device_train_batch_size: 450
+global_train_batch_size: 3600
+device_eval_batch_size: 450
+device_train_microbatch_size: 450
+model:
+  name: vevo_scgpt
+  d_model: 512
+  n_layers: 12
+  expansion_ratio: 1
+  transformer_activation: gelu
+  n_heads: 8
+  norm_scheme: "pre"
+  use_generative_training: True
+  cell_emb_style: cls
+  attn_config:
+    attn_impl: triton
+    attn_type: "grouped_query_attention"
+    kv_nheads: 8
+    attn_pdrop: 0.0
+  norm_config:
+    norm_type: "low_precision_layernorm"
+    eps: 1.0e-5
+  expression_encoder:
+    input_emb_style: "continuous"
+    dropout: 0.1
+    max_value: 512
+    activation: relu
+  mvc:
+    arch_style: "inner product"
+    query_activation: "silu"
+  expression_decoder:
+    n_outputs: 1
+    n_layers: 2
+    activation: "gelu"
+train_loader:
+  dataset:
+    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
+    local: "mds-data-folder/train"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: True
+    shuffle_seed: ${global_seed}
+  collator:
+    do_padding: True
+    pad_value: -2
+    do_mlm: True
+    do_binning: True
+    mlm_probability: 0.40
+    mask_value: -1
+    max_length: 1024
+    sampling: True
+    data_style: "both"
+    num_bins: 51
+    right_binning: True
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+valid_loader:
+  dataset:
+    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val"
+    local: "mds-data-folder/val"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: False
+    shuffle_seed: ${global_seed}
+  collator:
+    do_padding: True
+    pad_value: -2
+    do_mlm: True
+    do_binning: True
+    mlm_probability: 0.40
+    mask_value: -1
+    max_length: 1024
+    sampling: True
+    data_style: "both"
+    num_bins: 51
+    right_binning: True
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+optimizer:
+  name: decoupled_adamw
+  lr: 2.0e-4
+  betas:
+    - 0.9
+    - 0.95
+  eps: 1.0e-08
+  weight_decay: 2.0e-05
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: "0.05dur"
+  t_max: "1dur"
+  alpha_f: 0.1
+algorithms:
+  low_precision_layernorm: {}
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+precision: amp_bf16
+eval_interval: "500ba"
+max_duration: "6ep"
+deepspeed_config:
+  zero_optimization:
+    stage: 2
+    overlap_comm: True
+    reduce_scatter: True
+  precision: amp_bf16
+  bf_16:
+    enabled: True
+callbacks:
+  speed_monitor:
+    window_size: 20
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+loggers:
+  wandb:
+    project: vevo-scgpt
+    log_artifacts: False
+save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_interval: "500ba"
