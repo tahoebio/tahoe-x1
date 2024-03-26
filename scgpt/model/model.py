@@ -21,7 +21,7 @@ class SCGPTModel(nn.Module):
         self.device = device
         self.vocab_size = model_config.vocab_size
         self.n_layers = model_config.n_layers
-        self.n_heads = model_config.nheads
+        self.n_heads = model_config.n_heads
         self.d_model = model_config.d_model
         self.expansion_ratio = model_config.expansion_ratio
         self.norm_scheme = model_config.get("norm_scheme", "pre")
@@ -67,7 +67,7 @@ class SCGPTModel(nn.Module):
         if self.use_generative_training:
             encoder_layers = SCGPTBlock(
                 d_model=self.d_model,
-                n_heads=self.nheads,
+                n_heads=self.n_heads,
                 expansion_ratio=self.expansion_ratio,
                 attn_config=self.attn_config,
                 norm_config=self.norm_config,
