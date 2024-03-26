@@ -35,6 +35,7 @@ from scgpt.utils import download_file_from_s3_url
 
 log = logging.getLogger(__name__)
 
+
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)
 
@@ -54,9 +55,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     dist_timeout: Union[int, float] = pop_config(
         cfg, "dist_timeout", must_exist=False, default_value=600.0
     )
-    dist.initialize_dist(
-        get_device(None), timeout=dist_timeout
-    )
+    dist.initialize_dist(get_device(None), timeout=dist_timeout)
 
     # Get global and device batch size information from distributed/single node setting
     cfg = update_batch_size_info(cfg)
@@ -163,10 +162,9 @@ def main(cfg: DictConfig) -> composer.Trainer:
     log_to_console: bool = pop_config(
         cfg, "log_to_console", must_exist=False, default_value=True
     )
-    python_log_level: Optional[str] = pop_config(cfg,
-                                                 'python_log_level',
-                                                 must_exist=False,
-                                                 default_value='debug')
+    python_log_level: Optional[str] = pop_config(
+        cfg, "python_log_level", must_exist=False, default_value="debug"
+    )
     console_log_interval: Union[int, str] = pop_config(
         cfg, "console_log_interval", must_exist=False, default_value="1ba"
     )
@@ -234,13 +232,12 @@ def main(cfg: DictConfig) -> composer.Trainer:
         logging.basicConfig(
             # Example of format string
             # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
-            format=
-            f'%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s'
+            format=f"%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s"
         )
-        logging.getLogger('scgpt').setLevel(
-            python_log_level.upper())  # vevo-scGPT module
-        logging.getLogger(__name__).setLevel(
-            python_log_level.upper())  # Train script
+        logging.getLogger("scgpt").setLevel(
+            python_log_level.upper()
+        )  # vevo-scGPT module
+        logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
     log.info("Downloading vocab...")
     if dist.get_local_rank() == 0:
@@ -317,9 +314,18 @@ def main(cfg: DictConfig) -> composer.Trainer:
         model_config=model_config,
         collator_config=train_loader_config.collator,
     )
-    log.info(
-        f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"
+
+    # Log number of parameters
+    n_params = sum(p.numel() for p in model.parameters())
+    n_trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logged_cfg.update(
+        {
+            "n_params": n_params,
+            "n_trainable_params": n_trainable_params,
+        }
     )
+    log.info(f"Total parameters: {n_params / (10 ** 6)} M")
+    log.info(f"Total trainable parameters: {n_trainable_params / (10 ** 6)} M ")
     for name, sub_model in model.model.named_children():
         log.info(f"{name}: {count_parameters(sub_model) / (10 ** 6)} M parameters")
 

@@ -46,7 +46,9 @@ class SCGPTModel(nn.Module):
         self.flag_encoder = nn.Embedding(2, self.d_model)
 
         expression_encoder_config = model_config.expression_encoder
-        self.input_emb_style = expression_encoder_config.get("input_emb_style", "continuous")
+        self.input_emb_style = expression_encoder_config.get(
+            "input_emb_style", "continuous"
+        )
         if self.input_emb_style not in ["category", "continuous"]:
             raise ValueError(
                 f"input_emb_style should be one of category or continuous"
@@ -86,18 +88,18 @@ class SCGPTModel(nn.Module):
 
         expression_decoder_config = model_config.expression_decoder
         self.expression_decoder = ExprDecoder(
-            d_model = self.d_model,
-            n_outputs = expression_decoder_config.get("n_outputs", 1),
-            n_layers = expression_decoder_config.get("n_layers", 2),
-            activation = expression_decoder_config.get("activation", "leaky_relu"),
+            d_model=self.d_model,
+            n_outputs=expression_decoder_config.get("n_outputs", 1),
+            n_layers=expression_decoder_config.get("n_layers", 2),
+            activation=expression_decoder_config.get("activation", "leaky_relu"),
         )
 
         if model_config.mvc is not None:
             mvc_config = model_config.mvc
             self.mvc_decoder = MVCDecoder(
-                d_model = self.d_model,
-                arch_style = mvc_config.arch_style,
-                query_activation = mvc_config.query_activation,
+                d_model=self.d_model,
+                arch_style=mvc_config.arch_style,
+                query_activation=mvc_config.query_activation,
             )
 
         self.init_weights()
@@ -525,15 +527,17 @@ class ContinuousValueEncoder(nn.Module):
     Encode real number values to a vector using neural nets projection.
     """
 
-    def __init__(self,
-                 d_model: int,
-                 dropout: float = 0.1,
-                 max_value: int = 512,
-                 activation: str = "relu"):
+    def __init__(
+        self,
+        d_model: int,
+        dropout: float = 0.1,
+        max_value: int = 512,
+        activation: str = "relu",
+    ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
-        self.activation = resolve_ffn_act_fn({"name":activation})
+        self.activation = resolve_ffn_act_fn({"name": activation})
         self.linear2 = nn.Linear(d_model, d_model)
         self.norm = nn.LayerNorm(d_model)
         self.max_value = max_value
@@ -584,7 +588,7 @@ class ExprDecoder(nn.Module):
     ):
         super().__init__()
         d_in = d_model
-        self.activation = resolve_ffn_act_fn({"name":activation})
+        self.activation = resolve_ffn_act_fn({"name": activation})
         self.linear_layers = nn.ModuleList(
             [nn.Linear(d_in, d_model) for _ in range(n_layers)]
         )
@@ -664,6 +668,7 @@ class ComposerSCGPTModel(ComposerModel):
             collator_config=collator_config,
             device=device,
         )
+        self.n_active_params = sum(p.numel() for p in self.model.parameters())
         self.train_mse = MaskedMseMetric(name="MSE")
         self.train_mvc = MaskedMseMetric(name="MVC")
         self.train_gen = MaskedMseMetric(name="GEN")
@@ -742,3 +747,17 @@ class ComposerSCGPTModel(ComposerModel):
                 "GEN": self.val_gen,
             }
         return metric_dict
+
+    def flops_per_batch(self, batch: Mapping) -> int:
+        # specify how to compute the number of FLOPs for a batch
+        bs = batch["pcpt_gene"].shape[0]
+        pcpt_len = batch["pcpt_gene"].shape[1]
+        gen_len = batch["gen_gene"].shape[1]
+        msl = pcpt_len + gen_len  # Assumes no-padding (as an approximation)
+        params = self.n_active_params
+        params_flops_per_token = 2 * params
+        params_flops_per_seq = params_flops_per_token * msl
+        attn_flops_per_seq = (
+            self.model.n_layers * 2 * 2 * (self.model.d_model * (msl**2))
+        )
+        return (params_flops_per_seq + attn_flops_per_seq) * 3 * bs

@@ -58,7 +58,7 @@ parameters:
       attn_pdrop: 0.0
     norm_config:
       norm_type: "low_precision_layernorm"
-      eps: 1e-5
+      eps: 1.0e-5
     expression_encoder:
       input_emb_style: "continuous"
       dropout: 0.1
@@ -152,6 +152,9 @@ parameters:
   callbacks:
     speed_monitor:
       window_size: 20
+    lr_monitor: {}
+    memory_monitor: {}
+    runtime_estimator: {}
   loggers:
     wandb:
       project: vevo-scgpt
