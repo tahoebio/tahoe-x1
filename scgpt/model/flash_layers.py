@@ -88,8 +88,8 @@ class SCGPTBlock(nn.Module):
 
         # Norms
         norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
-        self.norm1 = norm_class(d_model, device=device, **norm_config)
-        self.norm2 = norm_class(d_model, device=device, **norm_config)
+        self.norm1 = norm_class(d_model, device=device, eps=norm_config.get("eps", 1e-5))
+        self.norm2 = norm_class(d_model, device=device, eps=norm_config.get("eps", 1e-5))
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
