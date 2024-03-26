@@ -1,5 +1,5 @@
 from functools import lru_cache
-from typing import Optional
+from typing import Any, Dict, List, Optional, Union
 import torch
 import torch.nn as nn
 from torch import Tensor
