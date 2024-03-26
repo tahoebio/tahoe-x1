@@ -1,98 +1,100 @@
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from torch.nn import TransformerEncoder, TransformerEncoderLayer
 from typing import Dict, Mapping, Optional, Tuple, Any, Union
 from composer.models import ComposerModel
 from scgpt.loss import masked_mse_loss, MaskedMseMetric
 from .flash_layers import SCGPTBlock, FlashscGPTGenerator
+from llmfoundry.models.layers.ffn import resolve_ffn_hidden_size, resolve_ffn_act_fn
+from omegaconf import DictConfig
 
 
 class SCGPTModel(nn.Module):
     def __init__(
         self,
-        ntoken: int,
-        d_model: int,
-        nhead: int,
-        d_hid: int,
-        nlayers: int,
-        pad_token_id: int,
-        pad_value: int,
-        dropout: float = 0.5,
-        do_mvc: bool = False,
-        input_emb_style: str = "continuous",
-        n_input_bins: Optional[int] = None,
-        cell_emb_style: str = "cls",
-        mvc_decoder_style: str = "inner product",
-        use_generative_training=False,
-        use_fast_transformer: bool = False,
-        fast_transformer_backend: str = "flash",
-        pre_norm: bool = False,
+        model_config: DictConfig,
+        collator_config: DictConfig,
+        device: Optional[str] = None,
     ):
         super().__init__()
         self.model_type = "Transformer"
-        self.d_model = d_model
-        self.input_emb_style = input_emb_style
-        self.cell_emb_style = cell_emb_style
-        self.pad_token_id = pad_token_id
-        self.norm_scheme = "pre" if pre_norm else "post"
+        self.device = device
+        self.vocab_size = model_config.vocab_size
+        self.n_layers = model_config.n_layers
+        self.n_heads = model_config.nheads
+        self.d_model = model_config.d_model
+        self.expansion_ratio = model_config.expansion_ratio
+        self.norm_scheme = model_config.get("norm_scheme", "pre")
+        self.transformer_activation = model_config.get("transformer_activation", "gelu")
+        self.use_generative_training = model_config.get("use_generative_training", True)
+
+        self.cell_emb_style = model_config.get("cell_emb_style", "cls")
+
+        self.pad_token_id = collator_config.pad_token_id
+        self.pad_value = collator_config.pad_value
+        self.n_input_bins = collator_config.num_bins
+
+        self.attn_config = model_config.get("attn_config", None)
+        self.norm_config = model_config.get("norm_config", None)
+
+        value_encoder_config = model_config.value_encoder
+        self.input_emb_style = value_encoder_config.get("input_emb_style", "continuous")
         if self.input_emb_style not in ["category", "continuous"]:
             raise ValueError(
                 f"input_emb_style should be one of category or continuous"
-                f"got {input_emb_style}"
+                f"got {self.input_emb_style}"
             )
-        if cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
-            raise ValueError(f"Unknown cell_emb_style: {cell_emb_style}")
+        if self.cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
+            raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
 
         # TODO: add dropout in the GeneEncoder
-        self.gene_encoder = GeneEncoder(ntoken, d_model, padding_idx=pad_token_id)
-        self.flag_encoder = nn.Embedding(2, d_model)
-        if input_emb_style == "continuous":
-            self.expression_encoder = ContinuousValueEncoder(d_model, dropout)
-        elif input_emb_style == "category":
-            assert n_input_bins > 0
+        self.gene_encoder = GeneEncoder(
+            self.vocab_size, self.d_model, padding_idx=self.pad_token_id
+        )
+        self.flag_encoder = nn.Embedding(2, self.d_model)
+        if self.input_emb_style == "continuous":
+            self.expression_encoder = ContinuousValueEncoder(
+                self.d_model, value_encoder_config.get("dropout", 0.1)
+            )
+        elif self.input_emb_style == "category":
+            assert self.n_input_bins > 0
             self.expression_encoder = CategoryValueEncoder(
-                n_input_bins, d_model, padding_idx=pad_value
+                self.n_input_bins, self.d_model, padding_idx=self.pad_value
             )
         else:
-            raise ValueError(f"Unknown input_emb_style: {input_emb_style}")
+            raise ValueError(f"Unknown input_emb_style: {self.input_emb_style}")
 
-        if use_generative_training:
+        if self.use_generative_training:
             encoder_layers = SCGPTBlock(
-                d_model,
-                nhead,
-                d_hid,
-                dropout,
+                d_model=self.d_model,
+                n_heads=self.nheads,
+                expansion_ratio=self.expansion_ratio,
+                attn_config=self.attn_config,
+                norm_config=self.norm_config,
+                activation=self.transformer_activation,
+                device=self.device,
                 norm_scheme=self.norm_scheme,
             )
-            self.transformer_encoder = FlashscGPTGenerator(encoder_layers, nlayers)
-        elif use_fast_transformer:
-            if fast_transformer_backend == "flash":
-                encoder_layers = FlashTransformerEncoderLayer(
-                    d_model,
-                    nhead,
-                    d_hid,
-                    dropout,
-                    batch_first=True,
-                    norm_scheme=self.norm_scheme,
-                )
-                self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
-            else:
-                raise ValueError(f"Unknown fast_transformer_backend: {fast_transformer_backend}")
-        else:
-            encoder_layers = TransformerEncoderLayer(
-                d_model, nhead, d_hid, dropout, batch_first=True
+            self.transformer_encoder = FlashscGPTGenerator(
+                encoder_layers, self.n_layers
             )
-            self.transformer_encoder = TransformerEncoder(encoder_layers, nlayers)
+        else:
+            raise NotImplementedError("Only generative training is supported")
 
+        expression_decoder_config = model_config.expression_decoder
         self.expression_decoder = ExprDecoder(
-            d_model,
+            d_model = self.d_model,
+            n_outputs = expression_decoder_config.get("n_outputs", 1),
+            n_layers = expression_decoder_config.get("n_layers", 2),
+            activation = expression_decoder_config.get("activation", "leaky_relu"),
         )
 
-        if do_mvc:
+        if model_config.mvc is not None:
+            mvc_config = model_config.mvc
             self.mvc_decoder = MVCDecoder(
-                d_model,
-                arch_style=mvc_decoder_style,
+                d_model = self.d_model,
+                arch_style = mvc_config.arch_style,
+                query_activation = mvc_config.query_activation,
             )
 
         self.init_weights()
@@ -126,7 +128,6 @@ class SCGPTModel(nn.Module):
         gen_key_padding_mask: Tensor,
         input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
     ) -> Tuple[Tensor, Tensor]:
-
         pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
         pcpt_values = self.expression_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
         pcpt_total_embs = pcpt_token_embs + pcpt_values
@@ -236,7 +237,10 @@ class SCGPTModel(nn.Module):
         if CLS:
             output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
         if MVC:
-            mvc_output = self.mvc_decoder(cell_emb, self.cur_gene_token_embs,)
+            mvc_output = self.mvc_decoder(
+                cell_emb,
+                self.cur_gene_token_embs,
+            )
             output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
         return output
 
@@ -509,7 +513,7 @@ class GeneEncoder(nn.Module):
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.embedding(x)  # (batch, seq_len, embsize)
-        x = self.enc_norm(x)
+        x = self.enc_norm(x)  # TODO remove this for pre-norm
         return x
 
 
@@ -567,20 +571,25 @@ class ExprDecoder(nn.Module):
     def __init__(
         self,
         d_model: int,
+        n_outputs: int = 1,
+        n_layers: int = 2,
+        activation: str = "leaky_relu",
     ):
         super().__init__()
         d_in = d_model
-        self.fc = nn.Sequential(
-            nn.Linear(d_in, d_model),
-            nn.LeakyReLU(),
-            nn.Linear(d_model, d_model),
-            nn.LeakyReLU(),
-            nn.Linear(d_model, 1),
+        self.activation = resolve_ffn_act_fn(activation)
+        self.linear_layers = nn.ModuleList(
+            [nn.Linear(d_in, d_model) for _ in range(n_layers)]
         )
+        self.out_proj = nn.Linear(d_model, n_outputs)
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
-        pred_value = self.fc(x).squeeze(-1)  # (batch, seq_len)
+        for layer in self.linear_layers:
+            x = self.activation(layer(x))
+        pred_value = self.out_proj(x)  # (batch, seq_len, n_outputs)
+        if pred_value.shape[-1] == 1:
+            pred_value = pred_value.squeeze(-1)
         return dict(pred=pred_value)
 
 
@@ -593,7 +602,7 @@ class MVCDecoder(nn.Module):
         self,
         d_model: int,
         arch_style: str = "inner product",
-        query_activation: nn.Module = nn.Sigmoid,
+        query_activation: str = "sigmoid",
     ) -> None:
         """
         Args:
@@ -607,9 +616,10 @@ class MVCDecoder(nn.Module):
         """
         super().__init__()
         d_in = d_model
-        if arch_style ==  "inner product":
+
+        if arch_style == "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
-            self.query_activation = query_activation()
+            self.query_activation = resolve_ffn_act_fn({"name": query_activation})
             self.W = nn.Linear(d_model, d_in, bias=False)
         else:
             raise ValueError(f"Unknown arch_style: {arch_style}")
@@ -625,35 +635,27 @@ class MVCDecoder(nn.Module):
             gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
         """
         if self.arch_style == "inner product":
-            query_vecs = self.query_activation(self.gene2query(gene_embs)) # (batch, seq_len, embsize)
+            query_vecs = self.query_activation(
+                self.gene2query(gene_embs)
+            )  # (batch, seq_len, embsize)
             cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
-            pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(2) # (batch, seq_len)
+            pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(
+                2
+            )  # (batch, seq_len)
             return dict(pred=pred_value)
         else:
             raise ValueError(f"Unknown arch_style: {self.arch_style}")
 
 
 class ComposerSCGPTModel(ComposerModel):
-    def __init__(self, ntoken, pad_token_id, pad_value):
+    def __init__(self, model_config, collator_config, device=None):
         super().__init__()
         self.criterion = masked_mse_loss
-        self.pad_token_id = pad_token_id
+        self.pad_token_id = collator_config.pad_token_id
         self.model = SCGPTModel(
-            ntoken=ntoken,
-            d_model=512,
-            nhead=8,
-            d_hid=512,
-            nlayers=12,
-            dropout=0.1,
-            pad_token_id=self.pad_token_id,
-            pad_value=pad_value,
-            do_mvc=True,
-            input_emb_style="continuous",
-            n_input_bins=51,
-            use_generative_training=True,
-            use_fast_transformer=True,
-            fast_transformer_backend="flash",
-            pre_norm=True,
+            model_config=model_config,
+            collator_config=collator_config,
+            device=device,
         )
         self.train_mse = MaskedMseMetric(name="MSE")
         self.train_mvc = MaskedMseMetric(name="MVC")

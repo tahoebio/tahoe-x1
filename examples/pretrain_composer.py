@@ -258,6 +258,11 @@ def main(cfg: DictConfig) -> composer.Trainer:
     for s in special_tokens:
         if s not in vocab:
             vocab.append_token(s)
+    ## Update PAD token ID
+    train_loader_config.collator.pad_token_id = vocab["<pad>"]
+    valid_loader_config.collator.pad_token_id = vocab["<pad>"]
+    ## Update model config with Vocab Size
+    model_config.vocab_size = len(vocab)
 
     # Scheduler
     scheduler_name: str = scheduler_config.pop("name")
@@ -308,10 +313,9 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
 
     # Build Model
-    PAD_VALUE = -2
-    PAD_TOKEN_ID = vocab["<pad>"]
     model = ComposerSCGPTModel(
-        ntoken=len(vocab), pad_token_id=PAD_TOKEN_ID, pad_value=PAD_VALUE
+        model_config=model_config,
+        collator_config=train_loader_config.collator,
     )
     log.info(
         f"Total Model parameters: {count_parameters(model.model) / (10 ** 6)} M parameters"

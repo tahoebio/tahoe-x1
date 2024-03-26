@@ -2,11 +2,26 @@ from functools import lru_cache
 from typing import Optional
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from torch import Tensor
 from torch.nn.modules.transformer import _get_clones
-from llmfoundry.models.layers.attention import GroupedQueryAttention
+from llmfoundry.models.layers.attention import ATTN_CLASS_REGISTRY
+from llmfoundry.models.layers.norm import NORM_CLASS_REGISTRY
+from llmfoundry.models.layers.ffn import resolve_ffn_hidden_size, resolve_ffn_act_fn
 
+attn_config_defaults: Dict = {
+    "attn_type": "grouped_query_attention",
+    "attn_pdrop": 0.0,
+    "attn_impl": "triton",
+    "qk_ln": False,
+    "qk_gn": False,
+    "clip_qkv": None,
+    "softmax_scale": None,
+}
+
+norm_config_defaults: Dict = {
+    "norm_type": "low_precision_layernorm",
+    "eps": 1e-5,
+}
 
 
 class SCGPTBlock(nn.Module):
@@ -16,7 +31,7 @@ class SCGPTBlock(nn.Module):
 
     Args:
         d_model: the number of expected features in the input (required).
-        nhead: the number of heads in the multiheadattention models (required).
+        n_heads: the number of heads in the multiheadattention models (required).
         dim_feedforward: the dimension of the feedforward network model (default=2048).
         dropout: the dropout value (default=0.1).
         activation: the activation function of intermediate layer, relu or gelu (default=relu).
@@ -38,32 +53,43 @@ class SCGPTBlock(nn.Module):
 
     def __init__(
         self,
-        d_model,
-        nhead,
-        dim_feedforward=2048,
-        dropout=0.1,
-        activation="relu",
-        layer_norm_eps=1e-5,
-        device=None,
+        d_model: int,
+        n_heads: int,
+        expansion_ratio: int,
+        attn_config: Optional[Dict] = None,
+        norm_config: Optional[Dict] = None,
+        dropout: Optional[float]=0.0,
+        activation: Optional[str]="gelu",
+        device: Optional[str] = None,
         dtype=None,
-        norm_scheme="post",  # "pre" or "post"
+        norm_scheme="pre",
+        **kwargs: Any,
     ) -> None:
+        if attn_config is None:
+            attn_config = attn_config_defaults
+        if norm_config is None:
+            norm_config = norm_config_defaults
+        del kwargs  # unused, just to capture any extra args from the config
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
-        self.self_attn = GroupedQueryAttention(
+        attn_class = ATTN_CLASS_REGISTRY[attn_config["attn_type"]]
+        self.self_attn = attn_class(
             d_model=d_model,
-            n_heads=nhead,
-            kv_n_heads=nhead,
-            attn_impl="triton",
+            n_heads=n_heads,
+            kv_n_heads=attn_config.get("kv_n_heads", n_heads),
+            attn_impl=attn_config.get("attn_impl", "triton"),
             device=device,
         )
         # Implementation of Feedforward model
+        dim_feedforward = resolve_ffn_hidden_size(d_model, expansion_ratio)
         self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
         self.dropout = nn.Dropout(dropout)
         self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
 
-        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
+        # Norms
+        norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
+        self.norm1 = norm_class(d_model, device=device, **norm_config)
+        self.norm2 = norm_class(d_model, device=device, **norm_config)
         self.dropout1 = nn.Dropout(dropout)
         self.dropout2 = nn.Dropout(dropout)
 
@@ -74,17 +100,7 @@ class SCGPTBlock(nn.Module):
 
     @staticmethod
     def _get_activation_fn(activation):
-        if activation == "relu":
-            return F.relu
-        elif activation == "gelu":
-            return F.gelu
-
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
-
-    def __setstate__(self, state):
-        if "activation" not in state:
-            state["activation"] = F.relu
-        super().__setstate__(state)
+        return resolve_ffn_act_fn({"name":activation})
 
     def forward(
         self,
@@ -111,8 +127,7 @@ class SCGPTBlock(nn.Module):
         return x
 
     def _sa_block(self, x: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
-        x,_,_ = self.self_attn(x, attn_bias=attn_bias,
-                               is_causal=False)
+        x, _, _ = self.self_attn(x, attn_bias=attn_bias, is_causal=False)
         return self.dropout1(x)
 
     def _ff_block(self, x: Tensor) -> Tensor:
@@ -196,7 +211,10 @@ class FlashscGPTGenerator(nn.Module):
         g_len = total_len - p_len
         attention_mask = _make_mask(p_len, g_len, total_embs.device)
         attn_bias = torch.zeros_like(
-            attention_mask, dtype=total_embs.dtype, device=attention_mask.device, requires_grad=False
+            attention_mask,
+            dtype=total_embs.dtype,
+            device=attention_mask.device,
+            requires_grad=False,
         ).masked_fill(
             attention_mask, torch.finfo(total_embs.dtype).min
         )  # Matrix with -inf at the place of masked values and 0 elsewhere
@@ -221,6 +239,7 @@ class FlashscGPTGenerator(nn.Module):
         pcpt_total_embs = total_embs[:, :p_len, :]
         gen_total_embs = total_embs[:, p_len:, :]
         return pcpt_total_embs, gen_total_embs
+
 
 @torch.no_grad()
 @lru_cache(maxsize=1)

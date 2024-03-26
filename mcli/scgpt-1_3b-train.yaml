@@ -45,6 +45,27 @@ parameters:
   model:
     name: vevo_scgpt
     d_model: 512
+    n_layers: 12
+    expansion_ratio: 1
+    n_heads: 8
+    norm_scheme: "pre"
+    use_generative_training: True
+    cell_emb_style: cls
+    attn_config:
+      attn_impl: triton
+      attn_type: "grouped_query_attention"
+      kv_nheads: 8
+      attn_pdrop: 0.0
+    norm_config:
+      norm_type: "low_precision_layernorm"
+      eps: 1e-5
+    mvc:
+      arch_style: "inner product"
+      query_activation: "sigmoid"
+    expression_decoder:
+      n_outputs: 1
+      n_layers: 2
+      activation: "leaky_relu"
   train_loader:
     dataset:
       remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
