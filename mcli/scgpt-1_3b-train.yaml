@@ -38,9 +38,9 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 1800
+  device_train_batch_size: 450
   global_train_batch_size: 14400
-  device_eval_batch_size: 1800
+  device_eval_batch_size: 450
   device_train_microbatch_size: 450
   model:
     name: vevo_scgpt
@@ -67,11 +67,11 @@ parameters:
       activation: relu
     mvc:
       arch_style: "inner product"
-      query_activation: "silu"
+      query_activation: "sigmoid"
     expression_decoder:
       n_outputs: 1
       n_layers: 2
-      activation: "silu"
+      activation: "leaky_relu"
   train_loader:
     dataset:
       remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
