@@ -533,7 +533,7 @@ class ContinuousValueEncoder(nn.Module):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
-        self.activation = resolve_ffn_act_fn(activation)
+        self.activation = resolve_ffn_act_fn({"name":activation})
         self.linear2 = nn.Linear(d_model, d_model)
         self.norm = nn.LayerNorm(d_model)
         self.max_value = max_value
@@ -584,7 +584,7 @@ class ExprDecoder(nn.Module):
     ):
         super().__init__()
         d_in = d_model
-        self.activation = resolve_ffn_act_fn(activation)
+        self.activation = resolve_ffn_act_fn({"name":activation})
         self.linear_layers = nn.ModuleList(
             [nn.Linear(d_in, d_model) for _ in range(n_layers)]
         )
