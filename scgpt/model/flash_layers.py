@@ -75,6 +75,7 @@ class SCGPTBlock(nn.Module):
         attn_class = ATTN_CLASS_REGISTRY[attn_config["attn_type"]]
         self.d_model = d_model
         self.n_heads = n_heads
+        self.device = device
         self.self_attn = attn_class(
             d_model=d_model,
             n_heads=n_heads,
