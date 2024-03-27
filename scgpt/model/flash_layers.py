@@ -63,6 +63,7 @@ class SCGPTBlock(nn.Module):
         device: Optional[str] = None,
         dtype=None,
         norm_scheme="pre",
+        use_glu: bool = False,
         **kwargs: Any,
     ) -> None:
         if attn_config is None:
@@ -85,16 +86,18 @@ class SCGPTBlock(nn.Module):
         )
         # Implementation of Feedforward model
         dim_feedforward = resolve_ffn_hidden_size(d_model, expansion_ratio)
-        self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
+        self.up_proj = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
+        self.down_proj = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
+        self.use_glu = use_glu
+        if self.use_glu:
+            self.gate_proj = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
 
         # Norms
         norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
         self.norm1 = norm_class(d_model, device=device, eps=norm_config.get("eps", 1e-5))
         self.norm2 = norm_class(d_model, device=device, eps=norm_config.get("eps", 1e-5))
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
+        self.post_sa_dropout = nn.Dropout(dropout)
+        self.post_ffn_dropout = nn.Dropout(dropout)
 
         self.activation = self._get_activation_fn(activation)
         self.norm_scheme = norm_scheme
@@ -131,11 +134,14 @@ class SCGPTBlock(nn.Module):
 
     def _sa_block(self, x: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
         x, _, _ = self.self_attn(x, attn_bias=attn_bias, is_causal=False)
-        return self.dropout1(x)
+        return self.post_sa_dropout(x)
 
+    @torch.compile
     def _ff_block(self, x: Tensor) -> Tensor:
-        x = self.linear2(self.dropout(self.activation(self.linear1(x))))
-        return self.dropout2(x)
+        if self.use_glu:
+            x = self.down_proj(self.activation(self.gate_proj(x)) * self.up_proj(x))
+        x = self.down_proj(self.activation(self.up_proj(x)))
+        return self.post_ffn_dropout(x)
 
 
 class FlashscGPTGenerator(nn.Module):

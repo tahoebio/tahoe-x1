@@ -81,6 +81,7 @@ class SCGPTModel(nn.Module):
                 activation=self.transformer_activation,
                 device=self.device,
                 norm_scheme=self.norm_scheme,
+                use_glu=model_config.get("use_glu", False),
             )
             self.transformer_encoder = FlashscGPTGenerator(
                 encoder_layers, self.n_layers,
@@ -517,7 +518,8 @@ class GeneEncoder(nn.Module):
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
-        if use_norm:
+        self.use_norm = use_norm
+        if self.use_norm:
             self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
