@@ -663,6 +663,7 @@ class ComposerSCGPTModel(ComposerModel):
         super().__init__()
         self.criterion = masked_mse_loss
         self.pad_token_id = collator_config.pad_token_id
+        self.use_cell_conditioned_generation = model_config.get("use_cell_conditioned_generation", False)
         self.model = SCGPTModel(
             model_config=model_config,
             collator_config=collator_config,
@@ -671,10 +672,12 @@ class ComposerSCGPTModel(ComposerModel):
         self.n_active_params = sum(p.numel() for p in self.model.parameters())
         self.train_mse = MaskedMseMetric(name="MSE")
         self.train_mvc = MaskedMseMetric(name="MVC")
-        self.train_gen = MaskedMseMetric(name="GEN")
         self.val_mse = MaskedMseMetric(name="MSE")
         self.val_mvc = MaskedMseMetric(name="MVC")
-        self.val_gen = MaskedMseMetric(name="GEN")
+        if self.use_cell_conditioned_generation:
+            self.train_gen = MaskedMseMetric(name="GEN")
+        if self.use_cell_conditioned_generation:
+            self.val_gen = MaskedMseMetric(name="GEN")
 
     def forward(self, batch):  # batch is the output of the dataloader
         # specify how batches are passed through the model
@@ -692,7 +695,19 @@ class ComposerSCGPTModel(ComposerModel):
             MVC=True,
             generative_training=True,
         )
-        output_dict["GEPC"] = output_dict["gen_preds"]
+        if self.use_cell_conditioned_generation:
+            previous_cell_embs = output_dict["cell_emb"].detach()
+            preds = self.model(
+                pcpt_gene,
+                pcpt_expr,
+                pcpt_key_padding_mask,
+                gen_gene,
+                gen_key_padding_mask,
+                MVC=False,
+                input_cell_emb=previous_cell_embs,
+                generative_training=True,
+            )["gen_preds"]
+            output_dict["GEPC"] = preds
         return output_dict
 
     def loss(self, outputs, batch):
@@ -702,19 +717,18 @@ class ComposerSCGPTModel(ComposerModel):
         gen_expr_target = batch["gen_expr_target"]
         gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
         positions_to_match = ~gen_key_padding_mask
-
         gen_expr_preds = outputs["gen_preds"]
-
         loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
         loss_mvc = self.criterion(
             outputs["mvc_output"][:, pcpt_gene.shape[1] :],
             gen_expr_target,
             positions_to_match,
         )
-
-        loss_gen = self.criterion(outputs["GEPC"], gen_expr_target, positions_to_match)
-
-        loss = loss_mse + loss_mvc + loss_gen
+        if self.use_cell_conditioned_generation:
+            loss_gen = self.criterion(outputs["GEPC"], gen_expr_target, positions_to_match)
+            loss = (loss_mse + loss_mvc + loss_gen) / 3
+        else:
+            loss = (loss_mse + loss_mvc) / 2
         return loss
 
     def update_metric(self, batch, outputs, metric):
@@ -727,6 +741,7 @@ class ComposerSCGPTModel(ComposerModel):
         elif metric.name == "MVC":
             preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
         elif metric.name == "GEN":
+            assert self.use_cell_conditioned_generation
             preds = outputs["GEPC"]
         else:
             raise ValueError(f"metric {metric.name} not recognized")
@@ -735,21 +750,34 @@ class ComposerSCGPTModel(ComposerModel):
     def get_metrics(self, is_train=False):
         # defines which metrics to use in each phase of training
         if is_train:
-            metric_dict = {
-                "MSE": self.train_mse,
-                "MVC": self.train_mvc,
-                "GEN": self.train_gen,
-            }
+            if self.use_cell_conditioned_generation:
+                metric_dict = {
+                    "MSE": self.train_mse,
+                    "MVC": self.train_mvc,
+                    "GEN": self.train_gen,
+                }
+            else:
+                metric_dict = {
+                    "MSE": self.train_mse,
+                    "MVC": self.train_mvc,
+                }
         else:
-            metric_dict = {
-                "MSE": self.val_mse,
-                "MVC": self.val_mvc,
-                "GEN": self.val_gen,
-            }
+            if self.use_cell_conditioned_generation:
+                metric_dict = {
+                    "MSE": self.val_mse,
+                    "MVC": self.val_mvc,
+                    "GEN": self.val_gen,
+                }
+            else:
+                metric_dict = {
+                    "MSE": self.val_mse,
+                    "MVC": self.val_mvc,
+                }
         return metric_dict
 
     def flops_per_batch(self, batch: Mapping) -> int:
         # specify how to compute the number of FLOPs for a batch
+        # This assumes non cell-conditioned generation (single forward pass)
         bs = batch["pcpt_gene"].shape[0]
         pcpt_len = batch["pcpt_gene"].shape[1]
         gen_len = batch["gen_gene"].shape[1]
