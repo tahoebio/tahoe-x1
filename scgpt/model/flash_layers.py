@@ -158,16 +158,24 @@ class FlashscGPTGenerator(nn.Module):
 
     def __init__(
         self,
-        encoder_layer,
-        num_layers,
-        norm=None,
-        mask_check=True,
+        encoder_layer: SCGPTBlock,
+        num_layers: int,
+        use_norm: bool=False,
+        norm_config: Optional[Dict]=None,
     ):
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
-        self.norm = norm
-        self.mask_check = mask_check
+        self.use_norm = use_norm
+        if self.use_norm:
+            if norm_config is None:
+                norm_config = norm_config_defaults
+            norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
+            self.norm = norm_class(
+                encoder_layer.d_model,
+                device=encoder_layer.device,
+                eps=norm_config.get("eps", 1e-5),
+            )
 
     def forward(
         self,
@@ -233,7 +241,7 @@ class FlashscGPTGenerator(nn.Module):
         for mod in self.layers:
             total_embs = mod(total_embs, attn_bias=attn_bias)
 
-        if self.norm is not None:
+        if self.use_norm:
             total_embs = self.norm(total_embs)
 
         pcpt_total_embs = total_embs[:, :p_len, :]

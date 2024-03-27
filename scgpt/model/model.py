@@ -41,7 +41,7 @@ class SCGPTModel(nn.Module):
 
         # TODO: add dropout in the GeneEncoder
         self.gene_encoder = GeneEncoder(
-            self.vocab_size, self.d_model, padding_idx=self.pad_token_id
+            self.vocab_size, self.d_model, padding_idx=self.pad_token_id,use_norm=False
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
 
@@ -60,11 +60,13 @@ class SCGPTModel(nn.Module):
                 dropout=expression_encoder_config.get("dropout", 0.1),
                 max_value=expression_encoder_config.get("max_value", 512),
                 activation=expression_encoder_config.get("activation", "relu"),
+                use_norm=False,
             )
         elif self.input_emb_style == "category":
             assert self.n_input_bins > 0
             self.expression_encoder = CategoryValueEncoder(
-                self.n_input_bins, self.d_model, padding_idx=self.pad_value
+                self.n_input_bins, self.d_model, padding_idx=self.pad_value,
+                use_norm=False
             )
         else:
             raise ValueError(f"Unknown input_emb_style: {self.input_emb_style}")
@@ -81,7 +83,9 @@ class SCGPTModel(nn.Module):
                 norm_scheme=self.norm_scheme,
             )
             self.transformer_encoder = FlashscGPTGenerator(
-                encoder_layers, self.n_layers
+                encoder_layers, self.n_layers,
+                use_norm=self.norm_scheme == "pre",
+                norm_config=self.norm_config,
             )
         else:
             raise NotImplementedError("Only generative training is supported")
@@ -101,7 +105,6 @@ class SCGPTModel(nn.Module):
                 arch_style=mvc_config.arch_style,
                 query_activation=mvc_config.query_activation,
             )
-
         self.init_weights()
 
     def init_weights(self) -> None:
@@ -223,7 +226,6 @@ class SCGPTModel(nn.Module):
         transformer_output = self.transformer_encoder(
             total_embs, src_key_padding_mask=src_key_padding_mask
         )
-
         mlm_output = self.expression_decoder(transformer_output)
         output = mlm_output["pred"]  # (batch, seq_len)
 
@@ -509,16 +511,19 @@ class GeneEncoder(nn.Module):
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
+        use_norm: bool = False,
     ):
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
-        self.enc_norm = nn.LayerNorm(embedding_dim)
+        if use_norm:
+            self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
         x = self.embedding(x)  # (batch, seq_len, embsize)
-        x = self.enc_norm(x)  # TODO remove this for pre-norm
+        if self.use_norm:
+            x = self.enc_norm(x)  # Norm for embedding is not used when using pre-norm transformer.
         return x
 
 
@@ -533,13 +538,15 @@ class ContinuousValueEncoder(nn.Module):
         dropout: float = 0.1,
         max_value: int = 512,
         activation: str = "relu",
+        use_norm: bool = False,
     ):
         super().__init__()
         self.dropout = nn.Dropout(p=dropout)
         self.linear1 = nn.Linear(1, d_model)
         self.activation = resolve_ffn_act_fn({"name": activation})
         self.linear2 = nn.Linear(d_model, d_model)
-        self.norm = nn.LayerNorm(d_model)
+        if use_norm:
+            self.norm = nn.LayerNorm(d_model)
         self.max_value = max_value
 
     def forward(self, x: Tensor) -> Tensor:
@@ -554,7 +561,8 @@ class ContinuousValueEncoder(nn.Module):
         x = torch.clamp(x, max=self.max_value)
         x = self.activation(self.linear1(x))
         x = self.linear2(x)
-        x = self.norm(x)
+        if self.use_norm:
+            x = self.norm(x)
         return self.dropout(x)
 
 
@@ -564,17 +572,21 @@ class CategoryValueEncoder(nn.Module):
         num_embeddings: int,
         embedding_dim: int,
         padding_idx: Optional[int] = None,
+        use_norm: bool = False,
     ):
         super().__init__()
         self.embedding = nn.Embedding(
             num_embeddings, embedding_dim, padding_idx=padding_idx
         )
-        self.enc_norm = nn.LayerNorm(embedding_dim)
+        self.use_norm = use_norm
+        if self.use_norm:
+            self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
         x = x.long()
         x = self.embedding(x)  # (batch, seq_len, embsize)
-        x = self.enc_norm(x)
+        if self.use_norm:
+            x = self.enc_norm(x)
         return x
 
 
@@ -663,7 +675,9 @@ class ComposerSCGPTModel(ComposerModel):
         super().__init__()
         self.criterion = masked_mse_loss
         self.pad_token_id = collator_config.pad_token_id
-        self.use_cell_conditioned_generation = model_config.get("use_cell_conditioned_generation", False)
+        self.use_cell_conditioned_generation = model_config.get(
+            "use_cell_conditioned_generation", False
+        )
         self.model = SCGPTModel(
             model_config=model_config,
             collator_config=collator_config,
@@ -725,7 +739,9 @@ class ComposerSCGPTModel(ComposerModel):
             positions_to_match,
         )
         if self.use_cell_conditioned_generation:
-            loss_gen = self.criterion(outputs["GEPC"], gen_expr_target, positions_to_match)
+            loss_gen = self.criterion(
+                outputs["GEPC"], gen_expr_target, positions_to_match
+            )
             loss = (loss_mse + loss_mvc + loss_gen) / 3
         else:
             loss = (loss_mse + loss_mvc) / 2
