@@ -73,6 +73,8 @@ class SCGPTBlock(nn.Module):
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
         attn_class = ATTN_CLASS_REGISTRY[attn_config["attn_type"]]
+        self.d_model = d_model
+        self.n_heads = n_heads
         self.self_attn = attn_class(
             d_model=d_model,
             n_heads=n_heads,
