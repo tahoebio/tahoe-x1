@@ -257,8 +257,8 @@ def main(cfg: DictConfig) -> composer.Trainer:
         if s not in vocab:
             vocab.append_token(s)
     if collator_config.get("use_junk_tokens", False):
-    # Based on Karpathy's observation that 64 is a good number for performance
-    # https://x.com/karpathy/status/1621578354024677377?s=20
+        # Based on Karpathy's observation that 64 is a good number for performance
+        # https://x.com/karpathy/status/1621578354024677377?s=20
         original_vocab_size = len(vocab)
         remainder = original_vocab_size % 64
         if remainder > 0:

@@ -8,11 +8,13 @@ model:
   name: vevo_scgpt
   d_model: 512
   n_layers: 12
-  expansion_ratio: 1
-  transformer_activation: gelu
+  expansion_ratio: 0.6875
+  transformer_activation: silu
   n_heads: 8
   norm_scheme: "pre"
   use_generative_training: True
+  use_cell_conditioned_generation: False
+  use_glu: True
   cell_emb_style: cls
   attn_config:
     attn_impl: triton
@@ -20,7 +22,7 @@ model:
     kv_nheads: 8
     attn_pdrop: 0.0
   norm_config:
-    norm_type: "low_precision_layernorm"
+    norm_type: "low_precision_rmsnorm"
     eps: 1.0e-5
   expression_encoder:
     input_emb_style: "continuous"
@@ -34,26 +36,27 @@ model:
     n_outputs: 1
     n_layers: 2
     activation: "gelu"
+collator:
+  do_padding: True
+  pad_value: -2
+  do_mlm: True
+  do_binning: True
+  mlm_probability: 0.40
+  mask_value: -1
+  max_length: 1024
+  sampling: True
+  data_style: "both"
+  num_bins: 51
+  right_binning: True
+  use_junk_tokens: True
 train_loader:
   dataset:
-    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/train"
-    local: "mds-data-folder/train"
+    remote: None
+    local: "/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/train"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: True
     shuffle_seed: ${global_seed}
-  collator:
-    do_padding: True
-    pad_value: -2
-    do_mlm: True
-    do_binning: True
-    mlm_probability: 0.40
-    mask_value: -1
-    max_length: 1024
-    sampling: True
-    data_style: "both"
-    num_bins: 51
-    right_binning: True
   drop_last: False
   num_workers: 8
   pin_memory: True
@@ -61,24 +64,12 @@ train_loader:
   persistent_workers: True
 valid_loader:
   dataset:
-    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/val"
-    local: "mds-data-folder/val"
+    remote: None
+    local: "/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/train"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: False
     shuffle_seed: ${global_seed}
-  collator:
-    do_padding: True
-    pad_value: -2
-    do_mlm: True
-    do_binning: True
-    mlm_probability: 0.40
-    mask_value: -1
-    max_length: 1024
-    sampling: True
-    data_style: "both"
-    num_bins: 51
-    right_binning: True
   drop_last: False
   num_workers: 8
   pin_memory: True
