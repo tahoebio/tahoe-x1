@@ -43,7 +43,7 @@ parameters:
     d_model: 512
     n_layers: 12
     expansion_ratio: 1
-    transformer_activation: gelu
+    transformer_activation: silu
     n_heads: 8
     norm_scheme: "pre"
     use_generative_training: True

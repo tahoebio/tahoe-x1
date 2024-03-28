@@ -312,15 +312,13 @@ def main(cfg: DictConfig) -> composer.Trainer:
     log.info("Building DataLoaders...")
     train_loader = build_dataloader(
         loader_cfg=train_loader_config,
-        collator_config=collator_config,
-        vocab=vocab,
+        collator_cfg=collator_config,
         device_batch_size=device_train_batch_size,
     )
     log.info(f"train set number of samples: {(train_loader.num_samples)}")
     valid_loader = build_dataloader(
         loader_cfg=valid_loader_config,
-        collator_config=collator_config,
-        vocab=vocab,
+        collator_cfg=collator_config,
         device_batch_size=device_eval_batch_size,
     )
     log.info(f"Validation set number of samples: {(valid_loader.num_samples)}")
