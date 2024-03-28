@@ -140,7 +140,8 @@ class SCGPTBlock(nn.Module):
     def _ff_block(self, x: Tensor) -> Tensor:
         if self.use_glu:
             x = self.down_proj(self.activation(self.gate_proj(x)) * self.up_proj(x))
-        x = self.down_proj(self.activation(self.up_proj(x)))
+        else:
+            x = self.down_proj(self.activation(self.up_proj(x)))
         return self.post_ffn_dropout(x)
 
 
