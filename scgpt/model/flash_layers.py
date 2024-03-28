@@ -249,25 +249,14 @@ class FlashscGPTGenerator(nn.Module):
         total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
         if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
             key_padding_mask = None
+        elif pcpt_key_padding_mask is None or gen_key_padding_mask is None:
+            raise ValueError(
+                "Both pcpt_key_padding_mask and gen_key_padding_mask must be provided"
+            )
         else:
-            if pcpt_key_padding_mask is None:
-                pcpt_key_padding_mask = torch.ones(
-                    (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
-                    device=pcpt_total_embs.device,
-                    dtype=torch.bool,
-                )
-            elif gen_key_padding_mask is None:
-                # NOTE: If making ones here, that assumes 1 indicate valid data
-                # it also assumes that the input pcpt_key_padding_mask is in the same way
-                gen_key_padding_mask = torch.ones(
-                    (gen_total_embs.shape[0], gen_total_embs.shape[1]),
-                    device=gen_total_embs.device,
-                    dtype=torch.bool,
-                )
-            key_padding_mask = ~torch.cat(
+            key_padding_mask = torch.cat(
                 [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-            )  # (B, S)
-            # NOTE: after this line it assumes 0 for valid data
+            )  # TODO: assume the llmfoundry fashion of key_padding_mask, where 1 is valid and 0 is not valid
         p_len = pcpt_total_embs.shape[1]
         total_len = total_embs.shape[1]
         g_len = total_len - p_len
@@ -285,10 +274,8 @@ class FlashscGPTGenerator(nn.Module):
             1
         )  # Broadcastable to (B,H, S_Q, S_K) dimensions
 
-        # Merge the key_padding_mask into attn_bias
-        if key_padding_mask is not None:
-            # NOTE: 1. handle the case when key_padding_mask is None
-            # 2. In llm_foundry, key padding mask 0 for valid data, and 1 for paddings?
+        if key_padding_mask is not None:  # NOTE: handle when key_padding_mask is None
+            # Merge the key_padding_mask into attn_bias
             b_size, s_k = key_padding_mask.shape[:2]
             attn_bias = attn_bias.masked_fill(
                 ~key_padding_mask.view((b_size, 1, 1, s_k)),
