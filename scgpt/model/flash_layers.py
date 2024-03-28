@@ -136,7 +136,6 @@ class SCGPTBlock(nn.Module):
         x, _, _ = self.self_attn(x, attn_bias=attn_bias, is_causal=False)
         return self.post_sa_dropout(x)
 
-    @torch.compile
     def _ff_block(self, x: Tensor) -> Tensor:
         if self.use_glu:
             x = self.down_proj(self.activation(self.gate_proj(x)) * self.up_proj(x))
