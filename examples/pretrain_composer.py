@@ -71,6 +71,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
     train_loader_config: DictConfig = pop_config(cfg, "train_loader", must_exist=True)
     valid_loader_config: DictConfig = pop_config(cfg, "valid_loader", must_exist=True)
+    collator_config: DictConfig = pop_config(cfg, "collator", must_exist=True)
 
     # Optional deepspeed, FSDP, and torch-compile config
     deepspeed_config: Optional[Dict[str, Any]] = pop_config(
@@ -255,11 +256,23 @@ def main(cfg: DictConfig) -> composer.Trainer:
     for s in special_tokens:
         if s not in vocab:
             vocab.append_token(s)
+    if collator_config.get("use_junk_tokens", False):
+    # Based on Karpathy's observation that 64 is a good number for performance
+    # https://x.com/karpathy/status/1621578354024677377?s=20
+        original_vocab_size = len(vocab)
+        remainder = original_vocab_size % 64
+        if remainder > 0:
+            junk_tokens_needed = 64 - remainder
+            for i in range(junk_tokens_needed):
+                junk_token = f"<junk{i}>"
+                vocab.append_token(junk_token)
+
     ## Update PAD token ID
-    train_loader_config.collator.pad_token_id = vocab["<pad>"]
-    valid_loader_config.collator.pad_token_id = vocab["<pad>"]
+    collator_config.pad_token_id = vocab["<pad>"]
     ## Update model config with Vocab Size
     model_config.vocab_size = len(vocab)
+    log.info(f"Setting vocab size to: {len(vocab)}")
+    logged_cfg.update({"vocab_size": len(vocab)})
 
     # Scheduler
     scheduler_name: str = scheduler_config.pop("name")
@@ -299,12 +312,14 @@ def main(cfg: DictConfig) -> composer.Trainer:
     log.info("Building DataLoaders...")
     train_loader = build_dataloader(
         loader_cfg=train_loader_config,
+        collator_config=collator_config,
         vocab=vocab,
         device_batch_size=device_train_batch_size,
     )
     log.info(f"train set number of samples: {(train_loader.num_samples)}")
     valid_loader = build_dataloader(
         loader_cfg=valid_loader_config,
+        collator_config=collator_config,
         vocab=vocab,
         device_batch_size=device_eval_batch_size,
     )
@@ -319,7 +334,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     # Build Model
     model = ComposerSCGPTModel(
         model_config=model_config,
-        collator_config=train_loader_config.collator,
+        collator_config=collator_config,
     )
 
     # Log number of parameters

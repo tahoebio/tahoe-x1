@@ -1,5 +1,4 @@
 from scgpt.data import DataCollator
-from scgpt.tokenizer import GeneVocab
 from streaming import StreamingDataset, StreamingDataLoader
 from composer.core.data_spec import DataSpec
 from omegaconf import DictConfig
@@ -7,7 +6,7 @@ from omegaconf import DictConfig
 
 
 def build_dataloader(loader_cfg: DictConfig,
-                     vocab: GeneVocab,
+                     collator_cfg: DictConfig,
                      device_batch_size: int) -> DataSpec:
     """Builds a dataloader from a config.
 
@@ -27,13 +26,9 @@ def build_dataloader(loader_cfg: DictConfig,
         predownload=dataset_cfg.get("predownload", None),
         shuffle_seed=dataset_cfg.get("shuffle_seed", None),
     )
-
-    # Build Collator
-    collator_cfg = loader_cfg.collator
-    pad_token_id = vocab["<pad>"]
     collate_fn = DataCollator(
         do_padding=collator_cfg.get("do_padding", True),
-        pad_token_id=pad_token_id,
+        pad_token_id= collator_cfg.pad_token_id,
         pad_value=collator_cfg.pad_value,
         do_mlm=collator_cfg.get("do_mlm", True),
         do_binning=collator_cfg.get("do_binning", True),
