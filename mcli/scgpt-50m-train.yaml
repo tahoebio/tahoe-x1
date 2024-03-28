@@ -16,13 +16,13 @@ command: |
 image: vevotx/ml-scgpt:shreshth
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
-name: scgpt-debug-fa281891
+name: scgpt-test-50m
 
 compute:
-  gpus: 8  # Number of GPUs to use
+  gpus: 32  # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 0.25 # Maximum duration of the run in hours
+  max_duration: 10 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster: # TODO # Name of the cluster to use for this run
@@ -34,10 +34,10 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 450
-  global_train_batch_size: 3600
-  device_eval_batch_size: 450
-  device_train_microbatch_size: 450
+  device_train_batch_size: 192
+  global_train_batch_size: 12288
+  device_eval_batch_size: 192
+  device_train_microbatch_size: 192
   model:
     name: vevo_scgpt
     d_model: 512
@@ -53,7 +53,7 @@ parameters:
     attn_config:
       attn_impl: triton
       attn_type: "grouped_query_attention"
-      kv_nheads: 8
+      kv_nheads: 4
       attn_pdrop: 0.0
     norm_config:
       norm_type: "low_precision_rmsnorm"
@@ -77,7 +77,7 @@ parameters:
     do_binning: True
     mlm_probability: 0.40
     mask_value: -1
-    max_length: 1024
+    max_length: 2048
     sampling: True
     data_style: "both"
     num_bins: 51

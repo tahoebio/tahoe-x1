@@ -1,20 +1,20 @@
 global_seed: 777
 seed: ${global_seed}
-device_train_batch_size: 450
-global_train_batch_size: 3600
-device_eval_batch_size: 450
-device_train_microbatch_size: 450
+device_train_batch_size: 400
+global_train_batch_size: 3200
+device_eval_batch_size: 400
+device_train_microbatch_size: 400
 model:
   name: vevo_scgpt
   d_model: 512
   n_layers: 12
-  expansion_ratio: 0.6875
+  expansion_ratio: 1.0
   transformer_activation: silu
   n_heads: 8
   norm_scheme: "pre"
   use_generative_training: True
   use_cell_conditioned_generation: False
-  use_glu: True
+  use_glu: False
   cell_emb_style: cls
   attn_config:
     attn_impl: triton
@@ -65,7 +65,7 @@ train_loader:
 valid_loader:
   dataset:
     remote: None
-    local: "/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/train"
+    local: "/vevo/cellxgene/cellxgene_primary_2023-12-15_MDS/val"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: False
