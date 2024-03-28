@@ -547,7 +547,8 @@ class ContinuousValueEncoder(nn.Module):
         self.linear1 = nn.Linear(1, d_model)
         self.activation = resolve_ffn_act_fn({"name": activation})
         self.linear2 = nn.Linear(d_model, d_model)
-        if use_norm:
+        self.use_norm = use_norm
+        if self.use_norm:
             self.norm = nn.LayerNorm(d_model)
         self.max_value = max_value
 
