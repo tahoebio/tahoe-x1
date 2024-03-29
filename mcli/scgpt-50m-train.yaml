@@ -19,10 +19,10 @@ env_variables:
 name: scgpt-test-50m
 
 compute:
-  gpus: 80 # Number of GPUs to use
+  gpus: 8 # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 5 # Maximum duration of the run in hours
+  max_duration: 0.25 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster: # TODO # Name of the cluster to use for this run
@@ -42,21 +42,21 @@ parameters:
     name: vevo_scgpt
     d_model: 512
     n_layers: 12
-    expansion_ratio: 0.6875
-    transformer_activation: silu
+    expansion_ratio: 1.0
+    transformer_activation: relu
     n_heads: 8
     norm_scheme: "pre"
     use_generative_training: True
     use_cell_conditioned_generation: False
-    use_glu: True
+    use_glu: False
     cell_emb_style: cls
     attn_config:
       attn_impl: triton
       attn_type: "grouped_query_attention"
-      kv_nheads: 4
+      kv_nheads: 8
       attn_pdrop: 0.0
     norm_config:
-      norm_type: "low_precision_rmsnorm"
+      norm_type: "low_precision_layernorm"
       eps: 1.0e-5
     expression_encoder:
       input_emb_style: "continuous"
@@ -65,11 +65,11 @@ parameters:
       activation: relu
     mvc:
       arch_style: "inner product"
-      query_activation: "silu"
+      query_activation: "relu"
     expression_decoder:
       n_outputs: 1
-      n_layers: 2
-      activation: "gelu"
+      n_layers: 1
+      activation: "relu"
   collator:
     do_padding: True
     pad_value: -2
@@ -81,7 +81,7 @@ parameters:
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: True
+    right_binning: False
     use_junk_tokens: True
   train_loader:
     dataset:
