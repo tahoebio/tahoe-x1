@@ -20,7 +20,7 @@ name: scgpt-test-50m
 
 compute:
   gpus: 8 # Number of GPUs to use
-  cluster: r4z8
+  cluster: r14z3
 scheduling:
   max_duration: 0.25 # Maximum duration of the run in hours
 
@@ -34,9 +34,9 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 400
-  global_train_batch_size: 3200
-  device_eval_batch_size: 400
+  device_train_batch_size: 384
+  global_train_batch_size: 30720
+  device_eval_batch_size: 384
   device_train_microbatch_size: "auto"
   model:
     name: vevo_scgpt
@@ -56,7 +56,7 @@ parameters:
       kv_nheads: 8
       attn_pdrop: 0.0
     norm_config:
-      norm_type: "layernorm"
+      norm_type: "low_precision_layernorm"
       eps: 1.0e-5
     expression_encoder:
       input_emb_style: "continuous"
@@ -65,7 +65,7 @@ parameters:
       activation: relu
     mvc:
       arch_style: "inner product"
-      query_activation: "sigmoid"
+      query_activation: "relu"
     expression_decoder:
       n_outputs: 1
       n_layers: 1
@@ -122,6 +122,11 @@ parameters:
     t_warmup: "0.05dur"
     t_max: "1dur"
     alpha_f: 0.1
+  algorithms:
+    low_precision_layernorm: {}
+    gradient_clipping:
+      clipping_type: norm
+      clipping_threshold: 1.0
   precision: amp_bf16
   eval_interval: "500ba"
   max_duration: "6ep"
