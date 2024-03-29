@@ -97,6 +97,8 @@ class SCGPTModel(nn.Module):
             n_outputs=expression_decoder_config.get("n_outputs", 1),
             n_layers=expression_decoder_config.get("n_layers", 2),
             activation=expression_decoder_config.get("activation", "leaky_relu"),
+            max_value=self.n_input_bins-1,
+            min_value=1,
         )
 
         if model_config.mvc is not None:
@@ -105,6 +107,8 @@ class SCGPTModel(nn.Module):
                 d_model=self.d_model,
                 arch_style=mvc_config.arch_style,
                 query_activation=mvc_config.query_activation,
+                max_value=self.n_input_bins,
+                min_value=1,
             )
         self.init_weights()
 
@@ -600,6 +604,8 @@ class ExprDecoder(nn.Module):
         n_outputs: int = 1,
         n_layers: int = 2,
         activation: str = "leaky_relu",
+        max_value: int = 1000,
+        min_value: int = -1000,
     ):
         super().__init__()
         d_in = d_model
@@ -608,6 +614,9 @@ class ExprDecoder(nn.Module):
             [nn.Linear(d_in, d_model) for _ in range(n_layers)]
         )
         self.out_proj = nn.Linear(d_model, n_outputs)
+        epsilon = 1.0e-3
+        self.max_value = max_value + epsilon
+        self.min_value = min_value - epsilon
 
     def forward(self, x: Tensor) -> Dict[str, Tensor]:
         """x is the output of the transformer, (batch, seq_len, d_model)"""
@@ -616,6 +625,8 @@ class ExprDecoder(nn.Module):
         pred_value = self.out_proj(x)  # (batch, seq_len, n_outputs)
         if pred_value.shape[-1] == 1:
             pred_value = pred_value.squeeze(-1)
+        pred_value = F.hardtanh(pred_value, min_val=self.min_value,
+                                    max_val=self.max_value)
         return dict(pred=pred_value)
 
 
@@ -629,6 +640,8 @@ class MVCDecoder(nn.Module):
         d_model: int,
         arch_style: str = "inner product",
         query_activation: str = "sigmoid",
+        max_value: int = 1000,
+        min_value: int = -1000,
     ) -> None:
         """
         Args:
@@ -651,6 +664,9 @@ class MVCDecoder(nn.Module):
             raise ValueError(f"Unknown arch_style: {arch_style}")
 
         self.arch_style = arch_style
+        epsilon = 1.0e-3
+        self.max_value = max_value + epsilon
+        self.min_value = min_value - epsilon
 
     def forward(
         self, cell_emb: Tensor, gene_embs: Tensor
@@ -668,6 +684,8 @@ class MVCDecoder(nn.Module):
             pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(
                 2
             )  # (batch, seq_len)
+            pred_value = F.hardtanh(pred_value, min_val=self.min_value,
+                                        max_val=self.max_value)
             return dict(pred=pred_value)
         else:
             raise ValueError(f"Unknown arch_style: {self.arch_style}")
