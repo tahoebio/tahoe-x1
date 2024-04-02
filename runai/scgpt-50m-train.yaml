@@ -8,8 +8,8 @@ model:
   name: vevo_scgpt
   d_model: 512
   n_layers: 12
-  expansion_ratio: 1.0
-  transformer_activation: silu
+  expansion_ratio: 4.0
+  transformer_activation: relu
   n_heads: 8
   norm_scheme: "pre"
   use_generative_training: True
@@ -22,7 +22,7 @@ model:
     kv_nheads: 8
     attn_pdrop: 0.0
   norm_config:
-    norm_type: "low_precision_rmsnorm"
+    norm_type: "layernorm"
     eps: 1.0e-5
   expression_encoder:
     input_emb_style: "continuous"
@@ -31,11 +31,11 @@ model:
     activation: relu
   mvc:
     arch_style: "inner product"
-    query_activation: "silu"
+    query_activation: "sigmoid"
   expression_decoder:
     n_outputs: 1
-    n_layers: 2
-    activation: "gelu"
+    n_layers: 1
+    activation: "leaky_relu"
 collator:
   do_padding: True
   pad_value: -2
