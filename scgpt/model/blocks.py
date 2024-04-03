@@ -24,6 +24,18 @@ norm_config_defaults: Dict = {
     "eps": 1e-5,
 }
 
+init_config_defaults: Dict = {
+    'name': 'kaiming_normal_',
+    'fan_mode': 'fan_in',
+    'init_nonlinearity': 'relu',
+    'init_div_is_residual': True,
+    'emb_init_std': None,
+    'emb_init_uniform_lim': None,
+    'init_std': None,
+    'init_gain': 0.0,
+}
+
+
 
 class SCGPTBlock(nn.Module):
     r"""TransformerEncoderLayer is made up of self-attn and feedforward network.

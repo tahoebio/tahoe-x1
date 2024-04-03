@@ -19,6 +19,7 @@ from llmfoundry.utils.config_utils import (
     log_config,
     pop_config,
     update_batch_size_info,
+    process_init_device
 )
 from streaming.base.util import clean_stale_shared_memory
 from omegaconf import DictConfig
@@ -241,6 +242,10 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )  # vevo-scGPT module
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
+    # Initialize context
+    init_context = process_init_device(model_config, fsdp_config)
+    logged_cfg.update({'fsdp_config': fsdp_config}, merge=True)
+
     log.info("Downloading vocab...")
     if dist.get_local_rank() == 0:
         download_file_from_s3_url(
@@ -330,12 +335,12 @@ def main(cfg: DictConfig) -> composer.Trainer:
             "valid_dataset_size": valid_loader.num_samples,
         }
     )
-
-    # Build Model
-    model = ComposerSCGPTModel(
-        model_config=model_config,
-        collator_config=collator_config,
-    )
+    with init_context:
+        # Build Model
+        model = ComposerSCGPTModel(
+            model_config=model_config,
+            collator_config=collator_config,
+        )
 
     # Log number of parameters
     n_params = sum(p.numel() for p in model.parameters())

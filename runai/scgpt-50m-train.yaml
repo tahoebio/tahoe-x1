@@ -8,6 +8,7 @@ model:
   name: vevo_scgpt
   d_model: 512
   n_layers: 12
+  init_device: meta
   expansion_ratio: 4.0
   transformer_activation: relu
   n_heads: 8
@@ -22,7 +23,7 @@ model:
     kv_nheads: 8
     attn_pdrop: 0.0
   norm_config:
-    norm_type: "layernorm"
+    norm_type: "low_precision_layernorm"
     eps: 1.0e-5
   expression_encoder:
     input_emb_style: "continuous"
@@ -89,7 +90,6 @@ scheduler:
   t_max: "1dur"
   alpha_f: 0.1
 algorithms:
-  low_precision_layernorm: {}
   gradient_clipping:
     clipping_type: norm
     clipping_threshold: 1.0

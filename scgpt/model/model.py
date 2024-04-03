@@ -3,17 +3,27 @@ import torch.nn.functional as F
 from torch import nn, Tensor
 from typing import Mapping, Optional, Tuple
 from composer.models import ComposerModel
+from composer.utils import dist
 from scgpt.loss import masked_mse_loss, MaskedMseMetric
-from scgpt.model.blocks import (SCGPTBlock,
-                                SCGPTEncoder,
-                                GeneEncoder,
-                                ContinuousValueEncoder,
-                                CategoryValueEncoder,
-                                ExprDecoder,
-                                MVCDecoder
-                                )
+from scgpt.model.blocks import (
+    SCGPTBlock,
+    SCGPTEncoder,
+    GeneEncoder,
+    ContinuousValueEncoder,
+    CategoryValueEncoder,
+    ExprDecoder,
+    MVCDecoder,
+    init_config_defaults,
+)
+from llmfoundry.models.utils.param_init_fns import (
+    MODEL_INIT_REGISTRY,
+)
 
 from omegaconf import DictConfig
+
+import logging
+
+log = logging.getLogger(__name__)
 
 
 class SCGPTModel(nn.Module):
@@ -34,21 +44,27 @@ class SCGPTModel(nn.Module):
         self.norm_scheme = model_config.get("norm_scheme", "pre")
         self.transformer_activation = model_config.get("transformer_activation", "gelu")
         self.use_generative_training = model_config.get("use_generative_training", True)
-
+        self.init_device = model_config.get("init_device", "cpu")
+        if self.init_device == "mixed":
+            if dist.get_local_rank() == 0:
+                self.init_device = "cpu"
+            else:
+                self.init_device = "meta"
         self.cell_emb_style = model_config.get("cell_emb_style", "cls")
-
         self.pad_token_id = collator_config.pad_token_id
         self.pad_value = collator_config.pad_value
         self.n_input_bins = collator_config.num_bins
-
         self.attn_config = model_config.get("attn_config", None)
         self.norm_config = model_config.get("norm_config", None)
+        self.init_config = model_config.get("init_config", None)
+        if self.init_config is None:
+            self.init_config = init_config_defaults
         if self.cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
 
         # TODO: add dropout in the GeneEncoder
         self.gene_encoder = GeneEncoder(
-            self.vocab_size, self.d_model, padding_idx=self.pad_token_id,use_norm=False
+            self.vocab_size, self.d_model, padding_idx=self.pad_token_id, use_norm=False
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
 
@@ -72,8 +88,10 @@ class SCGPTModel(nn.Module):
         elif self.input_emb_style == "category":
             assert self.n_input_bins > 0
             self.expression_encoder = CategoryValueEncoder(
-                self.n_input_bins, self.d_model, padding_idx=self.pad_value,
-                use_norm=False
+                self.n_input_bins,
+                self.d_model,
+                padding_idx=self.pad_value,
+                use_norm=False,
             )
         else:
             raise ValueError(f"Unknown input_emb_style: {self.input_emb_style}")
@@ -90,7 +108,8 @@ class SCGPTModel(nn.Module):
             use_glu=model_config.get("use_glu", False),
         )
         self.transformer_encoder = SCGPTEncoder(
-            encoder_layers, self.n_layers,
+            encoder_layers,
+            self.n_layers,
             use_norm=self.norm_scheme == "pre",
             norm_config=self.norm_config,
         )
@@ -110,12 +129,21 @@ class SCGPTModel(nn.Module):
                 arch_style=mvc_config.arch_style,
                 query_activation=mvc_config.query_activation,
             )
-        self.init_weights()
 
-    def init_weights(self) -> None:
-        initrange = 0.1
-        # TODO: check if this initialization is helpful and shall we apply to all?
-        self.gene_encoder.embedding.weight.data.uniform_(-initrange, initrange)
+        if self.init_device != "meta":
+            log.info(
+                f'MosaicML recommends using config.init_device="meta" with Composer + FSDP for faster initialization.'
+            )
+            self.apply(self.param_init_fn)
+
+    def param_init_fn(self, module: nn.Module):
+        init_fn_name = self.init_config["name"]
+        MODEL_INIT_REGISTRY[init_fn_name](
+            module=module,
+            n_layers=self.n_layers,
+            d_model=self.d_model,
+            **self.init_config,
+        )
 
     def _encode(
         self,
@@ -131,7 +159,7 @@ class SCGPTModel(nn.Module):
             pcpt_total_embs=total_embs,
             gen_total_embs=None,
             pcpt_key_padding_mask=src_key_padding_mask,
-            gen_key_padding_mask=None
+            gen_key_padding_mask=None,
         )
         return output  # (batch, seq_len, embsize)
 
@@ -229,7 +257,9 @@ class SCGPTModel(nn.Module):
         on the value of the "generative_training" kwarg.
         """
         if "generative_training" not in kwargs:
-            raise ValueError("Please specify generative_training argument and set to False if doing inference")
+            raise ValueError(
+                "Please specify generative_training argument and set to False if doing inference"
+            )
         # get the generative training flag and pop it out
         do_generative_training = kwargs.pop("generative_training")
         if do_generative_training:
@@ -412,7 +442,9 @@ class ComposerSCGPTModel(ComposerModel):
         )
         if self.use_cell_conditioned_generation:
             loss_gen = self.criterion(
-                outputs["cell_conditioned_gen_preds"], gen_expr_target, positions_to_match
+                outputs["cell_conditioned_gen_preds"],
+                gen_expr_target,
+                positions_to_match,
             )
             loss = (loss_mse + loss_mvc + loss_gen) / 3
         else:
