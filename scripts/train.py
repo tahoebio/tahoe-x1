@@ -20,6 +20,7 @@ from llmfoundry.utils.config_utils import (
     pop_config,
     update_batch_size_info,
 )
+from streaming.base.util import clean_stale_shared_memory
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from typing import Any, Dict, List, Optional, Union
@@ -310,6 +311,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     # Build DataLoaders
     log.info("Building DataLoaders...")
+    clean_stale_shared_memory()
     train_loader = build_dataloader(
         loader_cfg=train_loader_config,
         collator_cfg=collator_config,
