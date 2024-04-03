@@ -1,6 +1,6 @@
 # Copyright 2024 vevo-scGPT  authors
 
-"""MosaicML LLM Foundry package setup."""
+"""vevo-scgpt package setup."""
 
 import os
 
@@ -25,7 +25,7 @@ setup(
         'vevo-scgpt': ['py.typed'],
     },
     packages=setuptools.find_packages(
-        exclude=['.github*', 'envs*', 'tutorials*', 'tests*','examples*','mcli*']),
+        exclude=['.github*', 'envs*', 'tutorials*', 'tests*','scripts*','mcli*']),
     install_requires=install_requires,
     python_requires='>=3.9',
 )

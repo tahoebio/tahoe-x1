@@ -1,11 +1,18 @@
 import torch
 import torch.nn.functional as F
 from torch import nn, Tensor
-from typing import Dict, Mapping, Optional, Tuple, Any, Union
+from typing import Mapping, Optional, Tuple
 from composer.models import ComposerModel
 from scgpt.loss import masked_mse_loss, MaskedMseMetric
-from .flash_layers import SCGPTBlock, FlashscGPTGenerator
-from llmfoundry.models.layers.ffn import resolve_ffn_hidden_size, resolve_ffn_act_fn
+from scgpt.model.blocks import (SCGPTBlock,
+                                SCGPTEncoder,
+                                GeneEncoder,
+                                ContinuousValueEncoder,
+                                CategoryValueEncoder,
+                                ExprDecoder,
+                                MVCDecoder
+                                )
+
 from omegaconf import DictConfig
 
 
@@ -71,25 +78,22 @@ class SCGPTModel(nn.Module):
         else:
             raise ValueError(f"Unknown input_emb_style: {self.input_emb_style}")
 
-        if self.use_generative_training:
-            encoder_layers = SCGPTBlock(
-                d_model=self.d_model,
-                n_heads=self.n_heads,
-                expansion_ratio=self.expansion_ratio,
-                attn_config=self.attn_config,
-                norm_config=self.norm_config,
-                activation=self.transformer_activation,
-                device=self.device,
-                norm_scheme=self.norm_scheme,
-                use_glu=model_config.get("use_glu", False),
-            )
-            self.transformer_encoder = FlashscGPTGenerator(
-                encoder_layers, self.n_layers,
-                use_norm=self.norm_scheme == "pre",
-                norm_config=self.norm_config,
-            )
-        else:
-            raise NotImplementedError("Only generative training is supported")
+        encoder_layers = SCGPTBlock(
+            d_model=self.d_model,
+            n_heads=self.n_heads,
+            expansion_ratio=self.expansion_ratio,
+            attn_config=self.attn_config,
+            norm_config=self.norm_config,
+            activation=self.transformer_activation,
+            device=self.device,
+            norm_scheme=self.norm_scheme,
+            use_glu=model_config.get("use_glu", False),
+        )
+        self.transformer_encoder = SCGPTEncoder(
+            encoder_layers, self.n_layers,
+            use_norm=self.norm_scheme == "pre",
+            norm_config=self.norm_config,
+        )
 
         expression_decoder_config = model_config.expression_decoder
         self.expression_decoder = ExprDecoder(
@@ -124,7 +128,10 @@ class SCGPTModel(nn.Module):
         values = self.expression_encoder(values)  # (batch, seq_len, embsize)
         total_embs = src + values
         output = self.transformer_encoder(
-            total_embs, src_key_padding_mask=src_key_padding_mask
+            pcpt_total_embs=total_embs,
+            gen_total_embs=None,
+            pcpt_key_padding_mask=src_key_padding_mask,
+            gen_key_padding_mask=None
         )
         return output  # (batch, seq_len, embsize)
 
@@ -158,8 +165,8 @@ class SCGPTModel(nn.Module):
             pcpt_total_embs[:, 0, :] = input_cell_emb
 
         pcpt_output, gen_output = self.transformer_encoder(
-            pcpt_total_embs,
-            gen_total_embs,
+            pcpt_total_embs=pcpt_total_embs,
+            gen_total_embs=gen_total_embs,
             pcpt_key_padding_mask=pcpt_key_padding_mask,
             gen_key_padding_mask=gen_key_padding_mask,
         )
@@ -192,46 +199,6 @@ class SCGPTModel(nn.Module):
 
         return cell_emb
 
-    def generate(
-        self,
-        cell_emb: Tensor,
-        src: Tensor,
-        values: Optional[Tensor] = None,
-        src_key_padding_mask: Optional[Tensor] = None,
-    ) -> Tensor:
-        """
-        Args:
-            cell_emb(:obj:`Tensor`): shape (batch, embsize)
-            src(:obj:`Tensor`): shape (batch, seq_len)
-            values(:obj:`Tensor`): shape (batch, seq_len), optional
-            src_key_padding_mask(:obj:`Tensor`): shape (batch, seq_len), optional
-        """
-        # TODO: should have a tag indicate the generation mode
-        # TODO: if gen_iters > 1, should have a tag indicate the current iteration
-
-        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
-        if values is not None:
-            values = self.expression_encoder(values)  # (batch, seq_len, embsize)
-            total_embs = src + values
-        else:
-            total_embs = src
-
-        total_embs = self.bn(total_embs.permute(0, 2, 1)).permute(0, 2, 1)
-
-        total_embs[:, 0, :] = cell_emb
-
-        if src_key_padding_mask is None:
-            src_key_padding_mask = torch.zeros(
-                total_embs.shape[:2], dtype=torch.bool, device=total_embs.device
-            )
-        transformer_output = self.transformer_encoder(
-            total_embs, src_key_padding_mask=src_key_padding_mask
-        )
-        mlm_output = self.expression_decoder(transformer_output)
-        output = mlm_output["pred"]  # (batch, seq_len)
-
-        return output  # (batch, seq_len)
-
     def _extend_output(
         self,
         output: Mapping[str, Tensor],
@@ -262,13 +229,7 @@ class SCGPTModel(nn.Module):
         on the value of the "generative_training" kwarg.
         """
         if "generative_training" not in kwargs:
-            # raise ValueError("generative_training kwarg is required")
-            warnings.warn(
-                "generative_training kwarg is required but not provided! "
-                "Using False and calling perceptual_forward instead"
-            )
-            return self.perceptual_forward(*args, **kwargs)
-
+            raise ValueError("Please specify generative_training argument and set to False if doing inference")
         # get the generative training flag and pop it out
         do_generative_training = kwargs.pop("generative_training")
         if do_generative_training:
@@ -362,8 +323,8 @@ class SCGPTModel(nn.Module):
         transformer_output = self._encode(src, values, src_key_padding_mask)
 
         output = {}
-        mlm_output = self.expression_decoder(transformer_output)
-        output["mlm_output"] = mlm_output["pred"]  # (batch, seq_len)
+        expression_decoder_output = self.expression_decoder(transformer_output)
+        output["pcpt_preds"] = expression_decoder_output["pred"]  # (batch, seq_len)
 
         output = self._extend_output(
             output,
@@ -379,298 +340,6 @@ class SCGPTModel(nn.Module):
 
     def activation_checkpointing_fn(self, module):
         return isinstance(module, SCGPTBlock)
-
-
-class FlashTransformerEncoderLayer(nn.Module):
-    r"""TransformerEncoderLayer is made up of self-attn and feedforward network.
-    The class is modified from torch.nn.TransformerEncoderLayer to support the
-    FlashAttention.
-
-    Args:
-        d_model: the number of expected features in the input (required).
-        nhead: the number of heads in the multiheadattention models (required).
-        dim_feedforward: the dimension of the feedforward network model (default=2048).
-        dropout: the dropout value (default=0.1).
-        activation: the activation function of intermediate layer, relu or gelu (default=relu).
-        layer_norm_eps: the eps value in layer normalization components (default=1e-5).
-        batch_first: If ``True``, then the input and output tensors are provided
-            as (batch, seq, feature). Default: ``False``.
-
-    Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = encoder_layer(src)
-
-    Alternatively, when ``batch_first`` is ``True``:
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8, batch_first=True)
-        >>> src = torch.rand(32, 10, 512)
-        >>> out = encoder_layer(src)
-    """
-    __constants__ = ["batch_first"]
-
-    def __init__(
-        self,
-        d_model,
-        nhead,
-        dim_feedforward=2048,
-        dropout=0.1,
-        activation="relu",
-        layer_norm_eps=1e-5,
-        batch_first=True,
-        device=None,
-        dtype=None,
-        norm_scheme="post",  # "pre" or "post"
-    ) -> None:
-        factory_kwargs = {"device": device, "dtype": dtype}
-        super().__init__()
-        self.self_attn = FlashMHA(
-            embed_dim=d_model,
-            num_heads=nhead,
-            batch_first=batch_first,
-            attention_dropout=dropout,
-            **factory_kwargs,
-        )
-        # Implementation of Feedforward model
-        self.linear1 = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
-        self.dropout = nn.Dropout(dropout)
-        self.linear2 = nn.Linear(dim_feedforward, d_model, **factory_kwargs)
-
-        self.norm1 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-        self.norm2 = nn.LayerNorm(d_model, eps=layer_norm_eps, **factory_kwargs)
-        self.dropout1 = nn.Dropout(dropout)
-        self.dropout2 = nn.Dropout(dropout)
-
-        self.activation = self._get_activation_fn(activation)
-        self.norm_scheme = norm_scheme
-        if self.norm_scheme not in ["pre", "post"]:
-            raise ValueError(f"norm_scheme should be pre or post, not {norm_scheme}")
-
-    @staticmethod
-    def _get_activation_fn(activation):
-        if activation == "relu":
-            return F.relu
-        elif activation == "gelu":
-            return F.gelu
-
-        raise RuntimeError("activation should be relu/gelu, not {}".format(activation))
-
-    def __setstate__(self, state):
-        if "activation" not in state:
-            state["activation"] = F.relu
-        super().__setstate__(state)
-
-    def forward(
-        self,
-        src: Tensor,
-        src_mask: Optional[Tensor] = None,
-        src_key_padding_mask: Optional[Tensor] = None,
-        **kwargs,
-    ) -> Tensor:
-        r"""Pass the input through the encoder layer.
-
-        Args:
-            src: the sequence to the encoder layer (required).
-            src_mask: the mask for the src sequence (optional).
-            src_key_padding_mask: the mask for the src keys per batch (optional).
-
-        Shape:
-            see the docs in Transformer class.
-        """
-        if src_mask is not None:
-            raise ValueError("FlashTransformerEncoderLayer does not support src_mask")
-
-        if not src_key_padding_mask.any().item():
-            # no padding tokens in src
-            src_key_padding_mask_ = None
-        else:
-            if src_key_padding_mask.dtype != torch.bool:
-                src_key_padding_mask = src_key_padding_mask.bool()
-            # NOTE: the FlashMHA uses mask 0 for padding tokens, which is the opposite
-            src_key_padding_mask_ = ~src_key_padding_mask
-
-        if self.norm_scheme == "pre":
-            src = self.norm1(src)
-            src2 = self.self_attn(src, key_padding_mask=src_key_padding_mask_)[0]
-            src = src + self.dropout1(src2)
-            src = self.norm2(src)
-            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
-            src = src + self.dropout2(src2)
-        else:
-            src2 = self.self_attn(src, key_padding_mask=src_key_padding_mask_)[0]
-            src = src + self.dropout1(src2)
-            src = self.norm1(src)
-            src2 = self.linear2(self.dropout(self.activation(self.linear1(src))))
-            src = src + self.dropout2(src2)
-            src = self.norm2(src)
-
-        return src
-
-
-class GeneEncoder(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        padding_idx: Optional[int] = None,
-        use_norm: bool = False,
-    ):
-        super().__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings, embedding_dim, padding_idx=padding_idx
-        )
-        self.use_norm = use_norm
-        if self.use_norm:
-            self.enc_norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, seq_len, embsize)
-        if self.use_norm:
-            x = self.enc_norm(x)  # Norm for embedding is not used when using pre-norm transformer.
-        return x
-
-
-class ContinuousValueEncoder(nn.Module):
-    """
-    Encode real number values to a vector using neural nets projection.
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        dropout: float = 0.1,
-        max_value: int = 512,
-        activation: str = "relu",
-        use_norm: bool = False,
-    ):
-        super().__init__()
-        self.dropout = nn.Dropout(p=dropout)
-        self.linear1 = nn.Linear(1, d_model)
-        self.activation = resolve_ffn_act_fn({"name": activation})
-        self.linear2 = nn.Linear(d_model, d_model)
-        self.use_norm = use_norm
-        if self.use_norm:
-            self.norm = nn.LayerNorm(d_model)
-        self.max_value = max_value
-
-    def forward(self, x: Tensor) -> Tensor:
-        """
-        Args:
-            x: Tensor, shape [batch_size, seq_len]
-        """
-        # TODO: test using actual embedding layer if input is categorical
-        # expand last dimension
-        x = x.unsqueeze(-1)
-        # clip x to [-inf, max_value]
-        x = torch.clamp(x, max=self.max_value)
-        x = self.activation(self.linear1(x))
-        x = self.linear2(x)
-        if self.use_norm:
-            x = self.norm(x)
-        return self.dropout(x)
-
-
-class CategoryValueEncoder(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        padding_idx: Optional[int] = None,
-        use_norm: bool = False,
-    ):
-        super().__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings, embedding_dim, padding_idx=padding_idx
-        )
-        self.use_norm = use_norm
-        if self.use_norm:
-            self.enc_norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = x.long()
-        x = self.embedding(x)  # (batch, seq_len, embsize)
-        if self.use_norm:
-            x = self.enc_norm(x)
-        return x
-
-
-class ExprDecoder(nn.Module):
-    def __init__(
-        self,
-        d_model: int,
-        n_outputs: int = 1,
-        n_layers: int = 2,
-        activation: str = "leaky_relu",
-    ):
-        super().__init__()
-        d_in = d_model
-        self.activation = resolve_ffn_act_fn({"name": activation})
-        self.linear_layers = nn.ModuleList(
-            [nn.Linear(d_in, d_model) for _ in range(n_layers)]
-        )
-        self.out_proj = nn.Linear(d_model, n_outputs)
-
-    def forward(self, x: Tensor) -> Dict[str, Tensor]:
-        """x is the output of the transformer, (batch, seq_len, d_model)"""
-        for layer in self.linear_layers:
-            x = self.activation(layer(x))
-        pred_value = self.out_proj(x)  # (batch, seq_len, n_outputs)
-        if pred_value.shape[-1] == 1:
-            pred_value = pred_value.squeeze(-1)
-        return dict(pred=pred_value)
-
-
-class MVCDecoder(nn.Module):
-    """
-    Decoder for the masked value prediction for cell embeddings.
-    """
-
-    def __init__(
-        self,
-        d_model: int,
-        arch_style: str = "inner product",
-        query_activation: str = "sigmoid",
-    ) -> None:
-        """
-        Args:
-            d_model (:obj:`int`): dimension of the gene embedding.
-            arch_style (:obj:`str`): architecture style of the decoder, choice from
-                1. "inner product" or 2. "concat query" or 3. "sum query".
-            query_activation (:obj:`nn.Module`): activation function for the query
-                vectors.
-            hidden_activation (:obj:`nn.Module`): activation function for the hidden
-                layers.
-        """
-        super().__init__()
-        d_in = d_model
-
-        if arch_style == "inner product":
-            self.gene2query = nn.Linear(d_model, d_model)
-            self.query_activation = resolve_ffn_act_fn({"name": query_activation})
-            self.W = nn.Linear(d_model, d_in, bias=False)
-        else:
-            raise ValueError(f"Unknown arch_style: {arch_style}")
-
-        self.arch_style = arch_style
-
-    def forward(
-        self, cell_emb: Tensor, gene_embs: Tensor
-    ) -> Union[Tensor, Dict[str, Tensor]]:
-        """
-        Args:
-            cell_emb: Tensor, shape (batch, embsize=d_model)
-            gene_embs: Tensor, shape (batch, seq_len, embsize=d_model)
-        """
-        if self.arch_style == "inner product":
-            query_vecs = self.query_activation(
-                self.gene2query(gene_embs)
-            )  # (batch, seq_len, embsize)
-            cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
-            pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(
-                2
-            )  # (batch, seq_len)
-            return dict(pred=pred_value)
-        else:
-            raise ValueError(f"Unknown arch_style: {self.arch_style}")
 
 
 class ComposerSCGPTModel(ComposerModel):
@@ -700,9 +369,9 @@ class ComposerSCGPTModel(ComposerModel):
         # specify how batches are passed through the model
         pcpt_gene = batch["pcpt_gene"]
         pcpt_expr = batch["pcpt_expr"]
-        pcpt_key_padding_mask = pcpt_gene.eq(self.pad_token_id)
+        pcpt_key_padding_mask = ~pcpt_gene.eq(self.pad_token_id)
         gen_gene = batch["gen_gene"]
-        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
+        gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
         output_dict = self.model(
             pcpt_gene,
             pcpt_expr,
@@ -724,7 +393,7 @@ class ComposerSCGPTModel(ComposerModel):
                 input_cell_emb=previous_cell_embs,
                 generative_training=True,
             )["gen_preds"]
-            output_dict["GEPC"] = preds
+            output_dict["cell_conditioned_gen_preds"] = preds
         return output_dict
 
     def loss(self, outputs, batch):
@@ -732,8 +401,8 @@ class ComposerSCGPTModel(ComposerModel):
         pcpt_gene = batch["pcpt_gene"]
         gen_gene = batch["gen_gene"]
         gen_expr_target = batch["gen_expr_target"]
-        gen_key_padding_mask = gen_gene.eq(self.pad_token_id)
-        positions_to_match = ~gen_key_padding_mask
+        gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
+        positions_to_match = gen_key_padding_mask
         gen_expr_preds = outputs["gen_preds"]
         loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
         loss_mvc = self.criterion(
@@ -743,7 +412,7 @@ class ComposerSCGPTModel(ComposerModel):
         )
         if self.use_cell_conditioned_generation:
             loss_gen = self.criterion(
-                outputs["GEPC"], gen_expr_target, positions_to_match
+                outputs["cell_conditioned_gen_preds"], gen_expr_target, positions_to_match
             )
             loss = (loss_mse + loss_mvc + loss_gen) / 3
         else:
@@ -761,7 +430,7 @@ class ComposerSCGPTModel(ComposerModel):
             preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
         elif metric.name == "GEN":
             assert self.use_cell_conditioned_generation
-            preds = outputs["GEPC"]
+            preds = outputs["cell_conditioned_gen_preds"]
         else:
             raise ValueError(f"metric {metric.name} not recognized")
         metric.update(preds=preds, target=target, mask=mask)

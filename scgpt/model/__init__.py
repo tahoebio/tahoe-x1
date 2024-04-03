@@ -1,7 +1,12 @@
 from .model import (
     SCGPTModel,
     ComposerSCGPTModel,
-    FlashTransformerEncoderLayer,
-    GeneEncoder,
-    MVCDecoder,
 )
+from .blocks import (SCGPTBlock,
+                    SCGPTEncoder,
+                    GeneEncoder,
+                    ContinuousValueEncoder,
+                    CategoryValueEncoder,
+                    ExprDecoder,
+                    MVCDecoder
+                    )

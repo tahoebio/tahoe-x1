@@ -11,8 +11,8 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/README.md`
 # to convert and host the full 'train' dataset.
 command: |
-  cd vevo-scGPT/examples
-  composer pretrain_composer.py /mnt/config/parameters.yaml
+  cd vevo-scGPT/scripts
+  composer train.py /mnt/config/parameters.yaml
 image: vevotx/ml-scgpt:shreshth
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout

@@ -3,7 +3,7 @@ seed: ${global_seed}
 device_train_batch_size: 400
 global_train_batch_size: 3200
 device_eval_batch_size: 400
-device_train_microbatch_size: 400
+device_train_microbatch_size: "auto"
 model:
   name: vevo_scgpt
   d_model: 512
@@ -47,7 +47,7 @@ collator:
   sampling: True
   data_style: "both"
   num_bins: 51
-  right_binning: True
+  right_binning: False
   use_junk_tokens: True
 train_loader:
   dataset:
@@ -96,14 +96,14 @@ algorithms:
 precision: amp_bf16
 eval_interval: "500ba"
 max_duration: "6ep"
-deepspeed_config:
-  zero_optimization:
-    stage: 2
-    overlap_comm: True
-    reduce_scatter: True
-  precision: amp_bf16
-  bf_16:
-    enabled: True
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: DEFAULT
+  activation_checkpointing: false
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+  verbose: true
 callbacks:
   speed_monitor:
     window_size: 20
