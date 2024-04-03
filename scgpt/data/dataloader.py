@@ -25,6 +25,7 @@ def build_dataloader(loader_cfg: DictConfig,
         shuffle=dataset_cfg.shuffle,
         predownload=dataset_cfg.get("predownload", None),
         shuffle_seed=dataset_cfg.get("shuffle_seed", None),
+        num_canonical_nodes=dataset_cfg.get("num_canonical_nodes", 2),
     )
     collate_fn = DataCollator(
         do_padding=collator_cfg.get("do_padding", True),
