@@ -49,6 +49,7 @@ class SCGPTBlock(nn.Module):
         >>> src = torch.rand(32, 10, 512)
         >>> out = encoder_layer(src)
     """
+
     __constants__ = ["batch_first"]
 
     def __init__(
@@ -204,25 +205,32 @@ class FlashscGPTGenerator(nn.Module):
             see the docs in Transformer class.
         """
 
+        if pcpt_total_embs is None:
+            raise ValueError("pcpt_total_embs cannot be None")
+
+        if gen_total_embs is None:
+            raise NotImplementedError
+            # total_embs = pcpt_total_embs
+            # for mod in self.layers:
+            #     total_embs = mod(
+            #         total_embs, attn_bias=None  # need the key padding mask here
+            #     )
+
+            # if self.norm is not None:
+            #     total_embs = self.norm(total_embs)
+            # return total_embs, None
+
         total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
         if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
             key_padding_mask = None
+        elif pcpt_key_padding_mask is None or gen_key_padding_mask is None:
+            raise ValueError(
+                "Both pcpt_key_padding_mask and gen_key_padding_mask must be provided"
+            )
         else:
-            if pcpt_key_padding_mask is None:
-                pcpt_key_padding_mask = torch.ones(
-                    (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
-                    device=pcpt_total_embs.device,
-                    dtype=torch.bool,
-                )
-            elif gen_key_padding_mask is None:
-                gen_key_padding_mask = torch.ones(
-                    (gen_total_embs.shape[0], gen_total_embs.shape[1]),
-                    device=gen_total_embs.device,
-                    dtype=torch.bool,
-                )
-            key_padding_mask = ~torch.cat(
+            key_padding_mask = torch.cat(
                 [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-            )  # (B, S)
+            )  # TODO: assume the llmfoundry fashion of key_padding_mask, where 1 is valid and 0 is not valid
         p_len = pcpt_total_embs.shape[1]
         total_len = total_embs.shape[1]
         g_len = total_len - p_len
@@ -240,12 +248,13 @@ class FlashscGPTGenerator(nn.Module):
             1
         )  # Broadcastable to (B,H, S_Q, S_K) dimensions
 
-        # Merge the key_padding_mask into attn_bias
-        b_size, s_k = key_padding_mask.shape[:2]
-        attn_bias = attn_bias.masked_fill(
-            ~key_padding_mask.view((b_size, 1, 1, s_k)),
-            torch.finfo(total_embs.dtype).min,
-        )
+        if key_padding_mask is not None:  # NOTE: handle when key_padding_mask is None
+            # Merge the key_padding_mask into attn_bias
+            b_size, s_k = key_padding_mask.shape[:2]
+            attn_bias = attn_bias.masked_fill(
+                ~key_padding_mask.view((b_size, 1, 1, s_k)),
+                torch.finfo(total_embs.dtype).min,
+            )
 
         for mod in self.layers:
             total_embs = mod(total_embs, attn_bias=attn_bias)
