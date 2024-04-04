@@ -14,7 +14,7 @@ model:
   n_heads: 8
   norm_scheme: "pre"
   use_generative_training: True
-  use_cell_conditioned_generation: False
+  use_cell_conditioned_generation: True
   use_glu: False
   cell_emb_style: cls
   attn_config:
@@ -48,7 +48,7 @@ collator:
   sampling: True
   data_style: "both"
   num_bins: 51
-  right_binning: False
+  right_binning: True
   use_junk_tokens: True
 train_loader:
   dataset:
@@ -116,3 +116,4 @@ loggers:
     log_artifacts: False
 save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
 save_interval: "500ba"
+run_name: scgpt-70m-1024-cell-cond-right-bin

@@ -42,6 +42,7 @@ parameters:
     name: vevo_scgpt
     d_model: 512
     n_layers: 12
+    init_device: meta
     expansion_ratio: 4.0
     transformer_activation: relu
     n_heads: 8
@@ -56,7 +57,7 @@ parameters:
       kv_nheads: 8
       attn_pdrop: 0.0
     norm_config:
-      norm_type: "layernorm"
+      norm_type: "low_precision_layernorm"
       eps: 1.0e-5
     expression_encoder:
       input_emb_style: "continuous"
@@ -77,11 +78,11 @@ parameters:
     do_binning: True
     mlm_probability: 0.40
     mask_value: -1
-    max_length: 2048
+    max_length: 1024
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: False
+    right_binning: True
     use_junk_tokens: True
   train_loader:
     dataset:
@@ -91,6 +92,7 @@ parameters:
       allow_unsafe_types: True
       shuffle: True
       shuffle_seed: ${global_seed}
+      num_canonical_nodes: 2
     drop_last: False
     num_workers: 8
     pin_memory: True
@@ -104,6 +106,7 @@ parameters:
       allow_unsafe_types: True
       shuffle: False
       shuffle_seed: ${global_seed}
+      num_canonical_nodes: 2
     drop_last: False
     num_workers: 8
     pin_memory: True
@@ -123,7 +126,9 @@ parameters:
     t_max: "1dur"
     alpha_f: 0.1
   algorithms:
-    low_precision_layernorm: {}
+    gradient_clipping:
+      clipping_type: norm
+      clipping_threshold: 1.0
   precision: amp_bf16
   eval_interval: "500ba"
   max_duration: "6ep"
@@ -148,4 +153,3 @@ parameters:
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
   save_interval: "500ba"
   autoresume: True
-  run_name: "scgpt-70m-2048"
