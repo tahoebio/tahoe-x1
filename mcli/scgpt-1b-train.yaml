@@ -19,13 +19,12 @@ env_variables:
 name: scgpt-test-50m
 
 compute:
-  gpus: 16 # Number of GPUs to use
+  gpus: 32 # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 12 # Maximum duration of the run in hours
+  max_duration: 0.25 # Maximum duration of the run in hours
 
   ## These configurations are optional
-  # cluster: # TODO # Name of the cluster to use for this run
   # gpu_type: a100_80gb # Type of GPU to use. We use a100_80gb in our experiments
 
 
@@ -34,18 +33,18 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 400
-  global_train_batch_size: 6400
-  device_eval_batch_size: 400
+  device_train_batch_size: 40
+  global_train_batch_size: 1792
+  device_eval_batch_size: 40
   device_train_microbatch_size: "auto"
   model:
     name: vevo_scgpt
-    d_model: 512
-    n_layers: 12
+    d_model: 2048
+    n_layers: 24
     init_device: meta
     expansion_ratio: 4.0
     transformer_activation: relu
-    n_heads: 8
+    n_heads: 16
     norm_scheme: "pre"
     use_generative_training: True
     use_cell_conditioned_generation: False
@@ -82,7 +81,7 @@ parameters:
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: True
+    right_binning: False
     use_junk_tokens: True
   train_loader:
     dataset:

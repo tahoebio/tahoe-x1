@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torchmetrics import Metric
+from torchmetrics.functional.regression import spearman_corrcoef
 
 
 def masked_mse_loss(
@@ -64,3 +65,30 @@ class MaskedMseMetric(Metric):
 
     def compute(self) -> torch.Tensor:
         return self.sum_mse / self.sum_mask
+
+class MaskedSpearmanMetric(Metric):
+    def __init__(self, name, **kwargs):
+        super().__init__(**kwargs)
+        self.name = name
+        self.add_state(
+            "sum_spearman",
+            default=torch.tensor(0.0, dtype=torch.float32),
+            dist_reduce_fx="sum",
+        )
+        self.add_state(
+            "num_examples",
+            default=torch.tensor(0.0, dtype=torch.float32),
+            dist_reduce_fx="sum",
+        )
+    def update(
+        self, preds: torch.Tensor, target: torch.Tensor, mask: torch.Tensor
+    ) -> None:
+        if preds.shape != target.shape:
+            raise ValueError("preds and target must have the same shape")
+        for pred_i, target_i, mask_i in zip(preds, target, mask):
+            non_mask_preds = pred_i[mask_i].to("cpu")
+            non_mask_targets = target_i[mask_i].to("cpu")
+            self.sum_spearman += spearman_corrcoef(non_mask_preds, non_mask_targets)
+            self.num_examples += 1
+    def compute(self) -> torch.Tensor:
+        return self.sum_spearman / self.num_examples

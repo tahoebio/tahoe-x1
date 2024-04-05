@@ -4,7 +4,7 @@ from torch import nn, Tensor
 from typing import Mapping, Optional, Tuple
 from composer.models import ComposerModel
 from composer.utils import dist
-from scgpt.loss import masked_mse_loss, MaskedMseMetric
+from scgpt.loss import masked_mse_loss, MaskedMseMetric, MaskedSpearmanMetric
 from scgpt.model.blocks import (
     SCGPTBlock,
     SCGPTEncoder,
@@ -386,14 +386,22 @@ class ComposerSCGPTModel(ComposerModel):
             device=device,
         )
         self.n_active_params = sum(p.numel() for p in self.model.parameters())
-        self.train_mse = MaskedMseMetric(name="MSE")
-        self.train_mvc = MaskedMseMetric(name="MVC")
-        self.val_mse = MaskedMseMetric(name="MSE")
-        self.val_mvc = MaskedMseMetric(name="MVC")
+        self.train_metrics = {
+            "MSE": MaskedMseMetric(name="MSE"),
+            "MVC": MaskedMseMetric(name="MVC"),
+        }
+
+        self.val_metrics = {
+            "MSE": MaskedMseMetric(name="MSE"),
+            "MVC": MaskedMseMetric(name="MVC"),
+            "Spearman": MaskedSpearmanMetric(name="Spearman"),
+        }
         if self.use_cell_conditioned_generation:
             self.train_gen = MaskedMseMetric(name="GEN")
+            self.train_metrics.update({"GEN": self.train_gen})
         if self.use_cell_conditioned_generation:
             self.val_gen = MaskedMseMetric(name="GEN")
+            self.val_metrics.update({"GEN": self.val_gen})
 
     def forward(self, batch):  # batch is the output of the dataloader
         # specify how batches are passed through the model
@@ -454,6 +462,7 @@ class ComposerSCGPTModel(ComposerModel):
     def update_metric(self, batch, outputs, metric):
         pcpt_gene = batch["pcpt_gene"]
         gen_gene = batch["gen_gene"]
+        gen_expr_raw = batch["gen_expr_raw"]
         mask = ~gen_gene.eq(self.pad_token_id)
         target = batch["gen_expr_target"]
         if metric.name == "MSE":
@@ -463,6 +472,9 @@ class ComposerSCGPTModel(ComposerModel):
         elif metric.name == "GEN":
             assert self.use_cell_conditioned_generation
             preds = outputs["cell_conditioned_gen_preds"]
+        elif (metric.name == "Spearman"):
+            preds = outputs["gen_preds"]
+            target = gen_expr_raw
         else:
             raise ValueError(f"metric {metric.name} not recognized")
         metric.update(preds=preds, target=target, mask=mask)
@@ -470,29 +482,9 @@ class ComposerSCGPTModel(ComposerModel):
     def get_metrics(self, is_train=False):
         # defines which metrics to use in each phase of training
         if is_train:
-            if self.use_cell_conditioned_generation:
-                metric_dict = {
-                    "MSE": self.train_mse,
-                    "MVC": self.train_mvc,
-                    "GEN": self.train_gen,
-                }
-            else:
-                metric_dict = {
-                    "MSE": self.train_mse,
-                    "MVC": self.train_mvc,
-                }
+            metric_dict = self.train_metrics
         else:
-            if self.use_cell_conditioned_generation:
-                metric_dict = {
-                    "MSE": self.val_mse,
-                    "MVC": self.val_mvc,
-                    "GEN": self.val_gen,
-                }
-            else:
-                metric_dict = {
-                    "MSE": self.val_mse,
-                    "MVC": self.val_mvc,
-                }
+            metric_dict = self.val_metrics
         return metric_dict
 
     def flops_per_batch(self, batch: Mapping) -> int:

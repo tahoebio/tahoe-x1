@@ -177,7 +177,7 @@ class DataCollator(DefaultDataCollator):
                     right=self.right_binning,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
-                genes, expressions, _max_length
+                genes, expressions, max_length=_max_length
             )  # torch tensors of length _max_length
             padded_genes.append(genes)
             padded_expressions.append(expressions)
@@ -246,7 +246,7 @@ class DataCollator(DefaultDataCollator):
                     right=self.right_binning,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
-                genes, expressions, _max_length
+                genes, expressions, max_length=_max_length
             )
             padded_pcpt_genes.append(genes)
             padded_pcpt_expressions.append(expressions)
@@ -323,11 +323,14 @@ class DataCollator(DefaultDataCollator):
         # pad and truncate
         padded_pcpt_genes = []
         padded_pcpt_expressions = []
+        padded_pcpt_original_exp = []
         padded_gen_genes = []
         padded_gen_expressions = []
+        padded_gen_original_exp = []
         for i in range(len(examples)):
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
+            original_expressions = expressions.detach().clone()
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
@@ -338,11 +341,14 @@ class DataCollator(DefaultDataCollator):
             (
                 gen_genes,
                 gen_expressions,
+                gen_original_exp,
                 pcpt_genes,
                 pcpt_expressions,
+                pcpt_original_exp,
             ) = self._random_split(
                 genes[self.keep_first_n_tokens :],
                 expressions[self.keep_first_n_tokens :],
+                original_expressions[self.keep_first_n_tokens :],
                 ratio=gen_prob,
             )
             pcpt_genes = torch.cat(
@@ -352,28 +358,38 @@ class DataCollator(DefaultDataCollator):
                 (expressions[: self.keep_first_n_tokens], pcpt_expressions), dim=0
             )
 
-            pcpt_genes, pcpt_expressions = self._sample_or_truncate_plus_pad(
-                pcpt_genes, pcpt_expressions, pcpt_length
+            pcpt_original_exp = torch.cat(
+                (original_expressions[: self.keep_first_n_tokens], pcpt_original_exp), dim=0
+            )
+
+            pcpt_genes, pcpt_expressions, pcpt_original_exp = self._sample_or_truncate_plus_pad(
+                pcpt_genes, pcpt_expressions,pcpt_original_exp, max_length=pcpt_length
             )  # torch tensors of length pcpt_length
             padded_pcpt_genes.append(pcpt_genes)
             padded_pcpt_expressions.append(pcpt_expressions)
+            padded_pcpt_original_exp.append(pcpt_original_exp)
 
-            gen_genes, gen_expressions = self._sample_or_truncate_plus_pad(
-                gen_genes, gen_expressions, gen_length
+            gen_genes, gen_expressions,gen_original_exp = self._sample_or_truncate_plus_pad(
+                gen_genes, gen_expressions,gen_original_exp, max_length=gen_length
             )  # torch tensors of length gen_length
             padded_gen_genes.append(gen_genes)
             padded_gen_expressions.append(gen_expressions)
+            padded_gen_original_exp.append(gen_original_exp)
 
         padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0)
         padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0)
+        padded_pcpt_original_exp = torch.stack(padded_pcpt_original_exp, dim=0)
         padded_gen_genes = torch.stack(padded_gen_genes, dim=0)
         padded_gen_expressions = torch.stack(padded_gen_expressions, dim=0)
+        padded_gen_original_exp = torch.stack(padded_gen_original_exp, dim=0)
 
         data_dict = {
             "pcpt_gene": padded_pcpt_genes,
             "pcpt_expr": padded_pcpt_expressions,
+            "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
             "gen_gene": padded_gen_genes,
             "gen_expr_target": padded_gen_expressions,
+            "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
         }
 
         return data_dict
@@ -462,73 +478,72 @@ class DataCollator(DefaultDataCollator):
 
     def _sample_or_truncate_plus_pad(
         self,
-        genes: torch.LongTensor,
-        expressions: torch.Tensor,
+        *arrays: torch.Tensor,
         max_length: int,
-    ) -> Tuple[torch.LongTensor, torch.Tensor]:
-        assert len(genes) == len(expressions)
-        if len(genes) == max_length:
-            return genes, expressions
-        if len(genes) > max_length:  # sample or truncate
+    ) -> Tuple[torch.Tensor, ...]:
+        assert len(arrays) > 0
+        assert max_length > 0
+        if len(arrays) > 1:
+            assert all(
+                array.shape[0] == arrays[0].shape[0] for array in arrays
+            ), "The arrays must have the same length."
+
+        if len(arrays[0]) == max_length:
+            return tuple(array for array in arrays)
+        if len(arrays[0]) > max_length:  # sample or truncate
             if self.sampling:
-                return self._sample(genes, expressions, max_length)
+                return self._sample(*arrays, max_length=max_length)
             else:
-                return genes[:max_length], expressions[:max_length]
+                return tuple(array[:max_length] for array in arrays)
         else:  # pad
-            return self._pad(genes, expressions, max_length)
+            return self._pad(*arrays, max_length=max_length)
 
     def _sample(
         self,
-        genes: torch.LongTensor,
-        expressions: torch.Tensor,
+        *arrays: torch.Tensor,
         max_length: int,
-    ) -> Tuple[torch.LongTensor, torch.Tensor]:
+    ) -> Tuple[torch.Tensor, ...]:
         # NOTE: the fastest way to sample in torch has been benchmarked here
         # https://discuss.pytorch.org/t/torch-equivalent-of-numpy-random-choice/16146/19
         # it shows the randperm on gpu is the fastest.
         # NOTE: also, the current implementation permute the orders of the genes
         # and expressions, although it is probably a nice argmentation.
-        device = genes.device
-        if self.keep_first_n_tokens == 0:
-            indices = torch.randperm(len(genes), device=device)[:max_length]
-            return genes[indices], expressions[indices]
+        assert len(arrays) > 0
+        if len(arrays) > 1:
+            assert all(
+                array.shape[0] == arrays[0].shape[0] for array in arrays
+            ), "The arrays must have the same length."
 
-        # keep the first n tokens unchanged
-        _n = self.keep_first_n_tokens
-        indices = torch.randperm(len(genes) - _n, device=device)[: max_length - _n]
-        indices = torch.cat([torch.arange(_n), indices + _n], dim=0)
-        return genes[indices], expressions[indices]
+        device = arrays[0].device
+        if self.keep_first_n_tokens == 0:
+            indices = torch.randperm(len(arrays[0]), device=device)[:max_length]
+        else:
+            # keep the first n tokens unchanged
+            _n = self.keep_first_n_tokens
+            indices = torch.randperm(len(arrays[0]) - _n, device=device)[: max_length - _n]
+            indices = torch.cat([torch.arange(_n), indices + _n], dim=0)
+        return tuple(array[indices] for array in arrays)
 
     def _pad(
         self,
-        genes: torch.LongTensor,
-        expressions: torch.Tensor,
+        *arrays: torch.Tensor, # First tensor is genes, rest are  expressions
         max_length: int,
     ):
-        device = genes.device
-        genes = torch.cat(
-            [
-                genes,
-                torch.full(
-                    (max_length - len(genes),),
-                    self.pad_token_id,
-                    dtype=genes.dtype,
-                    device=device,
-                ),
-            ]
+        device = arrays[0].device
+        return tuple(
+            torch.cat(
+                [
+                    array,
+                    torch.full(
+                        (max_length - len(array),),
+                        self.pad_token_id if i == 0 else self.pad_value,
+                        dtype=array.dtype,
+                        device=device,
+                    ),
+                ]
+            )
+            for i, array in enumerate(arrays)
         )
-        expressions = torch.cat(
-            [
-                expressions,
-                torch.full(
-                    (max_length - len(expressions),),
-                    self.pad_value,
-                    dtype=expressions.dtype,
-                    device=device,
-                ),
-            ]
-        )
-        return genes, expressions
 
 
 @torch.no_grad()

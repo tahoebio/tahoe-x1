@@ -14,7 +14,7 @@ model:
   n_heads: 8
   norm_scheme: "pre"
   use_generative_training: True
-  use_cell_conditioned_generation: True
+  use_cell_conditioned_generation: False
   use_glu: False
   cell_emb_style: cls
   attn_config:
@@ -114,6 +114,8 @@ loggers:
   wandb:
     project: vevo-scgpt
     log_artifacts: False
+    init_kwargs:
+      mode: offline
 save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
 save_interval: "500ba"
-run_name: scgpt-70m-1024-cell-cond-right-bin
+save_num_checkpoints_to_keep: 0 # Delete local copies of checkpoints
