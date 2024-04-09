@@ -213,28 +213,28 @@ class SCGPTEncoder(nn.Module):
         if gen_total_embs is None:
             pcpt_only = True
             total_embs = pcpt_total_embs
+            key_padding_mask = pcpt_key_padding_mask
         else:
             pcpt_only = False
             total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
-
-        if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
-            key_padding_mask = None
-        else:
-            if pcpt_key_padding_mask is None:
-                pcpt_key_padding_mask = torch.ones(
-                    (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
-                    device=pcpt_total_embs.device,
-                    dtype=torch.bool,
-                )  # 1 means attention is allowed
-            elif gen_key_padding_mask is None:
-                gen_key_padding_mask = torch.ones(
-                    (gen_total_embs.shape[0], gen_total_embs.shape[1]),
-                    device=gen_total_embs.device,
-                    dtype=torch.bool,
-                )  # 1 means attention is allowed
-            key_padding_mask = torch.cat(
-                [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
-            )  # (B, S)
+            if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
+                key_padding_mask = None
+            else:
+                if pcpt_key_padding_mask is None:
+                    pcpt_key_padding_mask = torch.ones(
+                        (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
+                        device=pcpt_total_embs.device,
+                        dtype=torch.bool,
+                    )  # 1 means attention is allowed
+                elif gen_key_padding_mask is None:
+                    gen_key_padding_mask = torch.ones(
+                        (gen_total_embs.shape[0], gen_total_embs.shape[1]),
+                        device=gen_total_embs.device,
+                        dtype=torch.bool,
+                    )  # 1 means attention is allowed
+                key_padding_mask = torch.cat(
+                    [pcpt_key_padding_mask, gen_key_padding_mask], dim=1
+                )  # (B, S)
         p_len = pcpt_total_embs.shape[1]
         total_len = total_embs.shape[1]
         g_len = total_len - p_len
