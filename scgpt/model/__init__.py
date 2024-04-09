@@ -10,3 +10,6 @@ from .blocks import (SCGPTBlock,
                     ExprDecoder,
                     MVCDecoder
                     )
+
+__all__ = ["SCGPTModel", "ComposerSCGPTModel", "SCGPTBlock", "SCGPTEncoder", "GeneEncoder",
+           "ContinuousValueEncoder", "CategoryValueEncoder", "ExprDecoder", "MVCDecoder"]

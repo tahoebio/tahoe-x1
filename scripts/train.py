@@ -117,6 +117,8 @@ def main(cfg: DictConfig) -> composer.Trainer:
     run_name: str = pop_config(
         cfg, "run_name", must_exist=False, default_value=default_run_name
     )
+
+    logged_cfg.update({"run_name": run_name})
     save_folder: Optional[str] = pop_config(
         cfg,
         "save_folder",

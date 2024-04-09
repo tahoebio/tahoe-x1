@@ -2,6 +2,8 @@ from scgpt.data import DataCollator
 from streaming import StreamingDataset, StreamingDataLoader
 from composer.core.data_spec import DataSpec
 from omegaconf import DictConfig
+import torch
+import numpy as np
 
 
 
@@ -54,3 +56,38 @@ def build_dataloader(loader_cfg: DictConfig,
         persistent_workers = loader_cfg.get("persistent_workers", True)
     )
     return DataSpec(dataloader=data_loader)
+
+
+class CountDataset(torch.utils.data.Dataset):
+    def __init__(self, count_matrix, gene_ids, cls_token_id, pad_value):
+        """
+        Args:
+            count_matrix (np.ndarray): A 2D expression count array of shape (n_cells, n_genes)
+            gene_ids (np.ndarray): Integer Gene IDs corresponding to gene names in the count matrix (n_genes,)
+            cls_token_id (int): The id of the <cls> token
+            pad_value (float): The expression value used for PAD tokens
+        """
+        self.count_matrix = count_matrix
+        self.gene_ids = gene_ids
+        self.cls_token_id = cls_token_id
+        self.pad_value = pad_value
+
+    def __len__(self):
+        return len(self.count_matrix)
+
+    def __getitem__(self, idx):
+        row = self.count_matrix[idx]
+        nonzero_idx = np.nonzero(row)[0]
+        values = row[nonzero_idx]
+        genes = self.gene_ids[nonzero_idx]
+        # append <cls> token at the beginning
+        genes = np.insert(genes, 0, self.cls_token_id)
+        values = np.insert(values, 0, self.pad_value)
+        genes = torch.from_numpy(genes).long()
+        values = torch.from_numpy(values).float()
+        output = {
+            "id": idx,
+            "genes": genes,
+            "expressions": values,
+        }
+        return output
