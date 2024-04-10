@@ -64,10 +64,10 @@ def get_batch_cell_embeddings(
         pad_value=collator_cfg.pad_value,
         do_mlm=False,  # Disable masking for inference
         do_binning=collator_cfg.get("do_binning", True),
-        mlm_probability=collator_cfg.mlm_probability, # Not used
+        mlm_probability=collator_cfg.mlm_probability,  # Not used
         mask_value=collator_cfg.mask_value,
         max_length=max_length,
-        sampling=collator_cfg.sampling, # Turned on since max-length can be less than the number of genes
+        sampling=collator_cfg.sampling,  # Turned on since max-length can be less than the number of genes
         data_style="pcpt",  # Disable splitting of genes into pcpt and gen for inference
         num_bins=collator_cfg.get("num_bins", 51),
         right_binning=collator_cfg.get("right_binning", False),
@@ -83,7 +83,17 @@ def get_batch_cell_embeddings(
 
     device = next(model.parameters()).device
     cell_embeddings = np.zeros((len(dataset), model_cfg["d_model"]), dtype=np.float32)
-    with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=model_cfg["precision"]):
+    dtype_from_string = {
+        "fp32": torch.float32,
+        "amp_bf16": torch.bfloat16,
+        "amp_fp16": torch.float16,
+        "fp16": torch.float16,
+        "bf16": torch.bfloat16,
+    }
+
+    with torch.no_grad(), torch.cuda.amp.autocast(
+        enabled=True, dtype=dtype_from_string[model_cfg["precision"]]
+    ):
         count = 0
         for data_dict in tqdm(data_loader, desc="Embedding cells"):
             input_gene_ids = data_dict["gene"].to(device)
