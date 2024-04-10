@@ -79,6 +79,7 @@ def get_batch_cell_embeddings(
         drop_last=False,
         num_workers=num_workers,
         pin_memory=True,
+        prefetch_factor=48,
     )
 
     device = next(model.parameters()).device
@@ -95,11 +96,12 @@ def get_batch_cell_embeddings(
         enabled=True, dtype=dtype_from_string[model_cfg["precision"]]
     ):
         count = 0
-        for data_dict in tqdm(data_loader, desc="Embedding cells"):
+        pbar = tqdm(total=len(dataset), desc="Embedding cells")
+        for data_dict in data_loader:
             input_gene_ids = data_dict["gene"].to(device)
             src_key_padding_mask = ~input_gene_ids.eq(
                 collator_cfg["pad_token_id"]
-            )  # Not the negation here compared to the public scGPT implementation!
+            )  # Note the negation here compared to the public scGPT implementation!
             embeddings = model._encode(
                 src=input_gene_ids,
                 values=data_dict["expr"].to(device),
@@ -113,6 +115,7 @@ def get_batch_cell_embeddings(
             embeddings = embeddings.to("cpu").to(torch.float32).numpy()
             cell_embeddings[count : count + len(embeddings)] = embeddings
             count += len(embeddings)
+            pbar.update(len(embeddings))
     cell_embeddings = cell_embeddings / np.linalg.norm(
         cell_embeddings, axis=1, keepdims=True
     )
