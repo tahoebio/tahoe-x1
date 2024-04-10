@@ -17,6 +17,7 @@ def get_batch_cell_embeddings(
     gene_ids: Optional[np.ndarray] = None,
     batch_size: int = 8,
     num_workers: int = 8,
+    max_length: Optional[int] = None,
 ) -> np.ndarray:
     """
     Get the cell embeddings for a batch of cells.
@@ -29,8 +30,9 @@ def get_batch_cell_embeddings(
         collator_cfg (DictConfig, optional): The collator configuration dictionary.
         gene_ids (np.ndarray, optional): The gene vocabulary ids.
             Defaults to None, in which case the gene IDs are taken from adata.var["id_in_vocab"].
-        batch_size (int): The batch size for inference. Defaults to 64.
+        batch_size (int): The batch size for inference. Defaults to 8.
         num_workers (int): The number of workers for the data loader. Defaults to 8.
+        max_length (int, optional): The maximum context length. Defaults to number of genes in the adata.
 
     Returns:
         np.ndarray: The cell embeddings.
@@ -46,6 +48,10 @@ def get_batch_cell_embeddings(
         gene_ids = np.array(adata.var["id_in_vocab"])
         assert np.all(gene_ids >= 0)
 
+    # Max context length is set to the number of genes unless provided
+    if max_length is None:
+        max_length = len(gene_ids)
+
     dataset = CountDataset(
         count_matrix,
         gene_ids,
@@ -58,10 +64,10 @@ def get_batch_cell_embeddings(
         pad_value=collator_cfg.pad_value,
         do_mlm=False,  # Disable masking for inference
         do_binning=collator_cfg.get("do_binning", True),
-        mlm_probability=collator_cfg.mlm_probability,
+        mlm_probability=collator_cfg.mlm_probability, # Not used
         mask_value=collator_cfg.mask_value,
-        max_length=collator_cfg.max_length,
-        sampling=collator_cfg.sampling,
+        max_length=max_length,
+        sampling=collator_cfg.sampling, # Turned on since max-length can be less than the number of genes
         data_style="pcpt",  # Disable splitting of genes into pcpt and gen for inference
         num_bins=collator_cfg.get("num_bins", 51),
         right_binning=collator_cfg.get("right_binning", False),
@@ -94,7 +100,7 @@ def get_batch_cell_embeddings(
 
             # Casting to float 32 avoids issues with bfloat16 -> numpy conversion for some models
             # https://github.com/pytorch/pytorch/issues/110285
-            embeddings = embeddings.cpu().to(torch.float32).numpy()
+            embeddings = embeddings.to("cpu").to(torch.float32).numpy()
             cell_embeddings[count : count + len(embeddings)] = embeddings
             count += len(embeddings)
     cell_embeddings = cell_embeddings / np.linalg.norm(
