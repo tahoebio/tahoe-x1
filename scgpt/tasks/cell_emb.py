@@ -83,7 +83,7 @@ def get_batch_cell_embeddings(
 
     device = next(model.parameters()).device
     cell_embeddings = np.zeros((len(dataset), model_cfg["d_model"]), dtype=np.float32)
-    with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
+    with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=model_cfg["precision"]):
         count = 0
         for data_dict in tqdm(data_loader, desc="Embedding cells"):
             input_gene_ids = data_dict["gene"].to(device)
