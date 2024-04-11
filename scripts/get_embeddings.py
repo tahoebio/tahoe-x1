@@ -20,7 +20,7 @@ logging.basicConfig(
 logging.getLogger(__name__).setLevel("INFO")  # Train script
 
 
-def main(model_name, input_path, output_path, gene_col="feature_name", N_HVG=20000):
+def main(model_name, input_path, output_path, gene_col, n_hvg):
     model_paths = {
         "scgpt-70m-2048": "/vevo/scgpt/checkpoints/release/scgpt-70m-2048/",
         "scgpt-70m-1024": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024/",
@@ -76,7 +76,7 @@ def main(model_name, input_path, output_path, gene_col="feature_name", N_HVG=200
 
             total_embs = token_embs + flag_embs
             chunk_embeddings = model.model.transformer_encoder(total_embs)
-            chunk_embeddings_cpu = chunk_embeddings.to("cpu").numpy()
+            chunk_embeddings_cpu = chunk_embeddings.to("cpu").to(torch.float32).numpy()
 
             # Assigning the chunk embeddings to the correct place in the full array.
             gene_embeddings_ctx_free[i : i + chunk_size] = chunk_embeddings_cpu
@@ -86,10 +86,10 @@ def main(model_name, input_path, output_path, gene_col="feature_name", N_HVG=200
     log.info(
         f"Loaded {adata.shape[0]} cells and {adata.shape[1]} genes from {input_path}"
     )
-    if N_HVG is not None:
-        sc.pp.highly_variable_genes(adata, n_top_genes=N_HVG, flavor="seurat_v3")
+    if n_hvg is not None:
+        sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, flavor="seurat_v3")
         adata = adata[:, adata.var["highly_variable"]]
-        log.info(f"Performed HVG selection with n_top_genes = {N_HVG}")
+        log.info(f"Performed HVG selection with n_top_genes = {n_hvg}")
     sc.pp.filter_cells(adata, min_genes=3)
     log.info("Filtered cells with min_genes = 3")
     adata.var["id_in_vocab"] = [
@@ -156,7 +156,7 @@ if __name__ == "__main__":
         help="Name of the column to be treated as gene identifier (default: feature_name)",
     )
     parser.add_argument(
-        "--N_HVG",
+        "--n_hvg",
         type=int,
         default=None,
         help="Number of highly variable genes to subset data ,default: None (no HVG selection)",
@@ -167,9 +167,9 @@ if __name__ == "__main__":
 
     # Pass the parsed arguments to the main function
     main(
-        args.model_name,
-        args.input_path,
-        args.output_path,
-        args.gene_col,
-        args.N_HVG,
+        model_name=args.model_name,
+        input_path=args.input_path,
+        output_path=args.output_path,
+        gene_col=args.gene_col,
+        n_hvg=args.N_HVG,
     )
