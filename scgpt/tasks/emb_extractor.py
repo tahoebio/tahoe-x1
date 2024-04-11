@@ -4,11 +4,11 @@ from scgpt.data import DataCollator, CountDataset
 from tqdm.auto import tqdm
 from scgpt.model import SCGPTModel
 from scgpt.tokenizer import GeneVocab
-from typing import Optional
+from typing import Optional, Union, Tuple
 from omegaconf import DictConfig
 
 
-def get_batch_cell_embeddings(
+def get_batch_embeddings(
     adata,
     model: SCGPTModel,
     vocab: GeneVocab,
@@ -18,7 +18,8 @@ def get_batch_cell_embeddings(
     batch_size: int = 8,
     num_workers: int = 8,
     max_length: Optional[int] = None,
-) -> np.ndarray:
+    return_gene_embeddings: bool = False,
+) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
     """
     Get the cell embeddings for a batch of cells.
 
@@ -33,6 +34,7 @@ def get_batch_cell_embeddings(
         batch_size (int): The batch size for inference. Defaults to 8.
         num_workers (int): The number of workers for the data loader. Defaults to 8.
         max_length (int, optional): The maximum context length. Defaults to number of genes in the adata.
+        return_gene_embeddings (bool): Whether to return the mean gene embeddings as well. Defaults to False.
 
     Returns:
         np.ndarray: The cell embeddings.
@@ -84,6 +86,11 @@ def get_batch_cell_embeddings(
 
     device = next(model.parameters()).device
     cell_embeddings = np.zeros((len(dataset), model_cfg["d_model"]), dtype=np.float32)
+    if return_gene_embeddings:
+        # Instantiate empty gene embeddings
+        gene_embeddings = np.zeros((len(vocab), model_cfg["d_model"]), dtype=np.float32)
+        gene_embedding_counts = np.zeros((len(vocab)), dtype=np.float32)
+
     dtype_from_string = {
         "fp32": torch.float32,
         "amp_bf16": torch.bfloat16,
@@ -107,16 +114,33 @@ def get_batch_cell_embeddings(
                 values=data_dict["expr"].to(device),
                 src_key_padding_mask=src_key_padding_mask,
             )
+            if return_gene_embeddings:
+                input_gene_ids = input_gene_ids.to("cpu").numpy()
+                embeddings = embeddings.to(torch.float32).to("cpu").numpy()
+                for emb, genes in zip(embeddings, input_gene_ids):
+                    gene_embeddings[genes] += emb
+                    gene_embedding_counts[genes] += 1
 
-            embeddings = embeddings[:, 0, :]  # get the <cls> position embedding
+            cls_embeddings = embeddings[:, 0, :]  # get the <cls> position embedding
 
             # Casting to float 32 avoids issues with bfloat16 -> numpy conversion for some models
             # https://github.com/pytorch/pytorch/issues/110285
-            embeddings = embeddings.to("cpu").to(torch.float32).numpy()
-            cell_embeddings[count : count + len(embeddings)] = embeddings
+            if not isinstance(cls_embeddings, np.ndarray):
+                cls_embeddings = cls_embeddings.to("cpu").to(torch.float32).numpy()
+            cell_embeddings[count : count + len(embeddings)] = cls_embeddings
             count += len(embeddings)
             pbar.update(len(embeddings))
     cell_embeddings = cell_embeddings / np.linalg.norm(
         cell_embeddings, axis=1, keepdims=True
     )
-    return cell_embeddings
+    if return_gene_embeddings:
+        gene_embedding_counts = np.expand_dims(gene_embedding_counts, axis=1)
+        gene_embeddings = np.divide(
+            gene_embeddings,
+            gene_embedding_counts,
+            out=np.ones_like(gene_embeddings) * np.nan,
+            where=gene_embedding_counts != 0,
+        )
+        return cell_embeddings, gene_embeddings
+    else:
+        return cell_embeddings

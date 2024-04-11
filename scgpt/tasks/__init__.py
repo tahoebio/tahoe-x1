@@ -1,3 +1,3 @@
-from .cell_emb import get_batch_cell_embeddings
+from .emb_extractor import get_batch_embeddings
 
-__all__ = ["get_batch_cell_embeddings"]
+__all__ = ["get_batch_embeddings"]
