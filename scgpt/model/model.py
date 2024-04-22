@@ -14,6 +14,7 @@ from scgpt.model.blocks import (
     ExprDecoder,
     MVCDecoder,
     init_config_defaults,
+    gene_encoder_defaults
 )
 from llmfoundry.models.utils.param_init_fns import (
     MODEL_INIT_REGISTRY,
@@ -57,14 +58,19 @@ class SCGPTModel(nn.Module):
         self.attn_config = model_config.get("attn_config", None)
         self.norm_config = model_config.get("norm_config", None)
         self.init_config = model_config.get("init_config", None)
+        self.gene_encoder_config = model_config.get("gene_encoder", None)
         if self.init_config is None:
             self.init_config = init_config_defaults
+        if self.gene_encoder_config is None:
+            self.gene_encoder_config = gene_encoder_defaults
         if self.cell_emb_style not in ["cls", "avg-pool", "w-pool"]:
             raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
 
         # TODO: add dropout in the GeneEncoder
+
         self.gene_encoder = GeneEncoder(
-            self.vocab_size, self.d_model, padding_idx=self.pad_token_id, use_norm=False
+            self.vocab_size, self.d_model, padding_idx=self.pad_token_id,
+            use_norm=self.gene_encoder_config["use_norm"],
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
 
@@ -83,7 +89,7 @@ class SCGPTModel(nn.Module):
                 dropout=expression_encoder_config.get("dropout", 0.1),
                 max_value=expression_encoder_config.get("max_value", 512),
                 activation=expression_encoder_config.get("activation", "relu"),
-                use_norm=False,
+                use_norm=expression_encoder_config.get("use_norm", False)
             )
         elif self.input_emb_style == "category":
             assert self.n_input_bins > 0

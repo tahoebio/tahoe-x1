@@ -16,13 +16,13 @@ command: |
 image: vevotx/ml-scgpt:shreshth
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
-name: scgpt-test-50m
+name: scgpt-debug-70m
 
 compute:
   gpus: 16 # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 12 # Maximum duration of the run in hours
+  max_duration: 15 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster: # TODO # Name of the cluster to use for this run
@@ -57,32 +57,38 @@ parameters:
       kv_nheads: 8
       attn_pdrop: 0.0
     norm_config:
-      norm_type: "low_precision_layernorm"
+      norm_type: "layernorm"
       eps: 1.0e-5
     expression_encoder:
       input_emb_style: "continuous"
       dropout: 0.1
       max_value: 512
       activation: relu
+      use_norm: True
+    gene_encoder:
+      use_norm: True
     mvc:
       arch_style: "inner product"
       query_activation: "sigmoid"
     expression_decoder:
       n_outputs: 1
-      n_layers: 1
+      n_layers: 2
       activation: "leaky_relu"
   collator:
     do_padding: True
     pad_value: -2
     do_mlm: True
     do_binning: True
-    mlm_probability: 0.40
+    mlm_probability:
+     - 0.25
+     - 0.50
+     - 0.75
     mask_value: -1
-    max_length: 1024
+    max_length: 1200
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: True
+    right_binning: False
     use_junk_tokens: True
   train_loader:
     dataset:
@@ -114,7 +120,7 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 2.0e-4
+    lr: 4.0e-4
     betas:
       - 0.9
       - 0.95
@@ -131,7 +137,7 @@ parameters:
       clipping_threshold: 1.0
   precision: amp_bf16
   eval_interval: "500ba"
-  max_duration: "6ep"
+  max_duration: "12ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -153,3 +159,4 @@ parameters:
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
   save_interval: "500ba"
   autoresume: True
+  run_name: "scgpt-70m-1200"

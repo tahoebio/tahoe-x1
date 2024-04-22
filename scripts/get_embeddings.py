@@ -14,7 +14,7 @@ from scgpt.tokenizer import GeneVocab
 log = logging.getLogger(__name__)
 logging.basicConfig(
     # Example of format string
-    # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
+    # 2022-06-29 11:22:26,152: [822018][MainThread]: INFO: Message here
     format=f"%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s"
 )
 logging.getLogger(__name__).setLevel("INFO")  # Train script
@@ -105,6 +105,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     vocab.set_default_index(vocab["<pad>"])
     genes = adata.var[gene_col].tolist()
     gene_ids = np.array(vocab(genes), dtype=int)
+    assert np.all(gene_ids == np.array(adata.var["id_in_vocab"]))
 
     cell_embeddings, gene_embeddings = get_batch_embeddings(
         adata=adata,

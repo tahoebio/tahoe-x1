@@ -35,6 +35,10 @@ init_config_defaults: Dict = {
     'init_gain': 0.0,
 }
 
+gene_encoder_defaults: Dict = {
+    "use_norm": False,
+}
+
 
 
 class SCGPTBlock(nn.Module):
