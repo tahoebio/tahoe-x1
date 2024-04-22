@@ -445,7 +445,7 @@ class DataCollator(DefaultDataCollator):
         else:
             raise ValueError(
                 "mlm_probability must be a float or a list of floats, "
-                f"but got {self.mlm_probability}."
+                f"but got {type(self.mlm_probability)} instead."
             )
 
     def _mask(

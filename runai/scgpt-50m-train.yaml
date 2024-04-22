@@ -1,7 +1,7 @@
 global_seed: 777
 seed: ${global_seed}
 device_train_batch_size: 400
-global_train_batch_size: 3200
+global_train_batch_size: 100
 device_eval_batch_size: 400
 device_train_microbatch_size: "auto"
 model:
@@ -42,7 +42,7 @@ collator:
   pad_value: -2
   do_mlm: True
   do_binning: True
-  mlm_probability: 0.40
+  mlm_probability: [0.25, 0.5, 0.75]
   mask_value: -1
   max_length: 1024
   sampling: True
@@ -114,8 +114,8 @@ loggers:
   wandb:
     project: vevo-scgpt
     log_artifacts: False
-    init_kwargs:
-      mode: offline
 save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
 save_interval: "500ba"
 save_num_checkpoints_to_keep: 0 # Delete local copies of checkpoints
+run_name: scgpt-test
+save_overwrite: True

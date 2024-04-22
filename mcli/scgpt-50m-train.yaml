@@ -22,7 +22,7 @@ compute:
   gpus: 16 # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 15 # Maximum duration of the run in hours
+  max_duration: 0.25 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster: # TODO # Name of the cluster to use for this run
@@ -34,9 +34,9 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 400
-  global_train_batch_size: 6400
-  device_eval_batch_size: 400
+  device_train_batch_size: 128
+  global_train_batch_size: 2048
+  device_eval_batch_size: 128
   device_train_microbatch_size: "auto"
   model:
     name: vevo_scgpt
@@ -120,12 +120,12 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 4.0e-4
+    lr: 2.0e-4
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
-    weight_decay: 2.0e-05
+    weight_decay: 1.0e-05
   scheduler:
     name: cosine_with_warmup
     t_warmup: "0.05dur"
@@ -136,7 +136,7 @@ parameters:
       clipping_type: norm
       clipping_threshold: 1.0
   precision: amp_bf16
-  eval_interval: "500ba"
+  eval_interval: "2000ba"
   max_duration: "12ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
@@ -157,6 +157,6 @@ parameters:
       project: vevo-scgpt
       log_artifacts: False
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
-  save_interval: "500ba"
+  save_interval: "2000ba"
   autoresume: True
   run_name: "scgpt-70m-1200"

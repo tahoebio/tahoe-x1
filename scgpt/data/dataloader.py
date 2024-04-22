@@ -2,6 +2,7 @@ from scgpt.data import DataCollator
 from streaming import StreamingDataset, StreamingDataLoader
 from composer.core.data_spec import DataSpec
 from omegaconf import DictConfig
+from collections.abc import MutableSequence
 import torch
 import numpy as np
 
@@ -29,13 +30,18 @@ def build_dataloader(loader_cfg: DictConfig,
         shuffle_seed=dataset_cfg.get("shuffle_seed", None),
         num_canonical_nodes=dataset_cfg.get("num_canonical_nodes", 2),
     )
+    print(type(collator_cfg.mlm_probability))
+    if isinstance(collator_cfg.mlm_probability, MutableSequence):
+        mlm_probability = list(collator_cfg.mlm_probability)
+    else:
+        mlm_probability = collator_cfg.mlm_probability
     collate_fn = DataCollator(
         do_padding=collator_cfg.get("do_padding", True),
         pad_token_id= collator_cfg.pad_token_id,
         pad_value=collator_cfg.pad_value,
         do_mlm=collator_cfg.get("do_mlm", True),
         do_binning=collator_cfg.get("do_binning", True),
-        mlm_probability=collator_cfg.mlm_probability,
+        mlm_probability=mlm_probability,
         mask_value=collator_cfg.mask_value,
         max_length=collator_cfg.max_length,
         sampling=collator_cfg.sampling,
