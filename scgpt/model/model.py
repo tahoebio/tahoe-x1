@@ -134,6 +134,7 @@ class SCGPTModel(nn.Module):
                 d_model=self.d_model,
                 arch_style=mvc_config.arch_style,
                 query_activation=mvc_config.query_activation,
+                scaled_dot_product=mvc_config.get("scaled_dot_product", False),
             )
 
         if self.init_device != "meta":

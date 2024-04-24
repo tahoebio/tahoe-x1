@@ -421,6 +421,7 @@ class MVCDecoder(nn.Module):
         d_model: int,
         arch_style: str = "inner product",
         query_activation: str = "sigmoid",
+        scaled_dot_product: bool = False,
     ) -> None:
         """
         Args:
@@ -434,11 +435,13 @@ class MVCDecoder(nn.Module):
         """
         super().__init__()
         d_in = d_model
-
+        self.scaled_dot_product = scaled_dot_product
         if arch_style == "inner product":
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = resolve_ffn_act_fn({"name": query_activation})
             self.W = nn.Linear(d_model, d_in, bias=False)
+            if self.scaled_dot_product:
+                self.out_proj = nn.Linear(1, 1)
         else:
             raise ValueError(f"Unknown arch_style: {arch_style}")
 
@@ -456,10 +459,14 @@ class MVCDecoder(nn.Module):
             query_vecs = self.query_activation(
                 self.gene2query(gene_embs)
             )  # (batch, seq_len, embsize)
+            inner_product_dimension = query_vecs.shape[-1]
             cell_emb = cell_emb.unsqueeze(2)  # (batch, embsize, 1)
             pred_value = torch.bmm(self.W(query_vecs), cell_emb).squeeze(
                 2
             )  # (batch, seq_len)
+            if self.scaled_dot_product:
+                pred_value = pred_value / torch.sqrt(torch.tensor(inner_product_dimension, dtype=pred_value.dtype))
+                pred_value = self.out_proj(pred_value)
             return dict(pred=pred_value)
         else:
             raise ValueError(f"Unknown arch_style: {self.arch_style}")
