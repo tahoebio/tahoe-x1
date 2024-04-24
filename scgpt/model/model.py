@@ -396,6 +396,8 @@ class ComposerSCGPTModel(ComposerModel):
             "MSE": MaskedMseMetric(name="MSE"),
             "MVC": MaskedMseMetric(name="MVC"),
         }
+        self.standard_scale_outputs = model_config.get("standard_scale_outputs", False)
+        self.collator_config = collator_config
 
         self.val_metrics = {
             "MSE": MaskedMseMetric(name="MSE"),
@@ -445,6 +447,8 @@ class ComposerSCGPTModel(ComposerModel):
         pcpt_gene = batch["pcpt_gene"]
         gen_gene = batch["gen_gene"]
         gen_expr_target = batch["gen_expr_target"]
+        if self.standard_scale_outputs:
+            gen_expr_target = self.scale_outputs(gen_expr_target)
         gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
         positions_to_match = gen_key_padding_mask
         gen_expr_preds = outputs["gen_preds"]
@@ -471,6 +475,8 @@ class ComposerSCGPTModel(ComposerModel):
         gen_expr_raw = batch["gen_expr_raw"]
         mask = ~gen_gene.eq(self.pad_token_id)
         target = batch["gen_expr_target"]
+        if self.standard_scale_outputs:
+            target = self.scale_outputs(target)
         if metric.name == "MSE":
             preds = outputs["gen_preds"]
         elif metric.name == "MVC":
@@ -507,3 +513,10 @@ class ComposerSCGPTModel(ComposerModel):
             self.model.n_layers * 2 * 2 * (self.model.d_model * (msl**2))
         )
         return (params_flops_per_seq + attn_flops_per_seq) * 3 * bs
+
+    def scale_outputs(self, x: torch.Tensor) -> torch.Tensor:
+        min_value = 1
+        max_value = self.collator_config.num_bins - 1
+        normalized_value = (x - min_value) / (max_value - min_value)
+        # Scale to -1..1
+        return 2 * normalized_value - 1

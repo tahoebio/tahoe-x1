@@ -30,7 +30,6 @@ def build_dataloader(loader_cfg: DictConfig,
         shuffle_seed=dataset_cfg.get("shuffle_seed", None),
         num_canonical_nodes=dataset_cfg.get("num_canonical_nodes", 2),
     )
-    print(type(collator_cfg.mlm_probability))
     if isinstance(collator_cfg.mlm_probability, MutableSequence):
         mlm_probability = list(collator_cfg.mlm_probability)
     else:
