@@ -440,8 +440,6 @@ class MVCDecoder(nn.Module):
             self.gene2query = nn.Linear(d_model, d_model)
             self.query_activation = resolve_ffn_act_fn({"name": query_activation})
             self.W = nn.Linear(d_model, d_in, bias=False)
-            if self.scaled_dot_product:
-                self.out_proj = nn.Linear(1, 1)
         else:
             raise ValueError(f"Unknown arch_style: {arch_style}")
 
@@ -466,7 +464,6 @@ class MVCDecoder(nn.Module):
             )  # (batch, seq_len)
             if self.scaled_dot_product:
                 pred_value = pred_value / torch.sqrt(torch.tensor(inner_product_dimension, dtype=pred_value.dtype))
-                pred_value = self.out_proj(pred_value)
             return dict(pred=pred_value)
         else:
             raise ValueError(f"Unknown arch_style: {self.arch_style}")
