@@ -74,7 +74,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     train_loader_config: DictConfig = pop_config(cfg, "train_loader", must_exist=True)
     valid_loader_config: DictConfig = pop_config(cfg, "valid_loader", must_exist=True)
     collator_config: DictConfig = pop_config(cfg, "collator", must_exist=True)
-
+    vocab_config: DictConfig = pop_config(cfg, "vocabulary", must_exist=True)
     # Optional deepspeed, FSDP, and torch-compile config
     deepspeed_config: Optional[Dict[str, Any]] = pop_config(
         cfg, "deepspeed_config", must_exist=False, default_value=None, convert=True
@@ -250,15 +250,13 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     log.info("Downloading vocab...")
     if dist.get_local_rank() == 0:
-        download_file_from_s3_url(
-            "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json",
-            "vocab.json",
-        )
-    with dist.local_rank_zero_download_and_wait("vocab.json"):
+        download_file_from_s3_url(s3_url=vocab_config["remote"],
+                                  local_file_path=vocab_config["local"])
+    with dist.local_rank_zero_download_and_wait(vocab_config["local"]):
         dist.barrier()
 
     # Build vocab
-    vocab = GeneVocab.from_file("vocab.json")
+    vocab = GeneVocab.from_file(vocab_config["local"])
     special_tokens = ["<pad>", "<cls>", "<eoc>"]
 
     for s in special_tokens:
