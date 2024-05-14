@@ -34,21 +34,22 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 128
-  global_train_batch_size: 2048
-  device_eval_batch_size: 128
+  device_train_batch_size: 32
+  global_train_batch_size: 512
+  device_eval_batch_size: 32
   device_train_microbatch_size: "auto"
   model:
     name: vevo_scgpt
     d_model: 512
     n_layers: 12
-    init_device: meta
-    expansion_ratio: 4.0
+    init_device: cpu
+    expansion_ratio: 1.0
+    standard_scale_outputs: False
     transformer_activation: relu
     n_heads: 8
-    norm_scheme: "pre"
+    norm_scheme: "post"
     use_generative_training: True
-    use_cell_conditioned_generation: False
+    use_cell_conditioned_generation: True
     use_glu: False
     cell_emb_style: cls
     attn_config:
@@ -70,13 +71,14 @@ parameters:
     mvc:
       arch_style: "inner product"
       query_activation: "sigmoid"
+      scaled_dot_product: False
     expression_decoder:
       n_outputs: 1
       n_layers: 2
       activation: "leaky_relu"
   vocabulary:
-    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json"
-    local: "mds-data-folder/vocab.json"
+    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-05-08_legacy_MDS/cellxgene_primary_2023-05-08_legacy_vocab.json"
+    local: "vocab.json"
   collator:
     do_padding: True
     pad_value: -2
@@ -91,11 +93,11 @@ parameters:
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: False
+    right_binning: True
     use_junk_tokens: True
   train_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS_v2/train"
+      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-05-08_legacy_MDS/train/"
       local: "mds-data-folder/train"
       download_timeout: 300
       allow_unsafe_types: True
@@ -109,7 +111,7 @@ parameters:
     persistent_workers: True
   valid_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS_v2/val"
+      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-05-08_legacy_MDS/val/"
       local: "mds-data-folder/val"
       download_timeout: 300
       allow_unsafe_types: True
@@ -123,24 +125,25 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 2.0e-4
+    lr: 3.0e-4
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
     weight_decay: 1.0e-05
   scheduler:
-    name: cosine_with_warmup
+    name: constant_with_warmup
     t_warmup: "0.05dur"
     t_max: "1dur"
-    alpha_f: 0.1
+    alpha: 1.0
   algorithms:
     gradient_clipping:
       clipping_type: norm
       clipping_threshold: 1.0
+    low_precision_layernorm: {}
   precision: amp_bf16
-  eval_interval: "2000ba"
-  max_duration: "12ep"
+  eval_interval: "1000ba"
+  max_duration: "13ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -162,4 +165,4 @@ parameters:
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
   save_interval: "2000ba"
   autoresume: True
-  run_name: "scgpt-70m-1200"
+  run_name: "scgpt-70m-1024-fix-norm"

@@ -16,13 +16,13 @@ command: |
 image: vevotx/ml-scgpt:shreshth
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
-name: scgpt-70m-2048
+name: scgpt-dev-70m
 
 compute:
   gpus: 16 # Number of GPUs to use
   cluster: r14z3
 scheduling:
-  max_duration: 28 # Maximum duration of the run in hours
+  max_duration: 12 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster:
@@ -34,10 +34,13 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 300
-  global_train_batch_size: 3200
-  device_eval_batch_size: 300
+  device_train_batch_size: 400
+  global_train_batch_size: 4800
+  device_eval_batch_size: 400
   device_train_microbatch_size: "auto"
+  vocabulary:
+    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json"
+    local: "vocab.json"
   model:
     name: vevo_scgpt
     d_model: 512
@@ -83,11 +86,11 @@ parameters:
     do_binning: True
     mlm_probability: 0.5
     mask_value: -1
-    max_length: 2048
+    max_length: 1024
     sampling: True
     data_style: "both"
     num_bins: 51
-    right_binning: False
+    right_binning: True
     use_junk_tokens: True
   train_loader:
     dataset:
@@ -137,7 +140,7 @@ parameters:
     low_precision_layernorm: {}
   precision: amp_bf16
   eval_interval: "1000ba"
-  max_duration: "8ep"
+  max_duration: "6ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -159,4 +162,4 @@ parameters:
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
   save_interval: "2000ba"
   autoresume: True
-  run_name: "scgpt-70m-2048-fix-norm"
+  run_name: "scgpt-70m-1024-fix-norm-right-bin"
