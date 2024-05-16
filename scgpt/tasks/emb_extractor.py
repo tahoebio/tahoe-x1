@@ -141,6 +141,9 @@ def get_batch_embeddings(
             out=np.ones_like(gene_embeddings) * np.nan,
             where=gene_embedding_counts != 0,
         )
+        gene2idx = vocab.get_stoi()
+        all_gene_ids = np.array([id for id in gene2idx.values()])
+        gene_embeddings = gene_embeddings[all_gene_ids,:]
         return cell_embeddings, gene_embeddings
     else:
         return cell_embeddings

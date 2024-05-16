@@ -26,6 +26,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
         "scgpt-70m-1024": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024/",
         "scgpt-70m-1024-cell-cond": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-cell-cond/",
         "scgpt-70m-1024-right-bin": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-right-bin",
+        "scgpt-1_3b-2048": "/vevo/scgpt/checkpoints/release/scgpt-1_3b-2048/",
     }
     # At the moment only these 4 models have been prepared for inference
     # For a new model, the wandb config needs to be split into model and collator configs and the latest
@@ -172,5 +173,5 @@ if __name__ == "__main__":
         input_path=args.input_path,
         output_path=args.output_path,
         gene_col=args.gene_col,
-        n_hvg=args.N_HVG,
+        n_hvg=args.n_hvg,
     )
