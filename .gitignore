@@ -150,6 +150,6 @@ logs/
 external/
 wandb/
 references/
-examples/save
-examples/modality_pred/data
+scripts/save
+scripts/modality_pred/data
 figures/

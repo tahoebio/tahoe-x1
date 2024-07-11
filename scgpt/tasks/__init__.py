@@ -1,2 +1,3 @@
-from .grn import GeneEmbedding
-from .cell_emb import get_batch_cell_embeddings, embed_data
+from .emb_extractor import get_batch_embeddings
+
+__all__ = ["get_batch_embeddings"]
