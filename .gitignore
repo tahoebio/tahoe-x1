@@ -153,3 +153,4 @@ references/
 scripts/save
 scripts/modality_pred/data
 figures/
+.micromamba/
