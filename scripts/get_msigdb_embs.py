@@ -1,3 +1,4 @@
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 import logging
 import os
 
@@ -5,14 +6,14 @@ import numpy as np
 import torch
 from omegaconf import OmegaConf as om
 
-from scgpt.model import ComposerSCGPTModel
-from scgpt.tokenizer import GeneVocab
+from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
     # Example of format string
     # 2022-06-29 11:22:26,152: [822018][MainThread]: INFO: Message here
-    format=f"%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s"
+    format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
 )
 logging.getLogger(__name__).setLevel("INFO")
 
@@ -29,7 +30,8 @@ for model_name in model_names:
     vocab = GeneVocab.from_file(vocab_path)
 
     model = ComposerSCGPTModel(
-        model_config=model_config, collator_config=collator_config
+        model_config=model_config,
+        collator_config=collator_config,
     )
     model.load_state_dict(torch.load(model_file)["state"]["model"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -39,7 +41,7 @@ for model_name in model_names:
 
     with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
         gene2idx = vocab.get_stoi()
-        all_gene_ids = np.array([[id for id in gene2idx.values()]])
+        all_gene_ids = np.array([list(gene2idx.values())])
         chunk_size = 30000  # Size of each chunk, >30000 OOMs
 
         # Initialize an empty array to hold the final embeddings.
@@ -54,12 +56,12 @@ for model_name in model_names:
         for i in range(0, num_genes, chunk_size):
             chunk_gene_ids = all_gene_ids[:, i : i + chunk_size]
             chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(
-                device
+                device,
             )
 
             token_embs = model.model.gene_encoder(chunk_gene_ids_tensor)
             flag_embs = model.model.flag_encoder(
-                torch.tensor(1, device=token_embs.device)
+                torch.tensor(1, device=token_embs.device),
             ).expand(chunk_gene_ids_tensor.shape[0], chunk_gene_ids_tensor.shape[1], -1)
 
             total_embs = token_embs + flag_embs
@@ -70,7 +72,7 @@ for model_name in model_names:
             gene_embeddings_ctx_free[i : i + chunk_size] = chunk_embeddings_cpu
 
         gene_embeddings_ctx_free_old = model.model.gene_encoder(
-            torch.tensor(all_gene_ids, dtype=torch.long).to(device)
+            torch.tensor(all_gene_ids, dtype=torch.long).to(device),
         )
         gene_embeddings_ctx_free_old = (
             gene_embeddings_ctx_free_old.to("cpu").to(torch.float32).numpy()
@@ -79,7 +81,7 @@ for model_name in model_names:
     torch.cuda.empty_cache()
     log.info("Context free embeddings created.")
     gene_emb_save_path = os.path.join(
-        f"/vevo/cellxgene/msigdb_gene_emb_subset/gene_embeddings_new/gene_embeddings_{model_name}.npz"
+        f"/vevo/cellxgene/msigdb_gene_emb_subset/gene_embeddings_new/gene_embeddings_{model_name}.npz",
     )
     np.savez(
         gene_emb_save_path,

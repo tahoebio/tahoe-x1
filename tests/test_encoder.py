@@ -1,11 +1,12 @@
-from pathlib import Path
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 import sys
-import torch
+from pathlib import Path
 
+import torch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from scgpt.model.blocks import SCGPTEncoder, SCGPTBlock
+from mosaicfm.model.blocks import SCGPTBlock, SCGPTEncoder
 
 # get the available device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -18,7 +19,9 @@ def test_encoder():
     embed_dim = 32 * n_heads
 
     flash_gpt_layer = SCGPTBlock(
-        d_model=embed_dim, n_heads=n_heads, expansion_ratio=1
+        d_model=embed_dim,
+        n_heads=n_heads,
+        expansion_ratio=1,
     )
     flash_gpt_generator = SCGPTEncoder(
         encoder_layer=flash_gpt_layer,
@@ -38,6 +41,7 @@ def test_encoder():
     with torch.cuda.amp.autocast():
         output1 = flash_gpt_generator(pcpt_total_embs)
     assert output1.shape == (n_cells, n_genes, embed_dim)
+
 
 if __name__ == "__main__":
     test_encoder()

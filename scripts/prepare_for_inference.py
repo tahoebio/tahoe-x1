@@ -1,15 +1,11 @@
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+import os
+
 import wandb
 from omegaconf import OmegaConf as om
-from scgpt.model import ComposerSCGPTModel
-import composer
-from scgpt.tokenizer import GeneVocab
-from scgpt.utils import download_file_from_s3_url
-import torch
-import scanpy as sc
-from torch.utils.data import DataLoader
-from scgpt.data import DataCollator
-import numpy as np
-import os
+
+from mosaicfm.tokenizer import GeneVocab
+from mosaicfm.utils import download_file_from_s3_url
 
 model_name = "scgpt-70m-1024-fix-norm-apr24-data"
 wandb_id = "55n5wvdm"
@@ -32,9 +28,9 @@ else:
 download_file_from_s3_url(
     vocab_remote_url,
     local_file_path="vocab.json",
-        )
+)
 
-save_dir = f"/vevo/scgpt/checkpoints/release/{model_name}" # Change this to the path where you want to save the model
+save_dir = f"/vevo/scgpt/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
 
 # Step 1 - Add special tokens to the vocab
 vocab = GeneVocab.from_file("vocab.json")
@@ -71,4 +67,3 @@ model_config["wandb_id"] = f"vevotx/vevo-scgpt/{wandb_id}"
 
 om.save(config=model_config, f=f"{save_dir}/model_config.yml")
 om.save(config=collator_config, f=f"{save_dir}/collator_config.yml")
-

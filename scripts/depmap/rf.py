@@ -1,18 +1,15 @@
-"""
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+"""Given embeddings from a model (processed into AnnData format for a DepMap
+task), this script will train the specified random forest model and save results
+for further analysis."""
 
-Given embeddings from a model (processed into AnnData format for a
-DepMap task), this script will train the specified random forest model
-and save results for further analysis.
-
-"""
-
-# imports
-import os
 import argparse
+import os
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
 
 # parse arguments
 parser = argparse.ArgumentParser()
@@ -65,12 +62,48 @@ rf.fit(train_data, train_labels)
 print("saving results...")
 train_preds = rf.predict(train_data)
 val_preds = rf.predict(val_data)
-np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-true.npy"), train_labels)
-np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-pred.npy"), train_preds)
-np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-true.npy"), val_labels)
-np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-pred.npy"), val_preds)
+np.save(
+    os.path.join(
+        args.base_path,
+        f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-true.npy",
+    ),
+    train_labels,
+)
+np.save(
+    os.path.join(
+        args.base_path,
+        f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-pred.npy",
+    ),
+    train_preds,
+)
+np.save(
+    os.path.join(
+        args.base_path,
+        f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-true.npy",
+    ),
+    val_labels,
+)
+np.save(
+    os.path.join(
+        args.base_path,
+        f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-pred.npy",
+    ),
+    val_preds,
+)
 if args.model_type == "classifier":
     train_probas = rf.predict_proba(train_data)
     val_probas = rf.predict_proba(val_data)
-    np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-proba.npy"), train_probas)
-    np.save(os.path.join(args.base_path, f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-proba.npy"), val_probas)
+    np.save(
+        os.path.join(
+            args.base_path,
+            f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-train-proba.npy",
+        ),
+        train_probas,
+    )
+    np.save(
+        os.path.join(
+            args.base_path,
+            f"gene-embs/results/{prefix}-{args.emb}{args.add_label}-fold-{args.fold}-val-proba.npy",
+        ),
+        val_probas,
+    )

@@ -1,3 +1,4 @@
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 import argparse
 import logging
 import os
@@ -7,15 +8,15 @@ import scanpy as sc
 import torch
 from omegaconf import OmegaConf as om
 
-from scgpt.model import ComposerSCGPTModel
-from scgpt.tasks import get_batch_embeddings
-from scgpt.tokenizer import GeneVocab
+from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.tasks import get_batch_embeddings
+from mosaicfm.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
     # Example of format string
     # 2022-06-29 11:22:26,152: [822018][MainThread]: INFO: Message here
-    format=f"%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s"
+    format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
 )
 logging.getLogger(__name__).setLevel("INFO")  # Train script
 
@@ -41,7 +42,8 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     vocab = GeneVocab.from_file(vocab_path)
 
     model = ComposerSCGPTModel(
-        model_config=model_config, collator_config=collator_config
+        model_config=model_config,
+        collator_config=collator_config,
     )
 
     model.load_state_dict(torch.load(model_file)["state"]["model"])
@@ -52,7 +54,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     # First create context free embeddings as the "default" per gene
     with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
         gene2idx = vocab.get_stoi()
-        all_gene_ids = np.array([[id for id in gene2idx.values()]])
+        all_gene_ids = np.array([list(gene2idx.values())])
         chunk_size = 30000  # Size of each chunk, >30000 OOMs
 
         # Initialize an empty array to hold the final embeddings.
@@ -67,12 +69,12 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
         for i in range(0, num_genes, chunk_size):
             chunk_gene_ids = all_gene_ids[:, i : i + chunk_size]
             chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(
-                device
+                device,
             )
 
             token_embs = model.model.gene_encoder(chunk_gene_ids_tensor)
             flag_embs = model.model.flag_encoder(
-                torch.tensor(1, device=token_embs.device)
+                torch.tensor(1, device=token_embs.device),
             ).expand(chunk_gene_ids_tensor.shape[0], chunk_gene_ids_tensor.shape[1], -1)
 
             total_embs = token_embs + flag_embs
@@ -85,7 +87,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     log.info("Context free embeddings created.")
     adata = sc.read_h5ad(input_path)
     log.info(
-        f"Loaded {adata.shape[0]} cells and {adata.shape[1]} genes from {input_path}"
+        f"Loaded {adata.shape[0]} cells and {adata.shape[1]} genes from {input_path}",
     )
     if n_hvg is not None:
         sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, flavor="seurat_v3")
@@ -93,13 +95,11 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
         log.info(f"Performed HVG selection with n_top_genes = {n_hvg}")
     sc.pp.filter_cells(adata, min_genes=3)
     log.info("Filtered cells with min_genes = 3")
-    adata.var["id_in_vocab"] = [
-        vocab[gene] if gene in vocab else -1 for gene in adata.var[gene_col]
-    ]
+    adata.var["id_in_vocab"] = [vocab.get(gene, -1) for gene in adata.var[gene_col]]
     gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
     log.info(
         f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
-        f"in vocabulary of size {len(vocab)}."
+        f"in vocabulary of size {len(vocab)}.",
     )
     adata = adata[:, adata.var["id_in_vocab"] >= 0]
 
@@ -140,14 +140,16 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-        description="Generate cell and gene embeddings for scGPT models"
+        description="Generate cell and gene embeddings for scGPT models",
     )
 
     # Required arguments
     parser.add_argument("--model_name", type=str, help="Name of the model to be used")
     parser.add_argument("--input_path", type=str, help="Path to the input data file")
     parser.add_argument(
-        "--output_path", type=str, help="Path where the output should be stored"
+        "--output_path",
+        type=str,
+        help="Path where the output should be stored",
     )
 
     # Optional arguments

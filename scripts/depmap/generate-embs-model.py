@@ -1,41 +1,42 @@
-"""
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+"""Given a model, this script will create and save the cell line embeddings,
+mean gene embeddings, and contextual gene embeddings needed to run the DepMap
+benchmarks."""
 
-Given a model, this script will create and save the cell line embeddings,
-mean gene embeddings, and contextual gene embeddings needed to run the 
-DepMap benchmarks.
-
-"""
-
-# imports
-import os
 import argparse
-import logging
-import pickle
 import json
+import logging
+import os
+import pickle
+
+import anndata as ad
+import geneformer.perturber_utils as pu
 import numpy as np
 import pandas as pd
-import anndata as ad
 import scanpy as sc
 import torch
-import geneformer.perturber_utils as pu
 import utils
-from tqdm import tqdm, trange
-from omegaconf import OmegaConf as om
-from scgpt.model import ComposerSCGPTModel
-from scgpt.data import DataCollator, CountDataset
-from scgpt.tasks import get_batch_embeddings
-from scgpt.tokenizer import GeneVocab
 from geneformer import EmbExtractor
 from geneformer.tokenizer import TOKEN_DICTIONARY_FILE
+from omegaconf import OmegaConf as om
+from tqdm import tqdm, trange
+
+from mosaicfm.data import CountDataset, DataCollator
+from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.tasks import get_batch_embeddings
+from mosaicfm.tokenizer import GeneVocab
 
 # set up logging
 log = logging.getLogger(__name__)
-logging.basicConfig(format=f"%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s")
+logging.basicConfig(
+    format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
+)
 logging.getLogger(__name__).setLevel("INFO")
+
 
 # generate embeddings for an scGPT model
 def run_scgpt(base_path, model_path, model_name):
-    
+
     # create paths
     model_config_path = os.path.join(model_path, "model_config.yml")
     vocab_path = os.path.join(model_path, "vocab.json")
@@ -49,7 +50,10 @@ def run_scgpt(base_path, model_path, model_name):
     vocab.set_default_index(vocab["<pad>"])
 
     # load model
-    model = ComposerSCGPTModel(model_config=model_config, collator_config=collator_config)
+    model = ComposerSCGPTModel(
+        model_config=model_config,
+        collator_config=collator_config,
+    )
     model.load_state_dict(torch.load(model_file)["state"]["model"])
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     model.to(device)
@@ -58,27 +62,31 @@ def run_scgpt(base_path, model_path, model_name):
 
     # extract context-free embeddings
     with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
-        
+
         # load gene IDs and set step size
         gene2idx = vocab.get_stoi()
-        all_gene_ids = np.array([[id for id in gene2idx.values()]])
+        all_gene_ids = np.array([list(gene2idx.values())])
         chunk_size = 30000
 
         # initialize empty array to hole embeddings
         num_genes = all_gene_ids.shape[1]
-        gene_embeddings_ctx_free = (np.ones((num_genes, model_config["d_model"])) * np.nan)
+        gene_embeddings_ctx_free = (
+            np.ones((num_genes, model_config["d_model"])) * np.nan
+        )
 
         # iterate over genes
         for i in range(0, num_genes, chunk_size):
 
             # extract chunk of gene IDs
             chunk_gene_ids = all_gene_ids[:, i : i + chunk_size]
-            chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(device)
+            chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(
+                device,
+            )
 
             # pass through model
             token_embs = model.model.gene_encoder(chunk_gene_ids_tensor)
             flag_embs = model.model.flag_encoder(
-                torch.tensor(1, device=token_embs.device)
+                torch.tensor(1, device=token_embs.device),
             ).expand(chunk_gene_ids_tensor.shape[0], chunk_gene_ids_tensor.shape[1], -1)
             total_embs = token_embs + flag_embs
             chunk_embeddings = model.model.transformer_encoder(total_embs)
@@ -95,10 +103,14 @@ def run_scgpt(base_path, model_path, model_name):
     input_path = os.path.join(base_path, "counts.h5ad")
     adata = sc.read_h5ad(input_path)
     log.info(f"loaded CCLE AnnData from {input_path} for mean gene embeddings")
-    adata.var["id_in_vocab"] = [vocab[gene] if gene in vocab else -1 for gene in adata.var["feature_name"]]
+    adata.var["id_in_vocab"] = [
+        vocab.get(gene, -1) for gene in adata.var["feature_name"]
+    ]
     adata = adata[:, adata.var["id_in_vocab"] >= 0]
     gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
-    log.info(f"matched {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes in vocabulary of size {len(vocab)}")
+    log.info(
+        f"matched {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes in vocabulary of size {len(vocab)}",
+    )
 
     # make sure all remaining genes are in vocabulary
     genes = adata.var["feature_name"].tolist()
@@ -120,13 +132,21 @@ def run_scgpt(base_path, model_path, model_name):
 
     # save cell line embeddings
     outpath = os.path.join(base_path, f"cell-embs/{model_name}.h5ad")
-    cl_embs = ad.AnnData(X=cell_embeddings, obs=adata.obs, var=pd.DataFrame({"dim": [str(i) for i in range(cell_embeddings.shape[1])]}).set_index("dim"))
+    cl_embs = ad.AnnData(
+        X=cell_embeddings,
+        obs=adata.obs,
+        var=pd.DataFrame(
+            {"dim": [str(i) for i in range(cell_embeddings.shape[1])]},
+        ).set_index("dim"),
+    )
     cl_embs.write_h5ad(outpath)
     log.info(f"saved cell line embeddings to {outpath}")
 
     # handle genes with NaN embeddings
     nan_genes = np.where(np.any(np.isnan(gene_embeddings), axis=-1))[0]
-    log.info(f"found {len(nan_genes)} genes with NaN embeddings, replacing with context-free embeddings")
+    log.info(
+        f"found {len(nan_genes)} genes with NaN embeddings, replacing with context-free embeddings",
+    )
     gene_embeddings[nan_genes] = gene_embeddings_ctx_free[nan_genes]
 
     # save NPZ of gene embeddings
@@ -145,7 +165,9 @@ def run_scgpt(base_path, model_path, model_name):
     genes, scores = utils.get_marginal_genes_scores(base_path)
 
     # reload embeddings
-    embs_npz = np.load(os.path.join(base_path, f"gene-embs/npz/{model_name}-gene-embs.npz"))
+    embs_npz = np.load(
+        os.path.join(base_path, f"gene-embs/npz/{model_name}-gene-embs.npz"),
+    )
     mean_embs_all = embs_npz["gene_embeddings"]
     gene_names = embs_npz["gene_names"]
     log.info("loaded mean gene embeddings for processing")
@@ -159,31 +181,44 @@ def run_scgpt(base_path, model_path, model_name):
     mean_embs_ad = ad.AnnData(
         X=mean_embs,
         obs=pd.DataFrame({"gene": genes, "score": scores}),
-        var=pd.DataFrame({"dim": np.arange(mean_embs.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(mean_embs.shape[1])}),
     )
 
     # write to disk
-    outpath = os.path.join(base_path, f"gene-embs/{'_'.join(model_name.split('-'))}-mean-lt5gt70-bin.h5ad")
+    outpath = os.path.join(
+        base_path,
+        f"gene-embs/{'_'.join(model_name.split('-'))}-mean-lt5gt70-bin.h5ad",
+    )
     mean_embs_ad.write_h5ad(outpath)
-    log.info(f"saved mean gene embedding AnnData for marginal essentiality task to {outpath}")
+    log.info(
+        f"saved mean gene embedding AnnData for marginal essentiality task to {outpath}",
+    )
 
     # reprocess AnnData of CCLE counts for contextual gene embeddings
     adata = sc.read_h5ad(os.path.join(base_path, "counts.h5ad"))
     gene_info_df = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))
-    scgpt_gene_mapping = {key: value for (key, value) in zip(gene_info_df["feature_id"], gene_info_df["feature_name"])}
+    scgpt_gene_mapping = dict(
+        zip(gene_info_df["feature_id"], gene_info_df["feature_name"]),
+    )
     scgpt_vocab_ids = set(gene_info_df["feature_id"])
     adata.var["in_scgpt_vocab"] = adata.var.index.map(lambda x: x in scgpt_vocab_ids)
-    adata = adata[:, adata.var["in_scgpt_vocab"] == True]
-    adata.var["gene_name_scgpt"] = adata.var.index.map(lambda gene_id: scgpt_gene_mapping[gene_id])
+    adata = adata[:, adata.var["in_scgpt_vocab"]]
+    adata.var["gene_name_scgpt"] = adata.var.index.map(
+        lambda gene_id: scgpt_gene_mapping[gene_id],
+    )
     adata.var = adata.var.drop(columns=["in_scgpt_vocab"])
     adata.layers["counts"] = adata.X.copy()
     log.info("processed CCLE AnnData for contextual gene embeddings")
 
     # subset to available genes
-    adata.var["id_in_vocab"] = [vocab[gene] if gene in vocab else -1 for gene in adata.var["gene_name_scgpt"]]
+    adata.var["id_in_vocab"] = [
+        vocab.get(gene, -1) for gene in adata.var["gene_name_scgpt"]
+    ]
     gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
     adata = adata[:, adata.var["id_in_vocab"] >= 0]
-    log.info(f"matched {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes in vocabulary of size {len(vocab)}")
+    log.info(
+        f"matched {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes in vocabulary of size {len(vocab)}",
+    )
 
     # get gene IDs
     genes = adata.var["gene_name_scgpt"].tolist()
@@ -191,7 +226,9 @@ def run_scgpt(base_path, model_path, model_name):
 
     # get count matrix
     count_matrix = adata.X
-    count_matrix = (count_matrix if isinstance(count_matrix, np.ndarray) else count_matrix.A)
+    count_matrix = (
+        count_matrix if isinstance(count_matrix, np.ndarray) else count_matrix.A
+    )
 
     # verify gene IDs
     if gene_ids is None:
@@ -199,7 +236,12 @@ def run_scgpt(base_path, model_path, model_name):
         assert np.all(gene_ids >= 0)
 
     # set up dataset
-    dataset = CountDataset(count_matrix, gene_ids, cls_token_id=vocab["<cls>"], pad_value=collator_config["pad_value"])
+    dataset = CountDataset(
+        count_matrix,
+        gene_ids,
+        cls_token_id=vocab["<cls>"],
+        pad_value=collator_config["pad_value"],
+    )
 
     # set up collator
     max_length = len(gene_ids)
@@ -296,11 +338,18 @@ def run_scgpt(base_path, model_path, model_name):
     embeddings = embeddings[sort_idx]
 
     # process and save contextual gene embeddings
-    utils.process_contextual_gene_embs(base_path, log, labels, embeddings, "_".join(model_name.split('-')))
+    utils.process_contextual_gene_embs(
+        base_path,
+        log,
+        labels,
+        embeddings,
+        "_".join(model_name.split("-")),
+    )
+
 
 # generate embeddings for a Geneformer model
 def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
-    
+
     # extract cell line embeddings
     log.info("extracting cell embeddings")
     embex = EmbExtractor(
@@ -308,13 +357,13 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
         emb_mode="cell",
         max_ncells=None,
         emb_layer=layer_offset,
-        emb_label=["CCLEName"]
+        emb_label=["CCLEName"],
     )
     embs = embex.extract_embs(
         model_path,
         data_path,
         os.path.join(base_path, "geneformer"),
-        output_prefix=f"{model_name}-cell-embs"
+        output_prefix=f"{model_name}-cell-embs",
     )
 
     # convert to AnnData, based on PCA embeddings
@@ -324,7 +373,7 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
     gf_embs_adata = ad.AnnData(
         X=gf_embs_x,
         obs=pca_embs.obs,
-        var=pd.DataFrame({"dim": np.arange(gf_embs_x.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(gf_embs_x.shape[1])}),
     )
     outpath = os.path.join(base_path, f"cell-embs/{model_name}.h5ad")
     gf_embs_adata.write_h5ad(outpath)
@@ -336,20 +385,22 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
         model_type="Pretrained",
         emb_mode="gene",
         max_ncells=None,
-        emb_layer=layer_offset
+        emb_layer=layer_offset,
     )
     embs = embex.extract_embs(
         model_path,
         data_path,
         os.path.join(base_path, "geneformer"),
-        output_prefix=f"{model_name}-mean-gene-embs"
+        output_prefix=f"{model_name}-mean-gene-embs",
     )
 
     # load other AnnDatas to process Geneformer embeddings
     counts_adata = sc.read_h5ad(os.path.join(base_path, "counts.h5ad"))
-    pca_adata = sc.read_h5ad(os.path.join(base_path , "gene-embs/loading15-lt5gt70-bin.h5ad"))
+    pca_adata = sc.read_h5ad(
+        os.path.join(base_path, "gene-embs/loading15-lt5gt70-bin.h5ad"),
+    )
     ensembl_to_name = counts_adata.var.to_dict()["feature_name"]
-    name_to_ensembl = {ensembl_to_name[k]: k for k in ensembl_to_name.keys()}
+    name_to_ensembl = {ensembl_to_name[k]: k for k in ensembl_to_name}
 
     # get embedding for each lt5gt70 gene that we have
     gf_embs_df = embs
@@ -357,23 +408,32 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
     embs = np.zeros((len(pca_adata), gf_embs_df.shape[1] - 1))
     for i, g in enumerate(tqdm(pca_adata.obs["gene"])):
         try:
-            embs[i] = gf_embs_df[gf_embs_df["Unnamed: 0"] == name_to_ensembl[g]].iloc[:, 1:].to_numpy()[0]
+            embs[i] = (
+                gf_embs_df[gf_embs_df["Unnamed: 0"] == name_to_ensembl[g]]
+                .iloc[:, 1:]
+                .to_numpy()[0]
+            )
             genes_to_keep.append(g)
-        except:
+        except KeyError:  # noqa: PERF203
             continue
 
     # create AnnData
     gf_embs_ad = ad.AnnData(
         X=embs,
         obs=pca_adata.obs,
-        var=pd.DataFrame({"dim": np.arange(embs.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(embs.shape[1])}),
     )
 
     # filter to genes we have and save
     gf_embs_ad = gf_embs_ad[gf_embs_ad.obs["gene"].isin(genes_to_keep)]
-    outpath = os.path.join(base_path, f"gene-embs/{"_".join(model_name.split('-'))}-mean-lt5gt70-bin.h5ad")
+    outpath = os.path.join(
+        base_path,
+        f"gene-embs/{'_'.join(model_name.split('-'))}-mean-lt5gt70-bin.h5ad",
+    )
     gf_embs_ad.write_h5ad(outpath)
-    log.info(f"created AnnData of mean gene embeddings for marginal essentiality task at {outpath}")
+    log.info(
+        f"created AnnData of mean gene embeddings for marginal essentiality task at {outpath}",
+    )
 
     # load dataset to iterate for contextual gene embeddings
     filtered_input_data = pu.load_and_filter(None, 4, data_path)
@@ -387,7 +447,9 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
     pad_token_id = gene_token_dict.get("<pad>")
 
     # load dictionary of gene IDs to names
-    gene_id_to_name = sc.read_h5ad(os.path.join(base_path, "geneformer/adata.h5ad")).var[["ensembl_id", "feature_name"]]
+    gene_id_to_name = sc.read_h5ad(
+        os.path.join(base_path, "geneformer/adata.h5ad"),
+    ).var[["ensembl_id", "feature_name"]]
     gene_id_to_name = gene_id_to_name.set_index("ensembl_id").to_dict()["feature_name"]
 
     # load model
@@ -404,13 +466,18 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
 
         # get batch
         max_range = min(i + forward_batch_size, total_batch_length)
-        minibatch = filtered_input_data.select([i for i in range(i, max_range)])
+        minibatch = filtered_input_data.select(list(range(i, max_range)))
         max_len = int(max(minibatch["length"]))
         minibatch.set_format(type="torch")
 
         # get input data and make attention mask
         input_data_minibatch = minibatch["input_ids"]
-        input_data_minibatch = pu.pad_tensor_list(input_data_minibatch, max_len, pad_token_id, model_input_size)
+        input_data_minibatch = pu.pad_tensor_list(
+            input_data_minibatch,
+            max_len,
+            pad_token_id,
+            model_input_size,
+        )
         attention_mask = pu.gen_attention_mask(minibatch)
 
         # pass through model
@@ -421,7 +488,9 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
             )
 
         # get embeddings from specified layer
-        batch_embeddings = outputs.hidden_states[layer_to_quant].to("cpu").to(torch.float32).numpy()
+        batch_embeddings = (
+            outputs.hidden_states[layer_to_quant].to("cpu").to(torch.float32).numpy()
+        )
 
         # bring inputs back to CPU
         input_data_minibatch = input_data_minibatch.cpu().numpy()
@@ -442,7 +511,9 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
                     continue
 
                 # fill embedding and label
-                labels.append(f"{cell_line} | {gene_id_to_name[token_gene_dict[input_id]]}")
+                labels.append(
+                    f"{cell_line} | {gene_id_to_name[token_gene_dict[input_id]]}",
+                )
                 embeddings.append(cell_line_embs[k])
 
         # clean up
@@ -464,28 +535,49 @@ def run_gf(base_path, model_path, model_name, data_path, layer_offset=0):
     embeddings = embeddings[sort_idx]
 
     # process and save contextual gene embeddings
-    utils.process_contextual_gene_embs(base_path, log, labels, embeddings, "_".join(model_name.split('-')))
+    utils.process_contextual_gene_embs(
+        base_path,
+        log,
+        labels,
+        embeddings,
+        "_".join(model_name.split("-")),
+    )
+
 
 # create AnnDatas for an NVIDIA Geneformer model (embeddings already computed)
 def run_nvidia_gf(base_path, model_name, raw_prefix):
 
     # load inference results
-    with open(os.path.join(base_path, f"nvidia-gf-preds/{raw_prefix}_depmap.pkl"), "rb") as f:
+    with open(
+        os.path.join(base_path, f"nvidia-gf-preds/{raw_prefix}_depmap.pkl"),
+        "rb",
+    ) as f:
         inference_results = pickle.load(f)
-        cell_embeddings = np.stack([inference_results[i]["embeddings"] for i in range(len(inference_results))])
-        gene_embeddings = np.stack([inference_results[i]["hiddens"] for i in range(len(inference_results))])
+        cell_embeddings = np.stack(
+            [inference_results[i]["embeddings"] for i in range(len(inference_results))],
+        )
+        gene_embeddings = np.stack(
+            [inference_results[i]["hiddens"] for i in range(len(inference_results))],
+        )
 
     # load vocabulary and create dictionaries
     with open(os.path.join(base_path, f"nvidia-gf-preds/{raw_prefix}_vocab.json")) as f:
         to_deserialize = json.load(f)
-        vocab = to_deserialize['vocab']
-        gene_to_ens = to_deserialize['gene_to_ens']
-        ens_to_gene = {v:k for k,v in gene_to_ens.items()}
-        vocab_itos = {v:k for k,v in vocab.items()}
+        vocab = to_deserialize["vocab"]
+        gene_to_ens = to_deserialize["gene_to_ens"]
+        ens_to_gene = {v: k for k, v in gene_to_ens.items()}
+        vocab_itos = {v: k for k, v in vocab.items()}
 
     # create arrays of gene IDs and names
-    gene_ids = np.stack([np.array([vocab_itos[i] for i in row["text"]]) for row in inference_results])
-    gene_names = np.stack([np.array([ens_to_gene.get(vocab_itos[i], None) for i in row["text"]]) for row in inference_results])
+    gene_ids = np.stack(
+        [np.array([vocab_itos[i] for i in row["text"]]) for row in inference_results],
+    )
+    gene_names = np.stack(
+        [
+            np.array([ens_to_gene.get(vocab_itos[i], None) for i in row["text"]])
+            for row in inference_results
+        ],
+    )
 
     # save NPZ for future use
     np.savez_compressed(
@@ -493,7 +585,7 @@ def run_nvidia_gf(base_path, model_name, raw_prefix):
         gene_embeddings=gene_embeddings,
         cell_embeddings=cell_embeddings,
         gene_names=gene_names,
-        gene_ids=gene_ids
+        gene_ids=gene_ids,
     )
 
     # create and save cell line embeddings
@@ -501,7 +593,7 @@ def run_nvidia_gf(base_path, model_name, raw_prefix):
     adata = ad.AnnData(
         X=cell_embeddings,
         obs=template.obs,
-        var=pd.DataFrame({"dim": np.arange(cell_embeddings.shape[1])}).set_index("dim")
+        var=pd.DataFrame({"dim": np.arange(cell_embeddings.shape[1])}).set_index("dim"),
     )
     outpath = os.path.join(base_path, f"cell-embs/{model_name}.h5ad")
     adata.write_h5ad(outpath)
@@ -536,11 +628,19 @@ def run_nvidia_gf(base_path, model_name, raw_prefix):
     embeddings = embeddings[sort_idx]
 
     # process and save contextual gene embeddings
-    model_name_underscore = "_".join(model_name.split('-'))
-    utils.process_contextual_gene_embs(base_path, log, labels, embeddings, model_name_underscore)
+    model_name_underscore = "_".join(model_name.split("-"))
+    utils.process_contextual_gene_embs(
+        base_path,
+        log,
+        labels,
+        embeddings,
+        model_name_underscore,
+    )
 
     # get available genes for marginal essentiality task
-    embs = sc.read_h5ad(os.path.join(base_path, f"gene-embs/{model_name_underscore}.h5ad"))
+    embs = sc.read_h5ad(
+        os.path.join(base_path, f"gene-embs/{model_name_underscore}.h5ad"),
+    )
     all_genes, all_scores = utils.get_marginal_genes_scores(base_path)
     genes, scores = [], []
     avail_genes = embs.obs["gene"].unique().tolist()
@@ -559,24 +659,51 @@ def run_nvidia_gf(base_path, model_name, raw_prefix):
     mean_embs_ad = ad.AnnData(
         X=mean_embs,
         obs=pd.DataFrame({"gene": genes, "score": scores}),
-        var=pd.DataFrame({"dim": np.arange(mean_embs.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(mean_embs.shape[1])}),
     )
 
     # write to disk
-    outpath = os.path.join(base_path, f"gene-embs/{model_name_underscore}-mean-lt5gt70-bin.h5ad")
+    outpath = os.path.join(
+        base_path,
+        f"gene-embs/{model_name_underscore}-mean-lt5gt70-bin.h5ad",
+    )
     mean_embs_ad.write_h5ad(outpath)
     log.info(f"saved AnnData for marginal essentiality task to {outpath}")
 
+
 if __name__ == "__main__":
-    
+
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-path", type=str, required=True, help="Path to DepMap benchmark base directory.")
-    parser.add_argument("--model-type", type=str, required=True, help="Model type: scgpt, gf, or nvidia-gf.")
-    parser.add_argument("--model-name", type=str, required=True, help="Model name (filenames are based on this).")
+    parser.add_argument(
+        "--base-path",
+        type=str,
+        required=True,
+        help="Path to DepMap benchmark base directory.",
+    )
+    parser.add_argument(
+        "--model-type",
+        type=str,
+        required=True,
+        help="Model type: scgpt, gf, or nvidia-gf.",
+    )
+    parser.add_argument(
+        "--model-name",
+        type=str,
+        required=True,
+        help="Model name (filenames are based on this).",
+    )
     parser.add_argument("--model-path", type=str, help="Path to model folder.")
-    parser.add_argument("--gf-data-path", type=str, help="Path to dataset for use with Geneformer.")
-    parser.add_argument("--nvidia-gf-data-prefix", type=str, help="Prefix to find embeddings in [base-path]/nvidia-gf-preds directory.")
+    parser.add_argument(
+        "--gf-data-path",
+        type=str,
+        help="Path to dataset for use with Geneformer.",
+    )
+    parser.add_argument(
+        "--nvidia-gf-data-prefix",
+        type=str,
+        help="Prefix to find embeddings in [base-path]/nvidia-gf-preds directory.",
+    )
     args = parser.parse_args()
 
     # run correct function

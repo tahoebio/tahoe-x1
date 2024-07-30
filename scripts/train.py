@@ -1,13 +1,16 @@
-import composer
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 import copy
 import gc
-import torch
-import sys
 import logging
 import os
-from composer.core.callback import Callback
-from composer.utils import dist, reproducibility, get_device
+import sys
 import warnings
+from typing import Any, Dict, List, Optional, Union
+
+import composer
+import torch
+from composer.core.callback import Callback
+from composer.utils import dist, get_device, reproducibility
 from llmfoundry.utils.builders import (
     build_algorithm,
     build_callback,
@@ -18,22 +21,20 @@ from llmfoundry.utils.builders import (
 from llmfoundry.utils.config_utils import (
     log_config,
     pop_config,
+    process_init_device,
     update_batch_size_info,
-    process_init_device
 )
-from streaming.base.util import clean_stale_shared_memory
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
-from typing import Any, Dict, List, Optional, Union
 from rich.traceback import install
+from streaming.base.util import clean_stale_shared_memory
 
 install()
 
-from scgpt.data import build_dataloader
-from scgpt.model import ComposerSCGPTModel
-from scgpt.tokenizer import GeneVocab
-from scgpt.utils import download_file_from_s3_url
-
+from mosaicfm.data import build_dataloader
+from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.tokenizer import GeneVocab
+from mosaicfm.utils import download_file_from_s3_url
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +56,10 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     # Initialize pytorch distributed training process groups
     dist_timeout: Union[int, float] = pop_config(
-        cfg, "dist_timeout", must_exist=False, default_value=600.0
+        cfg,
+        "dist_timeout",
+        must_exist=False,
+        default_value=600.0,
     )
     dist.initialize_dist(get_device(None), timeout=dist_timeout)
 
@@ -66,10 +70,16 @@ def main(cfg: DictConfig) -> composer.Trainer:
     # Mandatory model training configs
     model_config: DictConfig = pop_config(cfg, "model", must_exist=True)
     optimizer_config: Dict[str, Any] = pop_config(
-        cfg, "optimizer", must_exist=True, convert=True
+        cfg,
+        "optimizer",
+        must_exist=True,
+        convert=True,
     )
     scheduler_config: Dict[str, Any] = pop_config(
-        cfg, "scheduler", must_exist=True, convert=True
+        cfg,
+        "scheduler",
+        must_exist=True,
+        convert=True,
     )
     train_loader_config: DictConfig = pop_config(cfg, "train_loader", must_exist=True)
     valid_loader_config: DictConfig = pop_config(cfg, "valid_loader", must_exist=True)
@@ -77,45 +87,77 @@ def main(cfg: DictConfig) -> composer.Trainer:
     vocab_config: DictConfig = pop_config(cfg, "vocabulary", must_exist=True)
     # Optional deepspeed, FSDP, and torch-compile config
     deepspeed_config: Optional[Dict[str, Any]] = pop_config(
-        cfg, "deepspeed_config", must_exist=False, default_value=None, convert=True
+        cfg,
+        "deepspeed_config",
+        must_exist=False,
+        default_value=None,
+        convert=True,
     )
     compile_config: Optional[Dict[str, Any]] = pop_config(
-        cfg, "compile_config", must_exist=False, default_value=None
+        cfg,
+        "compile_config",
+        must_exist=False,
+        default_value=None,
     )
     fsdp_config: Optional[Dict[str, Any]] = pop_config(
-        cfg, "fsdp_config", must_exist=False, default_value=None, convert=True
+        cfg,
+        "fsdp_config",
+        must_exist=False,
+        default_value=None,
+        convert=True,
     )
     if (fsdp_config is not None) and (deepspeed_config is not None):
         raise ValueError("FSDP and DeepSpeed cannot be used together.")
 
     # Optional logging, evaluation and callback configs
     logger_configs: Optional[DictConfig] = pop_config(
-        cfg, "loggers", must_exist=False, default_value=None, convert=True
+        cfg,
+        "loggers",
+        must_exist=False,
+        default_value=None,
+        convert=True,
     )
     callback_configs: Optional[DictConfig] = pop_config(
-        cfg, "callbacks", must_exist=False, default_value=None, convert=True
+        cfg,
+        "callbacks",
+        must_exist=False,
+        default_value=None,
+        convert=True,
     )
     algorithm_configs: Optional[DictConfig] = pop_config(
-        cfg, "algorithms", must_exist=False, default_value=None
+        cfg,
+        "algorithms",
+        must_exist=False,
+        default_value=None,
     )
 
     # Mandatory hyperparameters for training
     device_train_batch_size: int = pop_config(
-        cfg, "device_train_batch_size", must_exist=True
+        cfg,
+        "device_train_batch_size",
+        must_exist=True,
     )
     device_eval_batch_size: int = pop_config(
-        cfg, "device_eval_batch_size", must_exist=True
+        cfg,
+        "device_eval_batch_size",
+        must_exist=True,
     )
     max_duration: Union[int, str] = pop_config(cfg, "max_duration", must_exist=True)
     eval_interval: Union[int, str] = pop_config(
-        cfg, "eval_interval", default_value="500ba", must_exist=False
+        cfg,
+        "eval_interval",
+        default_value="500ba",
+        must_exist=False,
     )
     precision: str = pop_config(cfg, "precision", must_exist=True)
 
     # Optional parameters will be set to default values if not specified.
-    default_run_name: str = os.environ.get("RUN_NAME", "scgpt")
+    default_run_name: str = os.environ.get("RUN_NAME", "mosaicfm")
     run_name: str = pop_config(
-        cfg, "run_name", must_exist=False, default_value=default_run_name
+        cfg,
+        "run_name",
+        must_exist=False,
+        default_value=default_run_name,
     )
 
     logged_cfg.update({"run_name": run_name})
@@ -135,16 +177,24 @@ def main(cfg: DictConfig) -> composer.Trainer:
         cfg,
         "save_latest_filename",
         must_exist=False,
-        default_value="latest-sharded-rank{rank}"
-        if is_state_dict_sharded
-        else "latest-rank{rank}.pt",
+        default_value=(
+            "latest-sharded-rank{rank}"
+            if is_state_dict_sharded
+            else "latest-rank{rank}.pt"
+        ),
     )
 
     save_overwrite: bool = pop_config(
-        cfg, "save_overwrite", must_exist=False, default_value=False
+        cfg,
+        "save_overwrite",
+        must_exist=False,
+        default_value=False,
     )
     save_weights_only: bool = pop_config(
-        cfg, "save_weights_only", must_exist=False, default_value=False
+        cfg,
+        "save_weights_only",
+        must_exist=False,
+        default_value=False,
     )
     save_filename: str = pop_config(
         cfg,
@@ -154,41 +204,74 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
 
     save_interval: Union[str, int] = pop_config(
-        cfg, "save_interval", must_exist=False, default_value="250ba"
+        cfg,
+        "save_interval",
+        must_exist=False,
+        default_value="250ba",
     )
 
     save_num_checkpoints_to_keep: int = pop_config(
-        cfg, "save_num_checkpoints_to_keep", must_exist=False, default_value=-1
+        cfg,
+        "save_num_checkpoints_to_keep",
+        must_exist=False,
+        default_value=-1,
     )
 
     progress_bar = pop_config(
-        cfg, "progress_bar", must_exist=False, default_value=False
+        cfg,
+        "progress_bar",
+        must_exist=False,
+        default_value=False,
     )
     log_to_console: bool = pop_config(
-        cfg, "log_to_console", must_exist=False, default_value=True
+        cfg,
+        "log_to_console",
+        must_exist=False,
+        default_value=True,
     )
     python_log_level: Optional[str] = pop_config(
-        cfg, "python_log_level", must_exist=False, default_value="debug"
+        cfg,
+        "python_log_level",
+        must_exist=False,
+        default_value="debug",
     )
     console_log_interval: Union[int, str] = pop_config(
-        cfg, "console_log_interval", must_exist=False, default_value="1ba"
+        cfg,
+        "console_log_interval",
+        must_exist=False,
+        default_value="1ba",
     )
     device_train_microbatch_size: Union[str, int] = pop_config(
-        cfg, "device_train_microbatch_size", must_exist=False, default_value="auto"
+        cfg,
+        "device_train_microbatch_size",
+        must_exist=False,
+        default_value="auto",
     )
 
     load_path: str = pop_config(cfg, "load_path", must_exist=False, default_value=None)
     load_weights_only: bool = pop_config(
-        cfg, "load_weights_only", must_exist=False, default_value=False
+        cfg,
+        "load_weights_only",
+        must_exist=False,
+        default_value=False,
     )
     load_strict_model_weights: bool = pop_config(
-        cfg, "load_strict_model_weights", must_exist=False, default_value=True
+        cfg,
+        "load_strict_model_weights",
+        must_exist=False,
+        default_value=True,
     )
     load_ignore_keys: Optional[List[str]] = pop_config(
-        cfg, "load_ignore_keys", must_exist=False, default_value=None
+        cfg,
+        "load_ignore_keys",
+        must_exist=False,
+        default_value=None,
     )
     should_log_config: bool = pop_config(
-        cfg, "log_config", must_exist=False, default_value=True
+        cfg,
+        "log_config",
+        must_exist=False,
+        default_value=True,
     )
     # Enable autoresume from model checkpoints if possible
     autoresume_default: bool = False
@@ -203,11 +286,14 @@ def main(cfg: DictConfig) -> composer.Trainer:
     if cfg.get("autoresume") is None and autoresume_default:
         log.info(
             "As run_name, save_folder, and save_latest_filename are set, \
-                    changing autoresume default to True..."
+                    changing autoresume default to True...",
         )
 
     autoresume: bool = pop_config(
-        cfg, "autoresume", must_exist=False, default_value=autoresume_default
+        cfg,
+        "autoresume",
+        must_exist=False,
+        default_value=autoresume_default,
     )
 
     # Pop known unused parameters that are used as interpolation variables or
@@ -222,13 +308,13 @@ def main(cfg: DictConfig) -> composer.Trainer:
     # Warn users for unused parameters
     for key in cfg:
         warnings.warn(
-            f"Unused parameter {key} found in cfg. Please check your yaml to ensure this parameter is necessary."
+            f"Unused parameter {key} found in cfg. Please check your yaml to ensure this parameter is necessary.",
         )
 
     # Warn if fsdp is enabled but user only has 1 GPU
     if dist.get_world_size() == 1 and fsdp_config is not None:
         warnings.warn(
-            "FSDP is not applicable for single-GPU training. Reverting to DDP."
+            "FSDP is not applicable for single-GPU training. Reverting to DDP.",
         )
         fsdp_config = None
 
@@ -237,21 +323,23 @@ def main(cfg: DictConfig) -> composer.Trainer:
         logging.basicConfig(
             # Example of format string
             # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
-            format=f"%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s"
+            format=f"%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
         )
-        logging.getLogger("scgpt").setLevel(
-            python_log_level.upper()
+        logging.getLogger("mosaicfm").setLevel(
+            python_log_level.upper(),
         )  # vevo-scGPT module
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
     # Initialize context
     init_context = process_init_device(model_config, fsdp_config)
-    logged_cfg.update({'fsdp_config': fsdp_config}, merge=True)
+    logged_cfg.update({"fsdp_config": fsdp_config}, merge=True)
 
     log.info("Downloading vocab...")
     if dist.get_local_rank() == 0:
-        download_file_from_s3_url(s3_url=vocab_config["remote"],
-                                  local_file_path=vocab_config["local"])
+        download_file_from_s3_url(
+            s3_url=vocab_config["remote"],
+            local_file_path=vocab_config["local"],
+        )
     with dist.local_rank_zero_download_and_wait(vocab_config["local"]):
         dist.barrier()
 
@@ -328,12 +416,14 @@ def main(cfg: DictConfig) -> composer.Trainer:
         collator_cfg=collator_config,
         device_batch_size=device_eval_batch_size,
     )
-    log.info(f"Validation set number of samples: {(valid_loader.dataloader.dataset.size)}")
+    log.info(
+        f"Validation set number of samples: {(valid_loader.dataloader.dataset.size)}",
+    )
     logged_cfg.update(
         {
             "train_dataset_size": train_loader.num_samples,
             "valid_dataset_size": valid_loader.num_samples,
-        }
+        },
     )
     with init_context:
         # Build Model
@@ -349,7 +439,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         {
             "n_params": n_params,
             "n_trainable_params": n_trainable_params,
-        }
+        },
     )
     log.info(f"Total parameters: {n_params / (10 ** 6)} M")
     log.info(f"Total trainable parameters: {n_trainable_params / (10 ** 6)} M ")

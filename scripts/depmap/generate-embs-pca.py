@@ -1,27 +1,26 @@
-"""
+# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+"""Creates principal component and gene loading baseline comparison AnnDatas for
+cell line embeddings, mean gene embeddings, and contextual gene embeddings."""
 
-Creates principal component and gene loading baseline comparison AnnDatas
-for cell line embeddings, mean gene embeddings, and contextual gene
-embeddings.
-
-"""
-
-# imports
-import os
 import argparse
 import logging
+import os
+
+import anndata as ad
 import numpy as np
 import pandas as pd
-import anndata as ad
 import scanpy as sc
 import utils
-from tqdm import tqdm
 from sklearn.decomposition import PCA
+from tqdm import tqdm
 
 # set up logging
 log = logging.getLogger(__name__)
-logging.basicConfig(format=f"%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s")
+logging.basicConfig(
+    format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
+)
 logging.getLogger(__name__).setLevel("INFO")
+
 
 # main function
 def main(base_path):
@@ -31,7 +30,11 @@ def main(base_path):
     sc.pp.normalize_total(raw)
     sc.pp.log1p(raw)
     sc.tl.pca(raw, n_comps=15)
-    pca = ad.AnnData(X=raw.obsm["X_pca"], obs=raw.obs, var=pd.DataFrame({"dim": [str(i) for i in range(15)]}).set_index("dim"))
+    pca = ad.AnnData(
+        X=raw.obsm["X_pca"],
+        obs=raw.obs,
+        var=pd.DataFrame({"dim": [str(i) for i in range(15)]}).set_index("dim"),
+    )
     outpath = os.path.join(base_path, "cell-embs/pca.h5ad")
     pca.write_h5ad(outpath)
     log.info(f"computed PCA and saved cell line embeddings to {outpath}")
@@ -48,7 +51,7 @@ def main(base_path):
     all_loadings = ad.AnnData(
         X=all_loadings_X,
         obs=pd.DataFrame({"gene": raw.var["feature_name"]}),
-        var=pd.DataFrame({"dim": np.arange(all_loadings_X.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(all_loadings_X.shape[1])}),
     )
 
     # extract loadings for required genes
@@ -61,7 +64,7 @@ def main(base_path):
     loadings = ad.AnnData(
         X=loadings_X,
         obs=pd.DataFrame({"gene": genes, "score": scores}),
-        var=pd.DataFrame({"dim": np.arange(loadings_X.shape[1])})
+        var=pd.DataFrame({"dim": np.arange(loadings_X.shape[1])}),
     )
 
     # save AnnData
@@ -72,11 +75,14 @@ def main(base_path):
     # load counts and cell line embeddings, build gene dictionary
     counts = sc.read_h5ad(os.path.join(base_path, "counts.h5ad"))
     pca_cell_embs = sc.read_h5ad(os.path.join(base_path, "cell-embs/pca.h5ad"))
-    gene_dict = {gene: i for i, gene in enumerate(sorted(counts.var["feature_name"].unique().tolist()))}
+    gene_dict = {
+        gene: i
+        for i, gene in enumerate(sorted(counts.var["feature_name"].unique().tolist()))
+    }
 
     # get lists for iterating
     cell_lines = sorted(counts.obs["ModelID"].tolist())
-    genes = sorted(list(gene_dict.keys()))
+    genes = sorted(gene_dict.keys())
 
     # iterate over cell lines
     log.info("creating gene_idx+pca15 embeddings")
@@ -103,13 +109,25 @@ def main(base_path):
     embeddings = embeddings[sort_idx]
 
     # process and save contextual gene embeddings
-    utils.process_contextual_gene_embs(base_path, log, labels, embeddings, "gene_idx+pca15")
+    utils.process_contextual_gene_embs(
+        base_path,
+        log,
+        labels,
+        embeddings,
+        "gene_idx+pca15",
+    )
+
 
 if __name__ == "__main__":
-    
+
     # parse arguments
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-path", type=str, required=True, help="Path to DepMap benchmark base directory.")
+    parser.add_argument(
+        "--base-path",
+        type=str,
+        required=True,
+        help="Path to DepMap benchmark base directory.",
+    )
     args = parser.parse_args()
 
     # run main function

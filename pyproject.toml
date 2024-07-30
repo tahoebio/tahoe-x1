@@ -1,0 +1,123 @@
+# build requirements
+[build-system]
+requires = ["setuptools < 68.0.0"]
+build-backend = "setuptools.build_meta"
+
+# iSort
+[tool.isort]
+multi_line_output = 0
+line_length = 80
+skip = [ "env", "wandb", "runs", "build", "node_modules" ]
+include_trailing_comma = true
+split_on_trailing_comma = true
+
+[tool.ruff.lint]
+select = [
+    "C4",
+    "LOG",
+    "PERF",
+    "PL",
+    "E",
+    "F",
+    "COM812",
+    "SIM",
+    "RUF",
+]
+ignore=["PLR0913", # Too many arguments in function
+    "PLR0915", # Too many statements
+    "PLR0912", # Too many branches
+    "PERF401", # Enforces list comprehensions over for-loops
+    "E501", # Line too long
+    "E402", # Module level import not at top of file
+
+    ]
+[tool.ruff]
+exclude = [
+    "build/**",
+    "docs/**",
+    "node_modules/**",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+
+# Coverage
+[tool.coverage.run]
+parallel = true
+branch = true
+relative_files = true
+concurrency = ["thread"]
+include = [
+    "llmfoundry/*"
+]
+
+
+# Pyright
+[tool.pyright]
+exclude = ['env-**', 'venv*', '.venv']
+stubPath = ""  # suppress useless 'stubPath is not a valid directory' errors
+
+reportUnnecessaryIsInstance = "none" # it is ok to do this for clarity or safety
+reportMissingTypeStubs = "none"
+reportIncompatibleMethodOverride = "none"
+reportIncompatibleVariableOverride = "error"
+reportUnusedImport = "none"
+reportUnusedClass = "warning"
+reportUnusedFunction = "warning"
+reportUnusedVariable = "error"
+reportDuplicateImport = "error"
+reportWildcardImportFromLibrary = "error"
+reportUntypedFunctionDecorator = "warning"
+reportPrivateImportUsage = "none"
+reportUndefinedVariable = "error"
+strictParameterNoneValue = true
+reportPropertyTypeMismatch = "error"
+reportUntypedNamedTuple = "error"
+reportUnnecessaryCast = "error"
+reportInvalidTypeVarUse = "error"
+reportOverlappingOverload = "error"
+reportUninitializedInstanceVariable = "error"
+reportInvalidStringEscapeSequence = "error"
+reportMissingParameterType = "error"
+reportCallInDefaultInitializer = "error"
+reportUnnecessaryComparison = "error"
+reportSelfClsParameterName = "error"
+reportImplicitStringConcatenation = "warning"
+reportInvalidStubStatement = "error"
+reportIncompleteStub = "error"
+reportUnsupportedDunderAll = "error"
+reportUnusedCoroutine = "error"
+reportMissingImports = "none"
+
+# Pytest
+[tool.pytest.ini_options]
+# By default, skip gpu tests
+addopts = "--tb=short -m 'not gpu'"
+
+markers = [
+    # For distributed testing
+    "world_size(val)",
+    # Should be run during daily regression
+    "daily",
+    # Whether the test will be reading data from a remote source, and may require credentials
+    "remote",
+    # whether the test requires a gpu
+    "gpu",
+]
+
+filterwarnings = [
+    # "error",  # warnings should be treated like errors, but still need to fix some warnings
+    'ignore:ExtraArgumentWarning',  # extra arguments originate from pytest-specific CLI args
+    'ignore:DistributedDefaultValueWarning',  # default distributed values are fine
+    'ignore:NoDistributedWarning',  # running without distributed is fine
+    'ignore:Deterministic mode is activated:UserWarning',  # all tests run with deterministic mode
+    'ignore:SubsetNumBatchesWarning',  # different subsets OK for testing
+    'ignore:No optimizer:UserWarning',  # testing defaults
+    'ignore:No scheduler:UserWarning',  # testing defaults
+    'ignore::DeprecationWarning:tensorboard',  # ignore tensorboard
+]
+
+[tool.pydocstyle]
+convention="google"
+add_ignore="D100,D101,D102,D103,D104,D105,D107,D400,D401,D415"
+add_select="D404"

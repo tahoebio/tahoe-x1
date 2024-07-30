@@ -1,0 +1,90 @@
+default_language_version:
+  python: python3
+repos:
+- repo: https://github.com/astral-sh/ruff-pre-commit
+  # Ruff version.
+  rev: v0.2.2
+  hooks:
+  - id: ruff
+    args: [--fix, --exit-non-zero-on-fix]
+- repo: https://github.com/psf/black-pre-commit-mirror
+  rev: 24.4.2
+  hooks:
+    - id: black
+      # It is recommended to specify the latest version of Python
+      # supported by your project here, or alternatively use
+      # pre-commit's default_language_version, see
+      # https://pre-commit.com/#top_level-default_language_version
+      language_version: python3.10
+- repo: https://github.com/hadialqattan/pycln
+  rev: v2.1.2
+  hooks:
+  - id: pycln
+    args: [. --all]
+- repo: https://github.com/pycqa/isort
+  hooks:
+  - id: isort
+  rev: 5.12.0
+- repo: https://github.com/Lucas-C/pre-commit-hooks
+  rev: v1.5.4
+  hooks:
+  - id: insert-license
+    files: \.(py|sh)$
+    args:
+    - --license-filepath
+    - .pre-commit/FILE_HEADER
+    - --comment-style
+    - "#"
+    - --use-current-year
+    - --no-extra-eol
+- repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.3.0
+  hooks:
+  - id: check-added-large-files
+  - id: check-ast
+  - id: check-builtin-literals
+    args:
+    - --no-allow-dict-kwargs
+  - id: check-case-conflict
+  - id: check-docstring-first
+  - id: check-executables-have-shebangs
+  - id: check-json
+  - id: check-shebang-scripts-are-executable
+  - id: check-merge-conflict
+  - id: check-symlinks
+  - id: check-toml
+  - id: check-vcs-permalinks
+  - id: check-xml
+  - id: check-yaml
+  - id: debug-statements
+  - id: destroyed-symlinks
+  - id: fix-byte-order-marker
+  - id: mixed-line-ending
+    args:
+    - --fix
+    - auto
+- repo: https://github.com/PyCQA/docformatter
+  rev: v1.7.4
+  hooks:
+  - id: docformatter
+    args: [--in-place, --wrap-summaries=80, --wrap-descriptions=80, --black,--style=google]
+# Disable type checking for now.
+#- repo: local
+#  hooks:
+#  - id: pyright
+#    name: pyright
+#    entry: pyright
+#    language: node
+#    types: [python]
+#    pass_filenames: false
+#    args: [--warnings]
+#    additional_dependencies: ["pyright@1.1.256"]
+- repo: https://github.com/trufflesecurity/trufflehog.git
+  rev: v3.40.0
+  hooks:
+  - id: trufflehog
+    name: secret scan
+    entry: trufflehog filesystem ./
+    args:
+    - --only-verified
+    - --fail
