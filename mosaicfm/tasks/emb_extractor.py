@@ -3,6 +3,7 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
+from anndata import AnnData
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
@@ -12,7 +13,7 @@ from mosaicfm.tokenizer import GeneVocab
 
 
 def get_batch_embeddings(
-    adata,
+    adata: AnnData,
     model: SCGPTModel,
     vocab: GeneVocab,
     model_cfg: DictConfig,

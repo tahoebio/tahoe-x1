@@ -10,12 +10,14 @@ from .blocks import (
 )
 from .model import (
     ComposerSCGPTModel,
+    ComposerSCGPTPerturbationModel,
     SCGPTModel,
 )
 
 __all__ = [
     "SCGPTModel",
     "ComposerSCGPTModel",
+    "ComposerSCGPTPerturbationModel",
     "SCGPTBlock",
     "SCGPTEncoder",
     "GeneEncoder",

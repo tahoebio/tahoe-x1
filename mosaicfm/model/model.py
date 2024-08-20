@@ -14,6 +14,7 @@ from torch import Tensor, nn
 
 from mosaicfm.loss import MaskedMseMetric, MaskedSpearmanMetric, masked_mse_loss
 from mosaicfm.model.blocks import (
+    AffineExprDecoder,
     CategoryValueEncoder,
     ContinuousValueEncoder,
     ExprDecoder,
@@ -318,7 +319,7 @@ class SCGPTModel(nn.Module):
             gen_key_padding_mask,
             input_cell_emb=input_cell_emb,
         )
-        if gen_output is None:
+        if gen_output is None:  # type: ignore
             transformer_output = pcpt_output
         else:
             transformer_output = torch.cat([pcpt_output, gen_output], dim=1)
@@ -522,3 +523,58 @@ class ComposerSCGPTModel(ComposerModel):
         normalized_value = (x - min_value) / (max_value - min_value)
         # Scale to -1..1
         return 2 * normalized_value - 1
+
+
+class ComposerSCGPTPerturbationModel(ComposerModel):
+    def __init__(self, model_config, collator_config, device="cuda"):
+        super().__init__()
+        self.device = device
+        self.criterion = masked_mse_loss
+        self.pad_token_id = collator_config.pad_token_id
+        self.use_cell_conditioned_generation = model_config.get(
+            "use_cell_conditioned_generation",
+            False,
+        )
+        self.model = SCGPTModel(
+            model_config=model_config,
+            collator_config=collator_config,
+            device=device,
+        )
+        self.pert_encoder = nn.Embedding(3, self.model.d_model, padding_idx=0)
+        self.pert_decoder = AffineExprDecoder(self.model.d_model)
+
+    def forward(self, batch):
+        gene_ids = batch["genes"]
+        ctrl_expr = batch["expressions_ctrl"]
+        perturbation_flags = batch["perturb_flags"]
+
+        gene_token_emb = self.model.gene_encoder(gene_ids.to(self.device))
+        gene_expr_emb = self.model.expression_encoder(ctrl_expr.to(self.device))
+        pert_flag_emb = self.pert_encoder(perturbation_flags.to(self.device))
+        combined_input_embs = gene_token_emb + gene_expr_emb + pert_flag_emb
+
+        transformer_encoding = self.model.transformer_encoder(
+            pcpt_total_embs=combined_input_embs,
+            gen_total_embs=None,
+            pcpt_key_padding_mask=None,
+            gen_key_padding_mask=None,
+        )
+        predicted_post_expr = self.pert_decoder(transformer_encoding, ctrl_expr)
+        output = {
+            "predicted_expr_perturbed": predicted_post_expr["pred"],
+        }
+        return output
+
+    def loss(self, outputs, batch):
+        expr_target = batch["expressions_perturbed"]
+        gene_ids = batch["genes"]
+        mask = torch.ones_like(gene_ids, dtype=torch.bool)
+
+        expr_pred = outputs["predicted_expr_perturbed"]
+
+        loss_mse = self.criterion(
+            expr_pred,
+            expr_target,
+            mask,
+        )
+        return loss_mse

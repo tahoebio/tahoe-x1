@@ -1,10 +1,11 @@
 # Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 from collections.abc import MutableSequence
-from typing import Dict
+from typing import Dict, List
 
 import numpy as np
 import torch
 from composer.core.data_spec import DataSpec
+from datasets import Dataset
 from omegaconf import DictConfig
 from streaming import StreamingDataLoader, StreamingDataset
 
@@ -67,6 +68,61 @@ def build_dataloader(
     return DataSpec(dataloader=data_loader)
 
 
+def build_perturbation_dataloader(
+    loader_cfg: DictConfig,
+    device_batch_size: int,
+    isTrain: bool,
+) -> DataSpec:
+    """Builds a dataloader from a config for perturbation task.
+
+    Args:
+        loader_cfg (DictConfig): An omegaconf dictionary used to configure the loader.
+        device_batch_size (int): The size of the batches (number of examples)
+            that the dataloader will produce.
+    """
+
+    data_path = loader_cfg.get("dataset")["local"]
+    max_len = loader_cfg.get("max_len")
+
+    dataset = Dataset.load_from_disk(data_path)
+
+    def collate_fn(examples: List[Dict[str, torch.Tensor]]) -> Dict[str, torch.Tensor]:
+
+        genes = torch.stack([example["genes"] for example in examples])
+        n_genes = len(genes[0])
+        expressions_ctrls = torch.stack(
+            [example["expressions_ctrl"] for example in examples],
+        )
+        expressions_perturbeds = torch.stack(
+            [example["expressions_perturbed"] for example in examples],
+        )
+        perturb_flags = torch.stack([example["perturb_flag"] for example in examples])
+        perturb_names = [example["perturb_name"] for example in examples]
+        de_flags = torch.stack([example["de_flag"] for example in examples])
+
+        # Randomly sample if sequence is longer than max_seq_len
+        indices = (
+            torch.randperm(n_genes)[:max_len] if isTrain else torch.arange(n_genes)
+        )
+
+        return {
+            "genes": genes[:, indices],
+            "expressions_ctrl": expressions_ctrls[:, indices],
+            "expressions_perturbed": expressions_perturbeds[:, indices],
+            "perturb_flags": perturb_flags[:, indices],
+            "perturb_names": perturb_names,
+            "de_flags": de_flags[:, indices],
+        }
+
+    data_loader = StreamingDataLoader(
+        dataset,
+        batch_size=device_batch_size,
+        collate_fn=collate_fn,
+    )
+
+    return data_loader
+
+
 class CountDataset(torch.utils.data.Dataset):
     def __init__(
         self,
@@ -90,7 +146,7 @@ class CountDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return len(self.count_matrix)
 
-    def __getitem__(self, idx) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, idx) -> Dict[str, torch.Tensor]:  # type: ignore
         row = self.count_matrix[idx]
         nonzero_idx = np.nonzero(row)[0]
         values = row[nonzero_idx]

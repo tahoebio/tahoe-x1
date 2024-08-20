@@ -1,0 +1,84 @@
+global_seed: 777
+seed: ${global_seed}
+device_train_batch_size: 32
+global_train_batch_size: 32 #256 #Haotian: 64
+device_test_batch_size: 32 #256 #Haotian: 64
+device_train_microbatch_size: "auto"
+max_duration: "10ep" #"15ep"
+precision: amp_bf16
+model:
+  cfg_path: "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-fix-norm-apr24-data/model_config.yml"
+  collator_cfg_path: "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-fix-norm-apr24-data/collator_config.yml"
+  checkpoint_path: "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-fix-norm-apr24-data/best-model.pt"
+  freeze: False
+  pretrained: False
+optimizer:
+  name: decoupled_adamw
+  lr: 1.0e-4
+  betas:
+    - 0.9
+    - 0.95
+  eps: 1.0e-08
+  weight_decay: 0 #1.0e-6
+scheduler:
+  name: linear_decay_with_warmup
+  t_warmup: "1000ba"
+  alpha_i: 1.0
+  alpha_f: 1.0
+  t_max: "1dur"
+train_loader:
+  dataset:
+    remote: None
+    local: "/vevo/datasets/perturbation_datasets/norman/norman_train.dataset"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: True
+    shuffle_seed: ${global_seed}
+  max_len: 5060
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+valid_loader:
+  dataset:
+    remote: None
+    local: "/vevo/datasets/perturbation_datasets/norman/norman_val.dataset"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: False
+    shuffle_seed: ${global_seed}
+  max_len: 5060  #Always use full length for val and test
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+test_loader:
+  dataset:
+    remote: None
+    local: "/vevo/datasets/perturbation_datasets/norman/norman_test.dataset"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: False
+    shuffle_seed: ${global_seed}
+  max_len: 5060  
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+callbacks:
+  speed_monitor:
+    window_size: 20
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+loggers:
+  wandb:
+    project: perturbation_exps
+    log_artifacts: False
+    tags: ['norman']
+run_name: randweight-70m-seq5060
+save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_overwrite: True
