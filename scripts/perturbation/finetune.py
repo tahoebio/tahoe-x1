@@ -268,7 +268,6 @@ def main(cfg: DictConfig) -> composer.Trainer:
     # Run evaluation on the test_loader using the trainer's built-in eval method
     trainer.eval(
         eval_dataloader=test_loader,
-        # callbacks= pert_callback,  # Use the callback to collect and log metrics
         subset_num_batches=None,  # Evaluate on the entire test set
     )
 

@@ -611,8 +611,7 @@ def binning(
     if return_np:
         binned_row = binned_row.astype(dtype)
     if not (right):
-        # Left sided binning satisfies the condition
-        # bins[i - 1] < row < bins[i]
+        # Left sided binning satisfies the condition: bins[i - 1] < row < bins[i]
         # For right=False, the smallest binned values is 0
         # To avoid inconsistency: always make output in be in the range 1...n_bins-1
         binned_row = binned_row + 1

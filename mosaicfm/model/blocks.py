@@ -476,7 +476,6 @@ class AffineExprDecoder(torch.nn.Module):
             bias["pred"] = self.activation(bias["pred"])
 
         if self.adaptive_bias:
-            # bias["pred"] = bias["pred"] * values.mean(dim=1, keepdim=True)
             non_zero_value_mean = values.sum(dim=1, keepdim=True) / (values != 0).sum(
                 dim=1,
                 keepdim=True,

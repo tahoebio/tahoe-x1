@@ -354,3 +354,9 @@ def random_mask_value(
         mask_idx = np.random.choice(non_padding_idx, n_mask, replace=False)
         row[mask_idx] = mask_value
     return torch.from_numpy(values).float()
+
+
+def get_default_gene_vocab() -> GeneVocab:
+    """Get the default gene vocabulary, consisting of gene symbols and ids."""
+    vocab_file = Path(__file__).parent / "default_gene_vocab.json"
+    return GeneVocab.from_file(vocab_file)

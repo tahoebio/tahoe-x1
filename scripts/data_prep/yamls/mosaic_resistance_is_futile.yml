@@ -1,0 +1,10 @@
+raw_data_path: "/vevo/scgpt/datasets/mosaic/resistance_is_futile_35/raw_data/adata_clean.h5ad.gz"
+vocab_path: "/vevo/scgpt/checkpoints/release/scgpt-1_3b-2048/vocab.json"
+gene_to_ensembl_path: "/vevo/cellxgene/cellxgene_primary_2024-04-29_MDS/gene_info_2024-04-29.json"
+metadata_path: "/vevo/scgpt/datasets/mosaic/resistance_is_futile_35/metadata/ResFutInvitro_metadata_filt.tsv"
+sensitivity_path: "/vevo/scgpt/datasets/mosaic/resistance_is_futile_35/metadata/Sensitivity_score_bin.tsv"
+drug_targets_path: "/vevo/scgpt/datasets/mosaic/resistance_is_futile_35/metadata/Resistance is futile in vitro double - drug targets - 20240802.tsv"
+dataset_save_path: "/vevo/scgpt/datasets/mosaic/output/resistance_is_futile.dataset"
+n_top_genes: 5000
+num_ctrl_samples_to_pair: 5
+min_n_cell_cond: 20

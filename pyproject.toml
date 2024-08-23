@@ -22,6 +22,7 @@ select = [
     "COM812",
     "SIM",
     "RUF",
+    "ERA",
 ]
 ignore=["PLR0913", # Too many arguments in function
     "PLR0915", # Too many statements

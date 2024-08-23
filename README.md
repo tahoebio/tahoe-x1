@@ -68,8 +68,9 @@ pip install -e .
 ```shell
 git clone https://github.com/vevotx/vevo-scgpt-private.git 
 cd vevo-scgpt-private
-mamba env create -f envs/composer_env.yml
-conda activate composer_env
+mamba env create -f envs/mosaicfm_env.yml
+mamba activate mosaicfm
+pip install -e . --no-deps # Inside the vevo-scgpt-private directory
 ```
 > [!NOTE]  
 > If you are on an H100 GPU you may see `'sm_90' is not a recognized processor for this target (ignoring processor)`. This is expected and safe to ignore.

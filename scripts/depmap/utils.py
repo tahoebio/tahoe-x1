@@ -1,7 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024. All rights reserved.
 """Functions that are reused across scripts."""
 
-# imports
 import os
 
 import anndata as ad

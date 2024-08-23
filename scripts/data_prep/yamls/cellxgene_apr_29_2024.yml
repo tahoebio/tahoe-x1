@@ -1,0 +1,5 @@
+version: "2024-04-29"
+chunk_size: 200000
+base_vocabulary_path: "/vevo/cellxgene/cellxgene_primary_2023-12-15_vocab.json"
+gene_info_csv_url: "https://github.com/bowang-lab/scGPT/files/13243634/gene_info.csv"
+output_root: "/vevo/cellxgene/new_dataset"
