@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import numpy as np
 from composer.core.callback import Callback
 from composer.core.state import State

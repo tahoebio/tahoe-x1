@@ -20,7 +20,7 @@ data in the adata format from multiple sources into the MDS format used by our t
 | Replogle K562 (HF dataset)          | Replogle K562 dataset mapped using MosaicFM 1.3B vocab in the Huggingface datasets format. Not split into train/test         | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/replogle_k562.dataset/ |
 
 The MDS folders also contain
- - `metadata.json` : Contains the splits and meadian_library_size for each dataset.
+ - `metadata.json` : Contains the splits and median_library_size for each dataset.
  - `mean_ctrl_log1p.json`: Dictionary mapping each vocab ID to its corresponding mean log1p value in the control cells.
 This can also be computed from the dataset quickly as follows:
 ```python

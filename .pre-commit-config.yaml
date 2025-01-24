@@ -3,12 +3,12 @@ default_language_version:
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.2.2
+  rev: v0.9.3
   hooks:
   - id: ruff
     args: [--fix, --exit-non-zero-on-fix]
 - repo: https://github.com/psf/black-pre-commit-mirror
-  rev: 24.4.2
+  rev: 24.10.0
   hooks:
     - id: black
       # It is recommended to specify the latest version of Python
@@ -17,16 +17,16 @@ repos:
       # https://pre-commit.com/#top_level-default_language_version
       language_version: python3.10
 - repo: https://github.com/hadialqattan/pycln
-  rev: v2.1.2
+  rev: v2.5.0
   hooks:
   - id: pycln
     args: [. --all]
 - repo: https://github.com/pycqa/isort
   hooks:
   - id: isort
-  rev: 5.12.0
+  rev: 5.13.2
 - repo: https://github.com/Lucas-C/pre-commit-hooks
-  rev: v1.5.4
+  rev: v1.5.5
   hooks:
   - id: insert-license
     files: \.(py|sh)$
@@ -38,7 +38,7 @@ repos:
     - --use-current-year
     - --no-extra-eol
 - repo: https://github.com/pre-commit/pre-commit-hooks
-  rev: v4.3.0
+  rev: v5.0.0
   hooks:
   - id: check-added-large-files
   - id: check-ast
@@ -64,7 +64,9 @@ repos:
     - --fix
     - auto
 - repo: https://github.com/PyCQA/docformatter
-  rev: v1.7.4
+  # rev: v1.7.6
+  # as long as https://github.com/PyCQA/docformatter/pull/287 is not yet released
+  rev: 06907d0
   hooks:
   - id: docformatter
     args: [--in-place, --wrap-summaries=80, --wrap-descriptions=80, --black,--style=google]
@@ -80,7 +82,7 @@ repos:
 #    args: [--warnings]
 #    additional_dependencies: ["pyright@1.1.256"]
 - repo: https://github.com/trufflesecurity/trufflehog.git
-  rev: v3.40.0
+  rev: v3.88.2
   hooks:
   - id: trufflehog
     name: secret scan

@@ -1,6 +1,6 @@
 integrations:
 - integration_type: git_repo
-  git_repo: vevotx/vevo-scgpt-private
+  git_repo: vevotx/mosaicfm
   git_branch: dev-temp
   # git_commit:  # OR use your commit hash
   pip_install: -e . --no-deps
@@ -11,7 +11,7 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/README.md`
 # to convert and host the full 'train' dataset.
 command: |
-  cd vevo-scgpt-private/scripts
+  cd mosaicfm/scripts
   composer train.py /mnt/config/parameters.yaml
 image: vevotx/ml-scgpt:shreshth
 env_variables:

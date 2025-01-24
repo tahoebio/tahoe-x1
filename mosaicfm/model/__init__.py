@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 from .blocks import (
     CategoryValueEncoder,
     ContinuousValueEncoder,
@@ -15,14 +15,14 @@ from .model import (
 )
 
 __all__ = [
-    "SCGPTModel",
+    "CategoryValueEncoder",
     "ComposerSCGPTModel",
     "ComposerSCGPTPerturbationModel",
+    "ContinuousValueEncoder",
+    "ExprDecoder",
+    "GeneEncoder",
+    "MVCDecoder",
     "SCGPTBlock",
     "SCGPTEncoder",
-    "GeneEncoder",
-    "ContinuousValueEncoder",
-    "CategoryValueEncoder",
-    "ExprDecoder",
-    "MVCDecoder",
+    "SCGPTModel",
 ]

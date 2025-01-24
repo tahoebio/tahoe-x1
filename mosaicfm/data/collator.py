@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 import numpy as np

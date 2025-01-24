@@ -1,0 +1,20 @@
+output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025"
+vocab:
+  reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
+  use_col: "gene_id"
+  add_junk_tokens: True
+  special_tokens: ["<pad>","<cls>","<eoc>"]
+  output_root: ${output_root}
+  output_file: "vevo_v2_vocab.json"
+cellxgene:
+  min_count_per_gene: 3
+  min_gene_measured_obs: 10
+  min_gene_nnz: 10
+  version: "2025-01-21"
+  use_col: "feature_id"
+  chunk_size: 100000
+  output_root: ${output_root}
+  vocab: ${vocab.output_file}
+tahoe:
+  pass_filter: full
+  min_count_per_gene: 3

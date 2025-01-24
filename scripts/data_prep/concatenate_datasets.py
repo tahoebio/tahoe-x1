@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import argparse
 from pathlib import Path
 from typing import Iterable

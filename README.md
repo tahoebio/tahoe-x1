@@ -1,6 +1,6 @@
 <!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_BEGIN -->
 <p align="center">
-  <a href="https://github.com/vevotx/vevo-scgpt-private">
+  <a href="https://github.com/vevotx/mosaicfm">
     <picture>
       <img alt="vevo-therapeutics" src="./assets/vevo_logo.png" width="95%">
     </picture>
@@ -10,7 +10,7 @@
 
 <p align="center">
 <a href="https://github.com/astral-sh/ruff"><img alt="Linter: Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json"></a>
-<a href="https://github.com/vevotx/vevo-scgpt-private/blob/main/LICENSE">
+<a href="https://github.com/vevotx/mosaicfm/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
     </a>
 <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
@@ -60,17 +60,17 @@ Currently, we have the following images available:
 
 ### With docker
 ```shell
-git clone https://github.com/vevotx/vevo-scgpt-private.git
-cd vevo-scgpt-private
+git clone https://github.com/vevotx/mosaicfm.git
+cd mosaicfm
 pip install -e .
 ```
 ### Without docker
 ```shell
-git clone https://github.com/vevotx/vevo-scgpt-private.git 
-cd vevo-scgpt-private
+git clone https://github.com/vevotx/mosaicfm.git 
+cd mosaicfm
 mamba env create -f envs/mosaicfm_env.yml
 mamba activate mosaicfm
-pip install -e . --no-deps # Inside the vevo-scgpt-private directory
+pip install -e . --no-deps # Inside the mosaicfm directory
 ```
 > [!NOTE]  
 > If you are on an H100 GPU you may see `'sm_90' is not a recognized processor for this target (ignoring processor)`. This is expected and safe to ignore.

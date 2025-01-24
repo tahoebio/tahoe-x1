@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024. All rights reserved.
+# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple, Union
 
