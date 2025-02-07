@@ -1,5 +1,9 @@
 # Data preparation
 
+> [!NOTE]
+> These instructions outline the steps followed for the 2024 release of MosaicFM.
+> For the datasets processing pipeline for MosaicFM-v2 please refer to the **datasets_v2** folder
+
 This folder contains scripts for converting single-cell 
 data in the adata format from multiple sources into the MDS format used by our training workflow.
 

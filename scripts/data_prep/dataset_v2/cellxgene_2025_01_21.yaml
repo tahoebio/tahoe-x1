@@ -1,0 +1,50 @@
+output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025"
+vocab:
+  reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
+  use_col: "gene_id"
+  add_junk_tokens: True
+  special_tokens: ["<pad>","<cls>","<eoc>"]
+  output_root: ${output_root}
+  output_file: "vevo_v2_vocab.json"
+  id_to_gene_output_file: "vevo_v2_ensembl_to_gene_name.json"
+cellxgene:
+  min_count_per_gene: 3
+  min_gene_measured_obs: 10
+  min_gene_nnz: 10
+  version: "2025-01-21"
+  use_col: "feature_id"
+  chunk_size: 100000
+  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_adata_chunks"
+  vocab: ${vocab.output_file}
+huggingface:
+  ignore_dir: None
+  cls_token: "<cls>"
+  dataset_name: "cellxgene_2025_01_21"
+  pad_value: -2
+  gene_col: ${cellxgene.use_col}
+  adata_dir: ${cellxgene.output_root}
+  num_chunks: 10
+  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_hf_chunks"
+  vocab_output_root: ${vocab.output_root}
+  vocab_path: ${vocab.output_file}
+  num_proc: 8
+  split_parameters:
+    test_size: 0.01
+    seed: 42
+    shuffle: True
+  merged_dataset_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged"
+mds:
+  out_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS"
+  root_dir: ${huggingface.merged_dataset_root}
+  num_proc: 128
+  splits:
+    - "train"
+    - "valid"
+  columns:
+    expressions: "pkl"
+    genes: "pkl"
+    id: "int64"
+  compression: zstd
+  hashes:
+    - "sha1"
+    - "xxh64"

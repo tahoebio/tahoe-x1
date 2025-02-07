@@ -1,7 +1,7 @@
 integrations:
 - integration_type: git_repo
   git_repo: vevotx/mosaicfm
-  git_branch: dev-temp
+  git_branch: 14-jan-2025-training-dataset-update
   # git_commit:  # OR use your commit hash
   pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
@@ -16,13 +16,13 @@ command: |
 image: vevotx/ml-scgpt:shreshth
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
-name: scgpt-hero-1300m
+name: mosaicfm-70m
 
 compute:
-  gpus: 64 # Number of GPUs to use
-  cluster: r14z3
+  gpus: 16 # Number of GPUs to use
+  cluster: r15z1p1
 scheduling:
-  max_duration: 72 # Maximum duration of the run in hours
+  max_duration: 12 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster:
@@ -34,22 +34,22 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 28
-  global_train_batch_size: 1792 # Try 1792
-  device_eval_batch_size: 28
+  device_train_batch_size: 400
+  global_train_batch_size: 4800
+  device_eval_batch_size: 400
   device_train_microbatch_size: "auto"
   vocabulary:
-    remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2024-04-29_MDS/cellxgene_primary_2024-04-29_vocab.json"
+    remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
     name: vevo_scgpt
-    d_model: 2048
-    n_layers: 24
+    d_model: 512
+    n_layers: 12
     init_device: cpu
     expansion_ratio: 4
     standard_scale_outputs: False
     transformer_activation: relu
-    n_heads: 16
+    n_heads: 8
     norm_scheme: "pre"
     use_generative_training: True
     use_cell_conditioned_generation: False
@@ -58,7 +58,7 @@ parameters:
     attn_config:
       attn_impl: triton
       attn_type: "grouped_query_attention"
-      kv_nheads: 16
+      kv_nheads: 8
       attn_pdrop: 0.0
     norm_config:
       norm_type: "layernorm"
@@ -86,15 +86,15 @@ parameters:
     do_binning: True
     mlm_probability: 0.5
     mask_value: -1
-    max_length: 2048
+    max_length: 1024
     sampling: True
     data_style: "both"
     num_bins: 51
     right_binning: False
-    use_junk_tokens: True
+    use_junk_tokens: False
   train_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2024-04-29_MDS/train/"
+      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
       local: "mds-data-folder/train"
       download_timeout: 300
       allow_unsafe_types: True
@@ -108,7 +108,7 @@ parameters:
     persistent_workers: True
   valid_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2024-04-29_MDS/val/"
+      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
       local: "mds-data-folder/val"
       download_timeout: 300
       allow_unsafe_types: True
@@ -122,12 +122,12 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 1.0e-4
+    lr: 3.0e-4
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
-    weight_decay: 1.0e-06
+    weight_decay: 1.0e-05
   scheduler:
     name: cosine_with_warmup
     t_warmup: "0.05dur"
@@ -162,4 +162,3 @@ parameters:
   save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
   save_interval: "2000ba"
   autoresume: True
-  run_name: "scgpt-1_3b-2048-prod"

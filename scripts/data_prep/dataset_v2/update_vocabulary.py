@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+import json
 import logging
 import os
-import sys
 
 import scanpy as sc
 from omegaconf import DictConfig
@@ -21,6 +21,13 @@ def main(cfg: DictConfig):
     adata_reference = sc.read_h5ad(cfg.vocab.reference_adata)
     vocab_col = cfg.vocab.use_col
     id_to_gene = dict(zip(adata_reference.var[vocab_col], adata_reference.var.index))
+    id_to_gene_path = os.path.join(
+        cfg.vocab.output_root,
+        cfg.vocab.id_to_gene_output_file,
+    )
+    with open(id_to_gene_path, "w") as f:
+        json.dump(id_to_gene, f, indent=2)
+    log.info(f"Gene to ID mapping saved to {id_to_gene_path}")
     new_vocab = GeneVocab(
         gene_list_or_vocab=list(id_to_gene.keys()),
         specials=cfg.vocab.special_tokens,
@@ -52,4 +59,3 @@ if __name__ == "__main__":
     om.resolve(cfg)
 
     main(cfg)
-    log.info("Script execution completed.")

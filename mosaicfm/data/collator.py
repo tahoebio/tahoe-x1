@@ -122,8 +122,10 @@ class DataCollator(DefaultDataCollator):
         for example in examples:
             if isinstance(example["genes"], list):
                 example["genes"] = torch.as_tensor(example["genes"])
+            example["genes"] = torch.squeeze(example["genes"])
             if isinstance(example["expressions"], list):
                 example["expressions"] = torch.as_tensor(example["expressions"])
+            example["expressions"] = torch.squeeze(example["expressions"])
         if len(self.reserve_keys) > 0:
             assert all(key in examples[0] for key in self.reserve_keys), (
                 f"reserve_keys must be a subset of the keys in the examples. "

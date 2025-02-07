@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: PodTemplate
+metadata:
+  name: gpu-pod-template
+  namespace: default
+  labels:
+    cloud.google.com/apply-warden-policies: "true"
+template:
+  spec:
+    nodeSelector:
+      cloud.google.com/gke-accelerator: nvidia-h100-80gb
+    tolerations:
+      - key: "nvidia.com/gpu"
+        operator: "Exists"
+        effect: "NoSchedule"
+    containers:
+      - name: pi
+        image: perl
+        command: ["/bin/sh"]
+        resources:
+          limits:
+            cpu: "16000m"
+            nvidia.com/gpu: 8
+          requests:
+            cpu: "16000m"
+            nvidia.com/gpu: 8
+    restartPolicy: Never
+---
+apiVersion: autoscaling.x-k8s.io/v1beta1
+kind: ProvisioningRequest
+metadata:
+  name: test-req
+  namespace: default
+spec:
+  provisioningClassName: queued-provisioning.gke.io
+  parameters:
+    maxRunDurationSeconds: "600"
+  podSets:
+  - count: 1
+    podTemplateRef:
+      name: gpu-pod-template

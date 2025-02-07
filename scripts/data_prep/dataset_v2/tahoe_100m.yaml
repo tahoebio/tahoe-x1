@@ -1,0 +1,44 @@
+output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025"
+vocab:
+  reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
+  use_col: "gene_id"
+  add_junk_tokens: True
+  special_tokens: ["<pad>","<cls>","<eoc>"]
+  output_root: ${output_root}
+  output_file: "vevo_v2_vocab.json"
+huggingface:
+  ignore_dir: None
+  dataset_name: tahoe_100m
+  cls_token: "<cls>"
+  pad_value: -2
+  gene_col: "gene_id"
+  adata_dir: "/tahoe"
+  num_chunks: 30
+  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_hf_chunks"
+  merged_dataset_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged"
+  split_parameters:
+    test_size: 0.01
+    seed: 42
+    shuffle: True
+  num_proc: 8
+  obs_filter:
+    key: "pass_filter"
+    value: "full"
+  vocab_output_root: ${vocab.output_root}
+  vocab_path: ${vocab.output_file}
+
+mds:
+  out_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS"
+  root_dir: ${huggingface.merged_dataset_root}
+  num_proc: 128
+  splits:
+    - "train"
+    - "valid"
+  columns:
+    expressions: "pkl"
+    genes: "pkl"
+    id: "int64"
+  compression: zstd
+  hashes:
+    - "sha1"
+    - "xxh64"

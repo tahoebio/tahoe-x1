@@ -1,14 +1,14 @@
 integrations:
 - integration_type: git_repo
   git_repo: vevotx/mosaicfm
-  git_branch: dev-temp
+  git_branch: main
   # git_commit:  # OR use your commit hash
   pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
 
 # We are fetching, converting, and training on the 'val' split
 # as it is small and quick to get going for this demo.
-# For real training runs, follow the instructions in `llm-foundry/scripts/train/README.md`
+# For real training runs, follow the instructions in `llm-foundry/scripts/train/provisioning-request.yaml`
 # to convert and host the full 'train' dataset.
 command: |
   cd mosaicfm/scripts
@@ -20,7 +20,7 @@ name: scgpt-dev-70m
 
 compute:
   gpus: 16 # Number of GPUs to use
-  cluster: r14z3
+  cluster: r15z1p1
 scheduling:
   max_duration: 12 # Maximum duration of the run in hours
 

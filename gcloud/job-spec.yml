@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+spec:
+  template:
+    metadata:
+      annotations:
+        autoscaling.x-k8s.io/consume-provisioning-request: test-req
+        autoscaling.x-k8s.io/provisioning-class-name: "queued-provisioning.gke.io"
+    spec:
+      nodeSelector:
+        cloud.google.com/gke-accelerator: "nvidia-h100-80g"
+      containers:
+      - name: gpu-container-1
+        image: nvidia/cuda:11.0.3-runtime-ubuntu20.04
+        command: [ "/bin/bash", "-c", "--" ]
+        args: [ "while true; do sleep 600; done;" ]
+        resources:
+          limits:
+            nvidia.com/gpu: 4
+            cpu: "54"
+            memory: "54Gi"
+          requests:
+            cpu: "54"
+            memory: "54Gi"
