@@ -1,15 +1,26 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 from collections.abc import MutableSequence
-from typing import Dict, List
+from typing import Any, Dict, List
 
 import numpy as np
 import torch
 from composer.core.data_spec import DataSpec
 from datasets import Dataset
 from omegaconf import DictConfig
-from streaming import StreamingDataLoader, StreamingDataset
+from streaming import Stream, StreamingDataLoader, StreamingDataset
 
 from mosaicfm.data import DataCollator
+
+
+def build_streams(streams: dict[str, Any]) -> List[Stream]:
+    """Builds a list of streams from a dictionary.
+
+    Args:
+        streams (dict[str, Any]): A dictionary of stream configurations.
+    Returns:
+        List[Stream]: A list of StreamingDataset.Stream objects.
+    """
+    return [Stream(**stream) for stream in streams.values()]
 
 
 def build_dataloader(
@@ -17,24 +28,27 @@ def build_dataloader(
     collator_cfg: DictConfig,
     device_batch_size: int,
 ) -> DataSpec:
-    """Builds a dataloader from a config.
-
-    Args:
-        loader_cfg (DictConfig): An omegaconf dictionary used to configure the loader.
-        device_batch_size (int): The size of the batches (number of examples)
-            that the dataloader will produce.
-    """
+    """Builds a dataloader from a config."""
     dataset_cfg = loader_cfg.dataset
-    # Build Dataset
+    streams = dataset_cfg.get("streams")
+
+    if streams:
+        streams = build_streams(streams)
+        remote, local = None, None
+    else:
+        remote, local = dataset_cfg.remote, dataset_cfg.local
+
     dataset = StreamingDataset(
-        remote=dataset_cfg.remote,
-        local=dataset_cfg.local,
+        remote=remote,
+        local=local,
+        streams=streams,
         download_timeout=dataset_cfg.get("download_timeout", 300),
         allow_unsafe_types=dataset_cfg.get("allow_unsafe_types", True),
         shuffle=dataset_cfg.shuffle,
-        predownload=dataset_cfg.get("predownload", None),
-        shuffle_seed=dataset_cfg.get("shuffle_seed", None),
+        predownload=dataset_cfg.get("predownload"),
+        shuffle_seed=dataset_cfg.get("shuffle_seed"),
         num_canonical_nodes=dataset_cfg.get("num_canonical_nodes", 2),
+        cache_limit=dataset_cfg.get("cache_limit"),
     )
     if isinstance(collator_cfg.mlm_probability, MutableSequence):
         mlm_probability = list(collator_cfg.mlm_probability)
