@@ -152,7 +152,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     precision: str = pop_config(cfg, "precision", must_exist=True)
 
     # Optional parameters will be set to default values if not specified.
-    default_run_name: str = os.environ.get("RUN_NAME", "mosaicfm")
+    default_run_name: str = os.environ.get("RUN_NAME")
     run_name: str = pop_config(
         cfg,
         "run_name",
