@@ -94,8 +94,13 @@ parameters:
     use_junk_tokens: False
   train_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
-      local: "mds-data-folder/train"
+      streams:
+        tahoe:
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
+          local: "mds-data-folder/tahoe/train"
+        cellxgene:
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
+          local: "mds-data-folder/cellxgene/train"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: True
@@ -108,8 +113,13 @@ parameters:
     persistent_workers: True
   valid_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
-      local: "mds-data-folder/val"
+      streams:
+        tahoe:
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
+          local: "mds-data-folder/tahoe/val"
+        cellxgene:
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
+          local: "mds-data-folder/cellxgene/val"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: False

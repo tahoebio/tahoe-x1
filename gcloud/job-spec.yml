@@ -1,24 +1,61 @@
 apiVersion: batch/v1
 kind: Job
+metadata:
+  name: vevo-mosaicfm-single-node
+  namespace: default
 spec:
   template:
     metadata:
       annotations:
-        autoscaling.x-k8s.io/consume-provisioning-request: test-req
-        autoscaling.x-k8s.io/provisioning-class-name: "queued-provisioning.gke.io"
+        autoscaling.k8s.io/consume-provisioning-request: "provisioning-req-single-node"
+        autoscaling.k8s.io/provisioning-class-name: "queued-provisioning.gke.io"
     spec:
       nodeSelector:
-        cloud.google.com/gke-accelerator: "nvidia-h100-80g"
+        cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
-      - name: gpu-container-1
-        image: nvidia/cuda:11.0.3-runtime-ubuntu20.04
+      - name: vevo-mosaicfm
+        image: us-central1-docker.pkg.dev/vevo-ml/default-registry/vevo-scgpt:shreshth
         command: [ "/bin/bash", "-c", "--" ]
-        args: [ "while true; do sleep 600; done;" ]
+        args:
+          - |
+            set -e;
+            mkdir -p /src;
+            cd /src;
+            git clone -b 32-train-13b-model-with-full-dataset https://oauth2:${GITHUB_TOKEN}@github.com/vevotx/mosaicfm.git;
+            cd mosaicfm/gcloud;
+            ./launch_run.sh
         resources:
           limits:
-            nvidia.com/gpu: 4
+            nvidia.com/gpu: 8
             cpu: "54"
             memory: "54Gi"
           requests:
             cpu: "54"
             memory: "54Gi"
+        env:
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: AWS_ACCESS_KEY_ID
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: AWS_SECRET_ACCESS_KEY
+        - name: AWS_DEFAULT_REGION
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: AWS_DEFAULT_REGION
+        - name: WANDB_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: wandb-secret
+              key: WANDB_API_KEY
+        - name: GITHUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: github-token
+              key: GITHUB_TOKEN
+      restartPolicy: Never
