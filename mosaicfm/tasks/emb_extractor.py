@@ -69,6 +69,8 @@ def get_batch_embeddings(
         pad_value=collator_cfg.pad_value,
         do_mlm=False,  # Disable masking for inference
         do_binning=collator_cfg.get("do_binning", True),
+        log_transform=collator_cfg.get("log_transform", False),
+        target_sum=collator_cfg.get("target_sum"),
         mlm_probability=collator_cfg.mlm_probability,  # Not used
         mask_value=collator_cfg.mask_value,
         max_length=max_length,

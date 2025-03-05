@@ -18,6 +18,8 @@ class DataCollator(DefaultDataCollator):
             values to the max length.
         do_mlm (:obj:`bool`): whether to do masking with MLM.
         do_binning (:obj:`bool`): whether to bin the expression values.
+        log_transform (:obj:`bool`): whether to transform the gene expression values.
+        target_sum (:obj:`int`): The target sum of the normalized counts before log1p transformation.
         mlm_probability (:obj:`float`): the probability of masking with MLM.
         mask_value (:obj:`int`): the value to fill at the expression postions
             that are masked.
@@ -48,6 +50,8 @@ class DataCollator(DefaultDataCollator):
         pad_value: int = 0,
         do_mlm: bool = True,
         do_binning: bool = True,
+        log_transform: bool = False,
+        target_sum: int = 10000,
         mlm_probability: float = 0.15,
         mask_value: int = -1,
         max_length: Optional[int] = None,
@@ -65,6 +69,8 @@ class DataCollator(DefaultDataCollator):
         self.pad_value = pad_value
         self.do_mlm = do_mlm
         self.do_binning = do_binning
+        self.log_transform = log_transform
+        self.target_sum = target_sum
         self.mlm_probability = mlm_probability
         self.mask_value = mask_value
         self.max_length = max_length
@@ -81,7 +87,10 @@ class DataCollator(DefaultDataCollator):
                 raise ValueError("`pad_token_id` is required if `do_padding`.")
             if self.max_length is None:
                 raise ValueError("`max_length` is required if `do_padding`.")
-
+        if self.do_binning and self.log_transform:
+            raise ValueError(
+                "Only one of `do_binning` and `log_transform` can be True.",
+            )
         if isinstance(self.mlm_probability, float):
             if self.mlm_probability <= 0 or self.mlm_probability >= 1:
                 raise ValueError("`mlm_probability` must be between 0 and 1.")
@@ -183,6 +192,14 @@ class DataCollator(DefaultDataCollator):
                     n_bins=self.num_bins,
                     right=self.right_binning,
                 )
+            elif self.log_transform:
+                assert not (
+                    self.do_binning
+                ), "Only one of `do_binning` and `log_transform` can be True."
+                expressions[self.keep_first_n_tokens :] = log_transform(
+                    row=expressions[self.keep_first_n_tokens :],
+                    target_sum=self.target_sum,
+                )
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes,
                 expressions,
@@ -255,6 +272,14 @@ class DataCollator(DefaultDataCollator):
                     row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.num_bins,
                     right=self.right_binning,
+                )
+            elif self.log_transform:
+                assert not (
+                    self.do_binning
+                ), "Only one of `do_binning` and `log_transform` can be True."
+                expressions[self.keep_first_n_tokens :] = log_transform(
+                    row=expressions[self.keep_first_n_tokens :],
+                    target_sum=self.target_sum,
                 )
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes,
@@ -347,6 +372,14 @@ class DataCollator(DefaultDataCollator):
                     row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.num_bins,
                     right=self.right_binning,
+                )
+            elif self.log_transform:
+                assert not (
+                    self.do_binning
+                ), "Only one of `do_binning` and `log_transform` can be True."
+                expressions[self.keep_first_n_tokens :] = log_transform(
+                    row=expressions[self.keep_first_n_tokens :],
+                    target_sum=self.target_sum,
                 )
 
             (
@@ -569,6 +602,36 @@ class DataCollator(DefaultDataCollator):
             )
             for i, array in enumerate(arrays)
         )
+
+
+@torch.no_grad()
+def log_transform(
+    row: Union[np.ndarray, torch.Tensor],
+    target_sum: int,
+    eps: float = 1e-9,
+) -> Union[np.ndarray, torch.Tensor]:
+    """Log transform the row.
+
+    Args:
+        row (Union[np.ndarray, torch.Tensor]):
+            The row to be log-1p-transformed.
+        target_sum (int, optional):
+            The target sum of the normalized row before log-1p transformation. Default to 10000.
+        eps (float, optional):
+            The epsilon value used for normalization.
+    Returns:
+        Union[np.ndarray, torch.Tensor]:
+            The log-1p-transformed row.
+    """
+    dtype = row.dtype
+    is_tensor = isinstance(row, torch.Tensor)
+    if not is_tensor:
+        row = torch.as_tensor(row)
+    row = (row / (row.sum(axis=-1, keepdims=True) + eps)) * target_sum
+    row = torch.log1p(row)
+    if not is_tensor:
+        return row.numpy().astype(dtype)
+    return row
 
 
 @torch.no_grad()

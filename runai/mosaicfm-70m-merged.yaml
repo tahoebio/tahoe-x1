@@ -49,7 +49,7 @@ collator:
   do_padding: True
   pad_value: -2
   do_mlm: True
-  do_binning: True
+  do_binning: True #set do_binning=False and log_transform=True and provide target_sum if you want to train with log1p inputs.
   mlm_probability: 0.5
   mask_value: -1
   max_length: 1024

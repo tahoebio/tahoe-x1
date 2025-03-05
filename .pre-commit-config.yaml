@@ -83,7 +83,7 @@ repos:
 #    args: [--warnings]
 #    additional_dependencies: ["pyright@1.1.256"]
 - repo: https://github.com/trufflesecurity/trufflehog.git
-  rev: v3.88.2
+  rev: v3.88.11
   hooks:
   - id: trufflehog
     name: secret scan
