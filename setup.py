@@ -27,25 +27,19 @@ repo_version = expr.findall(content)[0]
 install_requires = [
     "torchtext>=0.17.1",
     "awscli>=1.32",
-    "llm-foundry==0.6.0",
-    "transformers>=4.38.2,<4.39",
-    "mosaicml-streaming>=0.7.4,<0.8",
-    "datasets>=2.16,<2.17",
+    "llm-foundry[all-flash2]>=0.17.0",
 ]
 
 extra_deps = {}
 
 extra_deps["dev"] = [
     "pre-commit>=3.4.0,<4",
-    "wandb",
     "toml>=0.10.2,<0.11",
     "ipykernel",
     "packaging>=21,<23",
 ]
 
 extra_deps["gpu"] = [
-    "triton-pre-mlir@git+https://github.com/vchiley/triton.git@triton_pre_mlir_sm90#subdirectory=python",
-    "flash-attn>=2.5.6,<3",
     "transformer-engine@git+https://github.com/NVIDIA/TransformerEngine.git@stable",
 ]
 

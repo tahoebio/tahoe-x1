@@ -3,19 +3,20 @@ from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple, Union
 
 import torch
-from llmfoundry.models.layers.attention import ATTN_CLASS_REGISTRY
+from llmfoundry.layers_registry import attention_classes, norms
 from llmfoundry.models.layers.ffn import (
     resolve_ffn_act_fn,
     resolve_ffn_hidden_size,
 )
-from llmfoundry.models.layers.norm import NORM_CLASS_REGISTRY
+from llmfoundry.models.mpt.modeling_mpt import gen_flash_attn_padding_info
 from torch import Tensor, nn
 from torch.nn.modules.transformer import _get_clones
 
 attn_config_defaults: Dict = {
     "attn_type": "grouped_query_attention",
     "attn_pdrop": 0.0,
-    "attn_impl": "triton",
+    "attn_impl": "torch",
+    "use_attn_mask": True,
     "qk_ln": False,
     "qk_gn": False,
     "clip_qkv": None,
@@ -91,7 +92,7 @@ class SCGPTBlock(nn.Module):
         del kwargs  # unused, just to capture any extra args from the config
         super().__init__()
         factory_kwargs = {"device": device, "dtype": dtype}
-        attn_class = ATTN_CLASS_REGISTRY[attn_config["attn_type"]]
+        attn_class = attention_classes.get(attn_config["attn_type"])
         self.d_model = d_model
         self.n_heads = n_heads
         self.device = device
@@ -111,7 +112,7 @@ class SCGPTBlock(nn.Module):
             self.gate_proj = nn.Linear(d_model, dim_feedforward, **factory_kwargs)
 
         # Norms
-        norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
+        norm_class = norms.get(norm_config["norm_type"].lower())
         self.norm1 = norm_class(
             d_model,
             device=device,
@@ -138,6 +139,7 @@ class SCGPTBlock(nn.Module):
         self,
         x: Tensor,
         attn_bias: Optional[Tensor] = None,
+        flash_attn_padding_info: Optional[Tensor] = None,
     ) -> Tensor:
         r"""Pass the input through the encoder layer.
 
@@ -151,15 +153,35 @@ class SCGPTBlock(nn.Module):
         """
 
         if self.norm_scheme == "pre":
-            x = x + self._sa_block(self.norm1(x), attn_bias=attn_bias)
+            x = x + self._sa_block(
+                self.norm1(x),
+                attn_bias=attn_bias,
+                flash_attn_padding_info=flash_attn_padding_info,
+            )
             x = x + self._ff_block(self.norm2(x))
         else:
-            x = self.norm1(x + self._sa_block(x, attn_bias=attn_bias))
+            x = self.norm1(
+                x
+                + self._sa_block(
+                    x,
+                    attn_bias=attn_bias,
+                    flash_attn_padding_info=flash_attn_padding_info,
+                ),
+            )
             x = self.norm2(x + self._ff_block(x))
         return x
 
-    def _sa_block(self, x: Tensor, attn_bias: Optional[Tensor] = None) -> Tensor:
-        x, _, _ = self.self_attn(x, attn_bias=attn_bias, is_causal=False)
+    def _sa_block(
+        self,
+        x: Tensor,
+        attn_bias: Optional[Tensor] = None,
+        flash_attn_padding_info: Optional[Tensor] = None,
+    ) -> Tensor:
+        x, _, _ = self.self_attn(
+            x,
+            attn_bias=attn_bias,
+            flash_attn_padding_info=flash_attn_padding_info,
+        )
         return self.post_sa_dropout(x)
 
     def _ff_block(self, x: Tensor) -> Tensor:
@@ -196,15 +218,20 @@ class SCGPTEncoder(nn.Module):
         num_layers: int,
         use_norm: bool = False,
         norm_config: Optional[Dict] = None,
+        attn_config: Optional[Dict] = None,
     ):
         super().__init__()
         self.layers = _get_clones(encoder_layer, num_layers)
         self.num_layers = num_layers
         self.use_norm = use_norm
+
+        if attn_config is None:
+            attn_config = attn_config_defaults
+        self.use_attn_mask = attn_config.get("use_attn_mask", True)
         if self.use_norm:
             if norm_config is None:
                 norm_config = norm_config_defaults
-            norm_class = NORM_CLASS_REGISTRY[norm_config["norm_type"].lower()]
+            norm_class = norms.get(norm_config["norm_type"].lower())
             self.norm = norm_class(
                 encoder_layer.d_model,
                 device=encoder_layer.device,
@@ -247,29 +274,44 @@ class SCGPTEncoder(nn.Module):
         p_len = pcpt_total_embs.shape[1]
         total_len = total_embs.shape[1]
         g_len = total_len - p_len
-        attention_mask = self._make_mask(p_len, g_len, total_embs.device)
-        attn_bias = torch.zeros_like(
-            attention_mask,
-            dtype=total_embs.dtype,
-            device=attention_mask.device,
-            requires_grad=False,
-        ).masked_fill(
-            ~attention_mask,
-            torch.finfo(total_embs.dtype).min,
-        )  # Matrix with -inf at the place of masked values and 0 elsewhere
-        attn_bias = attn_bias.unsqueeze(0).unsqueeze(
-            1,
-        )  # Broadcastable to (B,H, S_Q, S_K) dimensions
-
-        if key_padding_mask is not None:  # NOTE: handle when key_padding_mask is None
-            # Merge the key_padding_mask into attn_bias
-            b_size, s_k = key_padding_mask.shape[:2]
-            attn_bias = attn_bias.masked_fill(
-                ~key_padding_mask.view((b_size, 1, 1, s_k)),
+        flash_attn_padding_info = gen_flash_attn_padding_info(
+            bsz=total_embs.shape[0],
+            S=total_len,
+            past_key_len=0,
+            attention_mask=key_padding_mask,
+            device=total_embs.device,
+        )
+        attn_bias = None
+        if self.use_attn_mask:
+            attention_mask = self._make_mask(p_len, g_len, total_embs.device)
+            attn_bias = torch.zeros_like(
+                attention_mask,
+                dtype=total_embs.dtype,
+                device=attention_mask.device,
+                requires_grad=False,
+            ).masked_fill(
+                ~attention_mask,
                 torch.finfo(total_embs.dtype).min,
-            )
+            )  # Matrix with -inf at the place of masked values and 0 elsewhere
+            attn_bias = attn_bias.unsqueeze(0).unsqueeze(
+                1,
+            )  # Broadcastable to (B,H, S_Q, S_K) dimensions
+
+            if (
+                key_padding_mask is not None
+            ):  # NOTE: handle when key_padding_mask is None
+                # Merge the key_padding_mask into attn_bias
+                b_size, s_k = key_padding_mask.shape[:2]
+                attn_bias = attn_bias.masked_fill(
+                    ~key_padding_mask.view((b_size, 1, 1, s_k)),
+                    torch.finfo(total_embs.dtype).min,
+                )
         for mod in self.layers:
-            total_embs = mod(total_embs, attn_bias=attn_bias)
+            total_embs = mod(
+                total_embs,
+                attn_bias=attn_bias,
+                flash_attn_padding_info=flash_attn_padding_info,
+            )
 
         if self.use_norm:
             total_embs = self.norm(total_embs)

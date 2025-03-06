@@ -49,6 +49,7 @@ def build_dataloader(
         shuffle_seed=dataset_cfg.get("shuffle_seed"),
         num_canonical_nodes=dataset_cfg.get("num_canonical_nodes", 2),
         cache_limit=dataset_cfg.get("cache_limit"),
+        batch_size=device_batch_size,
     )
     if isinstance(collator_cfg.mlm_probability, MutableSequence):
         mlm_probability = list(collator_cfg.mlm_probability)
