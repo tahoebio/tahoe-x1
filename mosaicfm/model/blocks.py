@@ -181,6 +181,7 @@ class SCGPTBlock(nn.Module):
             x,
             attn_bias=attn_bias,
             flash_attn_padding_info=flash_attn_padding_info,
+            is_causal=False,
         )
         return self.post_sa_dropout(x)
 
