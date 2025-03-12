@@ -64,7 +64,9 @@ def get_batch_embeddings(
         pad_value=collator_cfg["pad_value"],
     )
     collate_fn = DataCollator(
+        vocab=vocab,
         do_padding=collator_cfg.get("do_padding", True),
+        unexp_padding=False,  # Disable padding with random unexpressed genes for inference
         pad_token_id=collator_cfg.pad_token_id,
         pad_value=collator_cfg.pad_value,
         do_mlm=False,  # Disable masking for inference

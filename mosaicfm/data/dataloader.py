@@ -10,6 +10,7 @@ from omegaconf import DictConfig
 from streaming import Stream, StreamingDataLoader, StreamingDataset
 
 from mosaicfm.data import DataCollator
+from mosaicfm.tokenizer import GeneVocab
 
 
 def build_streams(streams: dict[str, Any]) -> List[Stream]:
@@ -24,6 +25,7 @@ def build_streams(streams: dict[str, Any]) -> List[Stream]:
 
 
 def build_dataloader(
+    vocab: GeneVocab,
     loader_cfg: DictConfig,
     collator_cfg: DictConfig,
     device_batch_size: int,
@@ -55,8 +57,11 @@ def build_dataloader(
         mlm_probability = list(collator_cfg.mlm_probability)
     else:
         mlm_probability = collator_cfg.mlm_probability
+
     collate_fn = DataCollator(
+        vocab=vocab,
         do_padding=collator_cfg.get("do_padding", True),
+        unexp_padding=loader_cfg.get("unexp_padding", False),
         pad_token_id=collator_cfg.pad_token_id,
         pad_value=collator_cfg.pad_value,
         do_mlm=collator_cfg.get("do_mlm", True),

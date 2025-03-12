@@ -5,13 +5,17 @@ import numpy as np
 import torch
 from transformers import DefaultDataCollator
 
+from mosaicfm.tokenizer import GeneVocab
+
 
 class DataCollator(DefaultDataCollator):
     """Data collator for the mask value learning task. It pads the sequences to
     the maximum length in the batch and masks the gene expression values.
 
     Args:
+        vocab (:obj: GeneVocab): The vocabulary that includes the gene ids, name, special tokens, etc.
         do_padding (:obj:`bool`): whether to pad the sequences to the max length.
+        unexp_padding (:obj:`bool`): whether to pad the sequences with unexpressed genes. If False it pads with pad token.
         pad_token_id (:obj:`int`, optional): the token id to use for padding.
             This is required if do_padding is True.
         pad_value (:obj:`int`): the value to use for padding the expression
@@ -45,7 +49,9 @@ class DataCollator(DefaultDataCollator):
 
     def __init__(
         self,
+        vocab: GeneVocab,
         do_padding: bool = True,
+        unexp_padding: bool = False,
         pad_token_id: Optional[int] = None,
         pad_value: int = 0,
         do_mlm: bool = True,
@@ -65,6 +71,7 @@ class DataCollator(DefaultDataCollator):
     ):
         super().__init__(return_tensors=return_tensors)
         self.do_padding = do_padding
+        self.unexp_padding = unexp_padding
         self.pad_token_id = pad_token_id
         self.pad_value = pad_value
         self.do_mlm = do_mlm
@@ -81,6 +88,16 @@ class DataCollator(DefaultDataCollator):
         self.num_bins = num_bins
         self.right_binning = right_binning
 
+        # filter non_special gene_ids
+        gene_to_id = vocab.get_stoi()
+        self.non_special_gene_ids = torch.tensor(
+            [
+                gene_id
+                for gene_name, gene_id in gene_to_id.items()
+                if not gene_name.startswith("<")
+            ],
+        )
+
     def __post_init__(self):
         if self.do_padding:
             if self.pad_token_id is None:
@@ -91,6 +108,8 @@ class DataCollator(DefaultDataCollator):
             raise ValueError(
                 "Only one of `do_binning` and `log_transform` can be True.",
             )
+        if self.unexp_padding and not self.do_padding:
+            raise ValueError("`do_padding` should be be True if `unexp_padding`.")
         if isinstance(self.mlm_probability, float):
             if self.mlm_probability <= 0 or self.mlm_probability >= 1:
                 raise ValueError("`mlm_probability` must be between 0 and 1.")
@@ -551,7 +570,10 @@ class DataCollator(DefaultDataCollator):
                 return self._sample(*arrays, max_length=max_length)
             else:
                 return tuple(array[:max_length] for array in arrays)
-        else:  # pad
+        # We either pad by pad_token or pad by unexpressed genes
+        elif self.unexp_padding:
+            return self._pad_unexp_genes(*arrays, max_length=max_length)
+        else:  # pad with pad token
             return self._pad(*arrays, max_length=max_length)
 
     def _sample(
@@ -597,6 +619,41 @@ class DataCollator(DefaultDataCollator):
                         self.pad_token_id if i == 0 else self.pad_value,
                         dtype=array.dtype,
                         device=device,
+                    ),
+                ],
+            )
+            for i, array in enumerate(arrays)
+        )
+
+    def _pad_unexp_genes(
+        self,
+        *arrays: torch.Tensor,  # First tensor is genes, rest are  expressions respectively processed expressions, raw expressions (optional)
+        max_length: int,
+    ):
+        device = arrays[0].device
+
+        num_to_pad = max_length - len(arrays[0])
+
+        # get list of all valid gene ids
+        non_special_gene_ids = self.non_special_gene_ids.to(device)
+
+        # filter out the expressed gene ids
+        mask = ~torch.isin(non_special_gene_ids, arrays[0])
+        unexp_genes = non_special_gene_ids[mask]
+
+        # randomly sample from unexpressed gene ids
+        idx = torch.randperm(unexp_genes.shape[0])[:num_to_pad]
+        random_unexp_genes = unexp_genes[idx]
+
+        # Pad the first tensor(gene_ids) with random unexpressed gene ids and the rest (expressions) with zeros.
+        return tuple(
+            torch.cat(
+                [
+                    array,
+                    (
+                        random_unexp_genes
+                        if i == 0
+                        else torch.zeros(num_to_pad, dtype=array.dtype, device=device)
                     ),
                 ],
             )
