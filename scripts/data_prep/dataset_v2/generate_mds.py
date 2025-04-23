@@ -5,7 +5,7 @@ import shutil
 import sys
 from multiprocessing import Pool
 from pathlib import Path
-from typing import Iterable, Tuple
+from typing import Iterable, Optional, Tuple
 
 import datasets
 from omegaconf import DictConfig, OmegaConf
@@ -45,6 +45,7 @@ def process_data(
     compression: str,
     hashes: Tuple[str],
     num_proc: int,
+    min_length: Optional[int],
 ):
     check_and_create_dir(out_root)
 
@@ -53,7 +54,14 @@ def process_data(
         log.warning(f"No files found in {dataset_path}. Exiting processing.")
         return
 
-    arg_tuples = each_task(out_root, dataset_path, columns, compression, hashes)
+    arg_tuples = each_task(
+        out_root,
+        dataset_path,
+        columns,
+        compression,
+        hashes,
+        min_length,
+    )
 
     with Pool(initializer=init_worker, processes=num_proc) as pool:
         pool.imap_unordered(convert_to_mds, arg_tuples)
@@ -70,16 +78,17 @@ def each_task(
     columns: dict,
     compression: str,
     hashes: Tuple[str],
-) -> Iterable[Tuple[str, str, dict, str, Tuple[str]]]:
+    min_length: Optional[int],
+) -> Iterable[Tuple[str, str, dict, str, Tuple[str], Optional[int]]]:
     for dataset_path in get_files(dataset_root_path):
         arrow_path = dataset_path.split(dataset_root_path)[1]
         chunk_suffix = arrow_path.split("-")[1]
         sub_out_root = f"{out_root}/chunk_{chunk_suffix}"
-        yield sub_out_root, dataset_path, columns, compression, hashes
+        yield sub_out_root, dataset_path, columns, compression, hashes, min_length
 
 
-def convert_to_mds(args: Tuple[str, str, dict, str, Tuple[str]]) -> None:
-    sub_out_root, dataset_path, columns, compression, hashes = args
+def convert_to_mds(args: Tuple[str, str, dict, str, Tuple[str], Optional[int]]) -> None:
+    sub_out_root, dataset_path, columns, compression, hashes, min_length = args
     check_and_create_dir(sub_out_root)
     dataset = datasets.Dataset.from_file(dataset_path)
     dataset = dataset.with_format("torch")
@@ -89,8 +98,9 @@ def convert_to_mds(args: Tuple[str, str, dict, str, Tuple[str]]) -> None:
         compression=compression,
         hashes=hashes,
     ) as out:
-        for sample in dataset.iter(1):
-            out.write(sample)
+        for sample in dataset:
+            if min_length is None or len(sample["genes"]) >= min_length:
+                out.write(sample)
 
 
 def main(cfg: DictConfig):
@@ -104,6 +114,7 @@ def main(cfg: DictConfig):
     compression = cfg.compression
     hashes = tuple(cfg.hashes)
     num_proc = cfg.get("num_proc", 1)  # Default to 1 if not specified
+    min_length: Optional[int] = cfg.get("min_length", None)
 
     # Process each split (train, val, test, etc.)
     for split in splits:
@@ -117,6 +128,7 @@ def main(cfg: DictConfig):
             compression,
             hashes,
             num_proc,
+            min_length,
         )
         log.info(f"Finished writing MDS files for {split.capitalize()}.")
 
@@ -132,7 +144,6 @@ if __name__ == "__main__":
     yaml_path = sys.argv[1]
     OmegaConf.clear_resolver("oc.env")
     log.info(f"Loading configuration from {yaml_path}...")
-    # Load the YAML configuration file
     with open(yaml_path) as f:
         cfg = OmegaConf.load(f)
     OmegaConf.resolve(cfg)

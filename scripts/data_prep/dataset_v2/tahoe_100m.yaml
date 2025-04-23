@@ -13,22 +13,47 @@ huggingface:
   pad_value: -2
   gene_col: "gene_id"
   adata_dir: "/tahoe"
-  num_chunks: 30
-  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_hf_chunks"
-  merged_dataset_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged"
+  num_chunks: 10
+  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_hf_chunks_w_metadata"
+  merged_dataset_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_w_metadata"
   split_parameters:
     test_size: 0.01
     seed: 42
     shuffle: True
-  num_proc: 8
+  num_proc: 128
   obs_filter:
     key: "pass_filter"
     value: "full"
+  obs_metadata_columns:
+    - drug
+    - sample
+  additional_metadata_info:
+    - merge_keys:
+        metadata_key: "Cell_ID_Vevo"
+        adata_key: "cell_line"
+      columns:
+        - "Cell_ID_Cellosaur"
+      path: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cell_gen_dr_a97.csv"
+    - merge_keys:
+        metadata_key: "drug"
+        adata_key: "drug"
+      columns:
+        - "moa-fine"
+        - "canonical_smiles"
+        - "pubchem_cid"
+        - "targets"
+      path: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_drug_smiles.csv"
+    - merge_keys:
+        metadata_key: sample
+        adata_key: sample
+      columns:
+        - "plate"
+      path: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/arc-virtual-cell-metadata/sample_metadata.csv"
   vocab_output_root: ${vocab.output_root}
   vocab_path: ${vocab.output_file}
 
 mds:
-  out_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS"
+  out_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS_v2"
   root_dir: ${huggingface.merged_dataset_root}
   num_proc: 128
   splits:
@@ -38,6 +63,10 @@ mds:
     expressions: "pkl"
     genes: "pkl"
     id: "int64"
+    drug: "str"
+    Cell_ID_Cellosaur: "str"
+    canonical_smiles: "str"
+    pubchem_cid: "str"
   compression: zstd
   hashes:
     - "sha1"

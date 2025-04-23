@@ -1,0 +1,60 @@
+output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025"
+vocab:
+  reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
+  use_col: "gene_id"
+  add_junk_tokens: True
+  special_tokens: ["<pad>","<cls>","<eoc>"]
+  output_root: ${output_root}
+  output_file: "vevo_v2_vocab.json"
+huggingface:
+  ignore_dir: None
+  dataset_name: scbasecamp
+  add_cls_token: True
+  cls_token: "<cls>"
+  pad_value: -2
+  gene_col: "index" # The adata.var.index is the gene_id
+  adata_dir: "/vevo/mosaicfm/datasets/scbasecamp/h5ad"
+  num_chunks: 10
+  filter_cells:
+    min_genes: 10
+    min_counts: 20
+  output_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/scbasecamp_hf_chunks"
+  merged_dataset_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/scbasecamp_merged"
+  split_parameters:
+    test_size: 0.01
+    seed: 42
+    shuffle: False
+  num_proc: 32
+  obs_metadata_columns:
+    - SRX_accession
+  add_obs_index: False
+  additional_metadata_info:
+    - merge_keys:
+        metadata_key: "srx_accession"
+        adata_key: "SRX_accession"
+      columns:
+        - "tissue"
+        - "disease"
+        - "perturbation"
+        - "cell_line"
+      path: "/vevo/mosaicfm/datasets/scbasecamp/metadata/sample_metadata.csv"
+  vocab_output_root: ${vocab.output_root}
+  vocab_path: ${vocab.output_file}
+
+mds:
+  out_root: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/scbasecamp_merged_MDS"
+  root_dir: ${huggingface.merged_dataset_root}
+  num_proc: 128
+  splits:
+    - "train"
+    - "valid"
+  columns:
+    expressions: "pkl"
+    SRX_accession: "str"
+    genes: "pkl"
+    id: "int64"
+  compression: zstd
+  min_length: 10
+  hashes:
+    - "sha1"
+    - "xxh64"
