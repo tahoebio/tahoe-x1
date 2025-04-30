@@ -155,10 +155,7 @@ scripts/modality_pred/data
 figures/
 .micromamba/
 scripts/perturbation/debug/
-runai/config_perts/
-runai/different_loss_configs/
-runai/swa_configs/
-runai/padding_configs/
+runai/*/
 vocab.json
 debug_notebooks/
 ckpt/

@@ -97,6 +97,7 @@ class DataCollator(DefaultDataCollator):
                 if not gene_name.startswith("<")
             ],
         )
+        self.vocab = vocab
 
     def __post_init__(self):
         if self.do_padding:

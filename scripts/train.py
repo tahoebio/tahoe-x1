@@ -10,6 +10,12 @@ from typing import Any, Dict, List, Optional, Union
 import composer
 import torch
 from composer.core.callback import Callback
+from llmfoundry.registry import callbacks
+
+from mosaicfm.tasks import MarginalEssentiality
+
+callbacks.register("marginal-essentiality", func=MarginalEssentiality)
+
 from composer.utils import dist, get_device, reproducibility
 from llmfoundry.utils.builders import (
     build_algorithm,
@@ -159,6 +165,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         default_value=None,
     )
     precision: str = pop_config(cfg, "precision", must_exist=True)
+    model_config["precision"] = precision
 
     # Optional parameters will be set to default values if not specified.
     default_run_name: str = os.environ.get("RUN_NAME")
@@ -395,16 +402,6 @@ def main(cfg: DictConfig) -> composer.Trainer:
         else []
     )
 
-    # Callbacks
-    callbacks: List[Callback] = (
-        [
-            build_callback(str(name), callback_cfg, om.to_container(logged_cfg))
-            for name, callback_cfg in callback_configs.items()
-        ]
-        if callback_configs
-        else []
-    )
-
     # Algorithms
     algorithms = (
         [
@@ -413,6 +410,16 @@ def main(cfg: DictConfig) -> composer.Trainer:
         ]
         if algorithm_configs
         else None
+    )
+
+    # Callbacks
+    callbacks: List[Callback] = (
+        [
+            build_callback(str(name), callback_cfg, om.to_container(logged_cfg))
+            for name, callback_cfg in callback_configs.items()
+        ]
+        if callback_configs
+        else []
     )
 
     # Build DataLoaders

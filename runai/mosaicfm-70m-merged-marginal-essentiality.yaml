@@ -1,0 +1,159 @@
+global_seed: 777
+seed: ${global_seed}
+device_train_batch_size: 400
+global_train_batch_size: 400
+device_eval_batch_size: 400
+device_train_microbatch_size: "auto"
+vocabulary:
+  remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+  local: "vocab.json"
+model:
+  name: vevo_scgpt
+  d_model: 512
+  n_layers: 12
+  init_device: cpu
+  expansion_ratio: 4
+  standard_scale_outputs: False
+  transformer_activation: relu
+  n_heads: 8
+  norm_scheme: "pre"
+  use_generative_training: True
+  use_cell_conditioned_generation: False
+  use_glu: False
+  cell_emb_style: cls
+  attn_config:
+    attn_impl: flash
+    attn_type: "grouped_query_attention"
+    kv_nheads: 8
+    attn_pdrop: 0.0
+    use_attn_mask: False
+  norm_config:
+    norm_type: "layernorm"
+    eps: 1.0e-5
+  expression_encoder:
+    input_emb_style: "continuous"
+    dropout: 0.1
+    max_value: 512
+    activation: relu
+    use_norm: True
+  gene_encoder:
+    use_norm: True
+  mvc:
+    arch_style: "inner product"
+    query_activation: "sigmoid"
+    scaled_dot_product: True
+  expression_decoder:
+    n_outputs: 1
+    n_layers: 1
+    activation: "leaky_relu"
+collator:
+  do_padding: True
+  pad_value: -2
+  do_mlm: True
+  do_binning: True #set do_binning=False and log_transform=True and provide target_sum if you want to train with log1p inputs.
+  mlm_probability: 0.5
+  mask_value: -1
+  max_length: 1024
+  sampling: True
+  data_style: "both"
+  num_bins: 51
+  right_binning: False
+  use_junk_tokens: False
+train_loader:
+  dataset:
+    streams:
+      tahoe:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
+        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/train"
+      cellxgene:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
+        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/train"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: True
+    shuffle_seed: ${global_seed}
+    num_canonical_nodes: 2
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+valid_loader:
+  dataset:
+    streams:
+      tahoe:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
+        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/valid"
+      cellxgene:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
+        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/valid"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: False
+    shuffle_seed: ${global_seed}
+    num_canonical_nodes: 2
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+optimizer:
+  name: decoupled_adamw
+  lr: 3.0e-4
+  betas:
+    - 0.9
+    - 0.95
+  eps: 1.0e-08
+  weight_decay: 1.0e-05
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: "0.05dur"
+  t_max: "1dur"
+  alpha_f: 0.1
+algorithms:
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+  low_precision_layernorm: {}
+precision: amp_bf16
+eval_interval: "1000ba"
+eval_subset_num_batches: 100
+max_duration: "10ba"
+fsdp_config:
+  sharding_strategy: FULL_SHARD
+  mixed_precision: DEFAULT
+  activation_checkpointing: false
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+  verbose: true
+callbacks:
+  speed_monitor:
+    window_size: 20
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+  marginal-essentiality:
+    cfg:
+      batch_size: 32
+      seq_len: 8192
+      adata:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/ccle.h5ad"
+        local: "/vevo/data/download/marginal-essentiality/ccle.h5ad"
+        gene_column: "feature_id"
+      labels:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/labels.csv"
+        local: "/vevo/data/download/marginal-essentiality/labels.csv"
+        gene_column: "gene_id"
+        label_column: "essential"
+      classifier:
+        n_jobs: 32
+        test_size: 0.2
+        random_state: 42
+loggers:
+  wandb:
+    project: vevo-scgpt
+    log_artifacts: False
+save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_interval: "2000ba"
+save_num_checkpoints_to_keep: 0

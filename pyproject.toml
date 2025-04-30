@@ -3,13 +3,13 @@
 requires = ["setuptools < 68.0.0"]
 build-backend = "setuptools.build_meta"
 
-# iSort
 [tool.isort]
-multi_line_output = 0
-line_length = 80
-skip = [ "env", "wandb", "runs", "build", "node_modules" ]
-include_trailing_comma = true
-split_on_trailing_comma = true
+profile = "black"
+skip = ["env", "wandb", "runs", "build", "node_modules"]
+
+[tool.black]
+line-length = 88
+
 
 [tool.ruff.lint]
 select = [
@@ -30,7 +30,8 @@ ignore=["PLR0913", # Too many arguments in function
     "PERF401", # Enforces list comprehensions over for-loops
     "E501", # Line too long
     "E402", # Module level import not at top of file
-
+    "LOG015", # Log.info on root logger
+    "SIM401", # Use .get method for dictionary like
     ]
 [tool.ruff]
 exclude = [

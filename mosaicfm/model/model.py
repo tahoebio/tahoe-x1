@@ -403,6 +403,7 @@ class ComposerSCGPTModel(ComposerModel):
         }
         self.standard_scale_outputs = model_config.get("standard_scale_outputs", False)
         self.collator_config = collator_config
+        self.model_config = model_config
 
         self.val_metrics = {
             "MSE": MaskedMseMetric(name="MSE"),

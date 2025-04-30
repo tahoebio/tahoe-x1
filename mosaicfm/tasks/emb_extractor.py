@@ -141,6 +141,7 @@ def get_batch_embeddings(
                 valid = flat_gene_ids != collator_cfg["pad_token_id"]
                 flat_gene_ids = flat_gene_ids[valid]
                 flat_embeddings = flat_embeddings[valid]
+                flat_embeddings = flat_embeddings.to(gene_embeddings.dtype)
 
                 gene_embeddings.index_add_(0, flat_gene_ids, flat_embeddings)
                 gene_embedding_counts.index_add_(
