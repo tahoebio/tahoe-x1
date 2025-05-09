@@ -118,7 +118,7 @@ def get_batch_embeddings(
         "bf16": torch.bfloat16,
     }
 
-    with torch.no_grad(), torch.cuda.amp.autocast(
+    with torch.no_grad(), torch.amp.autocast(
         enabled=True,
         dtype=dtype_from_string[model_cfg["precision"]],
     ):

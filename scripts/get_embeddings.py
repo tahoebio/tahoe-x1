@@ -52,7 +52,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     model.eval()
     log.info(f"Model loaded from {model_file}")
     # First create context free embeddings as the "default" per gene
-    with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
+    with torch.no_grad(), torch.amp.autocast(enabled=True, dtype=torch.bfloat16):
         gene2idx = vocab.get_stoi()
         all_gene_ids = np.array([list(gene2idx.values())])
         chunk_size = 30000  # Size of each chunk, >30000 OOMs

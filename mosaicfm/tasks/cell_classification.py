@@ -5,10 +5,11 @@ import json
 import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
+import torch
 from composer import State
 from composer.core.callback import Callback
 from composer.loggers import Logger
-from composer.utils import dist
+from composer.utils import dist, model_eval_mode
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import kneighbors_graph
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
@@ -53,7 +54,7 @@ class CellClassification(Callback):
     def fit_end(self, state: State, logger: Logger):
 
         self.model = state.model
-        self.model.eval()
+
         self.model_config = self.model.model_config
         self.collator_config = self.model.collator_config
         self.vocab = state.train_dataloader.collate_fn.vocab
@@ -90,7 +91,10 @@ class CellClassification(Callback):
         # step 2: extract mosaicfm embeddings
         from mosaicfm.tasks import get_batch_embeddings
 
-        with FSDP.summon_full_params(self.model.model):
+        with model_eval_mode(
+            self.model.model,
+        ), torch.no_grad(), FSDP.summon_full_params(self.model.model, writeback=False):
+
             cell_embeddings_train = get_batch_embeddings(
                 adata=adata_train,
                 model=self.model.model,
