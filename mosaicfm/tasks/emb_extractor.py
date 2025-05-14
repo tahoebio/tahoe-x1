@@ -121,6 +121,7 @@ def get_batch_embeddings(
     with torch.no_grad(), torch.amp.autocast(
         enabled=True,
         dtype=dtype_from_string[model_cfg["precision"]],
+        device_type=device.type,
     ):
         count = 0
         pbar = tqdm(total=len(dataset), desc="Embedding cells")
