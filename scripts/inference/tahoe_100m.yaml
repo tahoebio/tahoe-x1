@@ -1,0 +1,33 @@
+paths:
+  vocab_file: "/tahoe/mosaicfm/datasets/vevo_merged_jan_2025/vevo_v2_vocab.json"
+  model_config_path: "/tahoe/mosaicfm/checkpoints/release/mosaicfm-70m-merged/model_config.yml"
+  collator_config_path: "/tahoe/mosaicfm/checkpoints/release/mosaicfm-70m-merged/collator_config.yml"
+  model_file: "/tahoe/mosaicfm/checkpoints/release/mosaicfm-70m-merged/best-model.pt"
+  output_dir: "/tahoe/mosaicfm/datasets/barotaxis/embeddings_tahoe_100m"
+
+dataset:
+  name: "tahoebio/Tahoe-100M"
+  split: "train"
+  streaming: False
+
+data:
+  batch_size: 1750
+  max_length: 2048
+  num_workers: 8
+  prefetch_factor: 8
+  reserve_keys:
+    - "BARCODE_SUB_LIB_ID"
+    - "sample"
+    - "cell_line_id"
+    - "plate"
+    - "drug"
+
+model:
+  attn_impl: "flash"
+  use_attn_mask: false
+
+parquet:
+  chunk_size: 100000
+
+output:
+  prefix: "mosaicfm-70m-merged"

@@ -172,7 +172,11 @@ class DataCollator(DefaultDataCollator):
         device = examples[0]["genes"].device
         for key in self.reserve_keys:
             data_ = [example[key] for example in examples]
-            data_dict[key] = torch.stack(data_, dim=0).to(device)
+            if isinstance(data_[0], torch.Tensor):
+                # if the reserved key is a tensor, stack them
+                data_dict[key] = torch.stack(data_, dim=0).to(device)
+            else:
+                data_dict[key] = data_  # if not tensor, just keep the list
 
         return data_dict
 
