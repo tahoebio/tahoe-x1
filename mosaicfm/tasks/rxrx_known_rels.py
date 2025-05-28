@@ -4,11 +4,14 @@ import pickle
 
 import numpy as np
 import pandas as pd
+import torch
 from composer import State
 from composer.core.callback import Callback
 from composer.loggers import Logger
+from composer.utils import model_eval_mode
 from sklearn.metrics.pairwise import cosine_similarity
 from sklearn.utils import Bunch
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 from mosaicfm.utils import download_file_from_s3_url
 
@@ -148,7 +151,6 @@ class RxRxKnownRels(Callback):
 
         # get variables from state
         self.model = state.model
-        self.model.eval()
         self.run_name = state.run_name
 
         # download task data from S3
@@ -168,11 +170,16 @@ class RxRxKnownRels(Callback):
         # load gene metadata
         gene_metadata = pd.read_csv(self.gene_metadata_cfg["local"])
 
-        # extract gene emebddings from model and prepare for benchmark
-        gene_embs = (
-            self.model.model.gene_encoder.embedding.weight.detach().cpu().numpy()
-        )
-        gene_embs = gene_embs[gene_metadata["token_id"].to_numpy()]
+        with model_eval_mode(
+            self.model.model,
+        ), torch.no_grad(), FSDP.summon_full_params(self.model.model, writeback=False):
+
+            # extract gene emebddings from model and prepare for benchmark
+            gene_embs = (
+                self.model.model.gene_encoder.embedding.weight.detach().cpu().numpy()
+            )
+            gene_embs = gene_embs[gene_metadata["token_id"].to_numpy()]
+
         features = pd.DataFrame(gene_embs)
 
         # run benchmark
