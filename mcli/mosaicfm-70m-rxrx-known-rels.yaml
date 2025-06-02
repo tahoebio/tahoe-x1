@@ -172,10 +172,13 @@ parameters:
       cfg:
         known_rels:
           remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/known-rels.pkl"
-          local: "/vevo/data/download/rxrx-known-rels/known-rels.pkl"
+          local: "/tahoe/data/download/rxrx-known-rels/known-rels.pkl"
         gene_metadata:
           remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/gene-metadata.csv"
-          local: "/vevo/data/download/rxrx-known-rels/gene-metadata.csv"
+          local: "/tahoe/data/download/rxrx-known-rels/gene-metadata.csv"
+        rxrx_perturbations:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/example-embs-metadata.csv"
+          local: "/tahoe/data/download/rxrx-known-rels/rxrx-perturbations.csv"
   loggers:
     wandb:
       project: vevo-scgpt

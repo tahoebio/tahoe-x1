@@ -146,6 +146,7 @@ class RxRxKnownRels(Callback):
         super().__init__()
         self.known_rels_cfg = cfg["known_rels"]
         self.gene_metadata_cfg = cfg["gene_metadata"]
+        self.rxrx_perturbations_cfg = cfg["rxrx_perturbations"]
 
     def fit_end(self, state: State, logger: Logger):
 
@@ -161,6 +162,10 @@ class RxRxKnownRels(Callback):
         download_file_from_s3_url(
             s3_url=self.gene_metadata_cfg["remote"],
             local_file_path=self.gene_metadata_cfg["local"],
+        )
+        download_file_from_s3_url(
+            s3_url=self.rxrx_perturbations_cfg["remote"],
+            local_file_path=self.rxrx_perturbations_cfg["local"],
         )
 
         # open known relationships
@@ -180,11 +185,17 @@ class RxRxKnownRels(Callback):
             )
             gene_embs = gene_embs[gene_metadata["token_id"].to_numpy()]
 
-        features = pd.DataFrame(gene_embs)
+        # subset to genes used in the original RxRx benchmark
+        rxrx_perturbations = pd.read_csv(self.rxrx_perturbations_cfg["local"])
+        rows_to_keep = gene_metadata["gene_symbol"].isin(
+            rxrx_perturbations["perturbation"].unique(),
+        )
+        metadata = gene_metadata[rows_to_keep]
+        features = pd.DataFrame(gene_embs[rows_to_keep])
 
         # run benchmark
         results = known_relationship_benchmark(
-            Bunch(metadata=gene_metadata, features=features),
+            Bunch(metadata=metadata, features=features),
             pert_col="gene_symbol",
             known_rels=known_rels,
             log_stats=True,
