@@ -8,7 +8,7 @@ vocabulary:
   remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: vevo_scgpt
+  name: mosaicfm
   d_model: 512
   n_layers: 12
   init_device: cpu
@@ -50,7 +50,7 @@ collator:
   do_padding: True
   pad_value: -2
   do_mlm: True
-  do_binning: True #set do_binning=False and log_transform=True and provide target_sum if you want to train with log1p inputs.
+  do_binning: True
   mlm_probability: 0.5
   mask_value: -1
   max_length: 1024
@@ -63,11 +63,14 @@ train_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/train"
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2/train/"
+        local: "mds-data-folder/tahoe/train"
       cellxgene:
         remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/train"
+        local: "mds-data-folder/cellxgene/train"
+      scbasecamp:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2/train/"
+        local: "mds-data-folder/scbasecamp/train"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: True
@@ -82,11 +85,14 @@ valid_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/valid"
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2/valid/"
+        local: "mds-data-folder/tahoe/valid"
       cellxgene:
         remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/valid"
+        local: "mds-data-folder/cellxgene/valid"
+      scbasecamp:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2/valid/"
+        local: "mds-data-folder/scbasecamp/valid"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: False
@@ -116,9 +122,9 @@ algorithms:
     clipping_threshold: 1.0
   low_precision_layernorm: {}
 precision: amp_bf16
-eval_interval: "1000ba"
+eval_interval: "100ba"
 eval_subset_num_batches: 100
-max_duration: "10ba"
+max_duration: "1000ba"
 fsdp_config:
   sharding_strategy: FULL_SHARD
   mixed_precision: DEFAULT
@@ -135,52 +141,70 @@ callbacks:
   runtime_estimator: {}
   cell-classification:
     cfg:
-      ensemble_to_gene_path: 
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_ensembl_to_gene_name.json"
-        local: "/vevo/data/datasets/vevo_v2_ensembl_to_gene_name.json"
-      datasets:  
-        kim: 
+      datasets:
+        ccle:
           train:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/kim2020/kim_train.h5ad"
-            local: "/vevo/data/datasets/kim2020_lung/kim_train.h5ad"
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/CCLE/ccle.h5ad"
+            local: "cell-classification/ccle.h5ad"
+          cell_type_key: "OncotreeLineage"
+          gene_id_key: "feature_id"
+          seq_len: 8192
+          batch_size: 32
+        tabula:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_train.h5ad"
+            local: "cell-classification/Tabula50k_train.h5ad"
           test:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/kim2020/kim_test.h5ad"
-            local: "/vevo/data/datasets/kim2020_lung/kim_test.h5ad"
-          class_names:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/kim2020/kim-str_label.npy"
-            local: "/vevo/data/datasets/kim2020_lung/kim-str_label.npy"
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_test.h5ad"
+            local: "cell-classification/Tabula50k_test.h5ad"
+          cell_type_key: "cell_ontology_class"
+          gene_id_key: "ensembl_id"
+        tahoe:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_train.h5ad"
+            local: "cell-classification/Tahoe50k_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_test.h5ad"
+            local: "cell-classification/Tahoe50k_test.h5ad"
+          cell_type_key: "cell_line"
+          gene_id_key: "ensembl_id"
+        kim:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_train.h5ad"
+            local: "cell-classification/kim_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_test.h5ad"
+            local: "cell-classification/kim_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
         zheng:
-          train: 
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/zheng/zheng_train.h5ad"
-            local: "/vevo/data/datasets/zheng/zheng_train.h5ad"
-          test:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/zheng/zheng_test.h5ad"
-            local: "/vevo/data/datasets/zheng/zheng_test.h5ad"
-          class_names:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/zheng/zheng-str_label.npy"
-            local: "/vevo/data/datasets/zheng/zheng-str_label.npy"
-        Segerstolpe: 
           train:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/Segerstolpe/Segerstolpe_train.h5ad"
-            local: "/vevo/data/datasets/Segerstolpe/Segerstolpe_train.h5ad"
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_train.h5ad"
+            local: "cell-classification/zheng_train.h5ad"
           test:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/Segerstolpe/Segerstolpe_test.h5ad"
-            local: "/vevo/data/datasets/Segerstolpe/Segerstolpe_test.h5ad"
-          class_names:
-            remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/Segerstolpe/Segerstolpe-str_label.npy"
-            local: "/vevo/data/datasets/Segerstolpe/Segerstolpe-str_label.npy"
-      logistic:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_test.h5ad"
+            local: "cell-classification/zheng_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
+        segerstolpe:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_train.h5ad"
+            local: "cell-classification/segerstolpe_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_test.h5ad"
+            local: "cell-classification/Segerstolpe_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
+      classifier_config:
         max_iter: 5000
         solver: "lbfgs"
         multi_class: "multinomial"
         random_state: 42
       batch_size: 100
-      seq_len: 2048  
+      seq_len: 2048
 loggers:
   wandb:
     project: vevo-MFM-v2
     log_artifacts: False
-save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_folder: "s3://vevo-ml-datasets/mosaicfm_v2/models/{run_name}"
 save_interval: "2000ba"
-run_name: "test"
-save_num_checkpoints_to_keep: 0
