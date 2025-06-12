@@ -1,11 +1,14 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+import json
 from typing import Dict, List, Mapping, Optional, Tuple, Union
 
 import numpy as np
 import torch
+from composer.utils import dist
 from transformers import DefaultDataCollator
 
 from mosaicfm.tokenizer import GeneVocab
+from mosaicfm.utils import download_file_from_s3_url
 
 
 class DataCollator(DefaultDataCollator):
@@ -14,6 +17,8 @@ class DataCollator(DefaultDataCollator):
 
     Args:
         vocab (:obj: GeneVocab): The vocabulary that includes the gene ids, name, special tokens, etc.
+        use_chem_token (:obj:`bool`): whether to create and use the chemical token in the sequence.
+        drug_to_id_path (:obj:`dict`): path to the drug to id .json file.
         do_padding (:obj:`bool`): whether to pad the sequences to the max length.
         unexp_padding (:obj:`bool`): whether to pad the sequences with unexpressed genes. If False it pads with pad token.
         pad_token_id (:obj:`int`, optional): the token id to use for padding.
@@ -50,6 +55,8 @@ class DataCollator(DefaultDataCollator):
     def __init__(
         self,
         vocab: GeneVocab,
+        drug_to_id_path: Optional[dict] = None,
+        use_chem_token: int = False,
         do_padding: bool = True,
         unexp_padding: bool = False,
         pad_token_id: Optional[int] = None,
@@ -87,6 +94,9 @@ class DataCollator(DefaultDataCollator):
         self.data_style = data_style
         self.num_bins = num_bins
         self.right_binning = right_binning
+        self.drug_token = vocab[
+            "<drug>"
+        ]  # the <drug> token will not be used if use_chem_token is False
 
         # filter non_special gene_ids
         gene_to_id = vocab.get_stoi()
@@ -98,6 +108,29 @@ class DataCollator(DefaultDataCollator):
             ],
         )
         self.vocab = vocab
+
+        self.use_chem_token = use_chem_token
+        assert not self.use_chem_token or drug_to_id_path is not None, (
+            "If `use_chem_token` is True, `drug_to_id_path` must be provided.",
+        )
+        assert drug_to_id_path is None or self.use_chem_token, (
+            "If `drug_to_id_path` is provided, `use_chem_token` must be True.",
+        )
+        assert not self.use_chem_token or self.keep_first_n_tokens > 1, (
+            "If `use_chem_token` is True, we need to keep <cls> and <drug> token in the beggining of pcpt_genes. So `keep_first_n_tokens` must be >=2!",
+        )
+        # load drug_to_id mapping if present
+        if self.use_chem_token:
+            if dist.get_local_rank() == 0:
+                download_file_from_s3_url(
+                    s3_url=drug_to_id_path["remote"],
+                    local_file_path=drug_to_id_path["local"],
+                )
+            with dist.local_rank_zero_download_and_wait(drug_to_id_path["local"]):
+                dist.barrier()
+
+            with open(drug_to_id_path["local"]) as f:
+                self.drug_to_id = json.load(f)
 
     def __post_init__(self):
         if self.do_padding:
@@ -149,6 +182,16 @@ class DataCollator(DefaultDataCollator):
             :obj:`Dict[str, torch.Tensor]`: a dict of tensors.
         """
         for example in examples:
+            if self.use_chem_token:
+                drug = (
+                    example["drug"]
+                    if "drug" in example and example["drug"] in self.drug_to_id
+                    else "<pad>"
+                )
+                example["drug_id"] = torch.as_tensor(
+                    self.drug_to_id[drug],
+                    dtype=torch.int,
+                )
             if isinstance(example["genes"], list):
                 example["genes"] = torch.as_tensor(example["genes"])
             example["genes"] = torch.squeeze(example["genes"])
@@ -338,7 +381,8 @@ class DataCollator(DefaultDataCollator):
         Each example is like:
             {'id': tensor(184117),
             'genes': tensor([36572, 17868, ..., 17072]),
-            'expressions': tensor([ 0.,  2., ..., 18.])}
+            'expressions': tensor([ 0.,  2., ..., 18.])},
+            'drug_id': Optinal = tensor(256), id 0 refers to <pad> token and indicates that drug is not available
 
         Args:
             gen_prob (float, optional): the probability of a gene being assigned to
@@ -387,10 +431,23 @@ class DataCollator(DefaultDataCollator):
         padded_gen_genes = []
         padded_gen_expressions = []
         padded_gen_original_exp = []
+        drug_ids = [] if self.use_chem_token else None
+
         for i in range(len(examples)):
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
+
+            if self.use_chem_token:
+                # add drug token <drug>, and pad_value=-2 expression at location 1  (after <cls>) of genes and expressions
+                genes = torch.cat(
+                    (genes[:1], torch.tensor([self.drug_token]), genes[1:]),
+                )
+                expressions = torch.cat(
+                    (expressions[:1], torch.tensor([self.pad_value]), expressions[1:]),
+                )
+
             original_expressions = expressions.detach().clone()
+
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
@@ -457,6 +514,11 @@ class DataCollator(DefaultDataCollator):
             padded_gen_expressions.append(gen_expressions)
             padded_gen_original_exp.append(gen_original_exp)
 
+            if self.use_chem_token:
+                # add drug id, id=0 corresponds to <pad> which indicates that drug is not available
+                drug = examples[i]["drug_id"]
+                drug_ids.append(drug)
+
         padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0)
         padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0)
         padded_pcpt_original_exp = torch.stack(padded_pcpt_original_exp, dim=0)
@@ -464,15 +526,27 @@ class DataCollator(DefaultDataCollator):
         padded_gen_expressions = torch.stack(padded_gen_expressions, dim=0)
         padded_gen_original_exp = torch.stack(padded_gen_original_exp, dim=0)
 
-        data_dict = {
-            "pcpt_gene": padded_pcpt_genes,
-            "pcpt_expr": padded_pcpt_expressions,
-            "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
-            "gen_gene": padded_gen_genes,
-            "gen_expr_target": padded_gen_expressions,
-            "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
-        }
+        if self.use_chem_token:
+            drug_ids = torch.stack(drug_ids)
 
+            data_dict = {
+                "pcpt_gene": padded_pcpt_genes,
+                "pcpt_expr": padded_pcpt_expressions,
+                "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
+                "gen_gene": padded_gen_genes,
+                "gen_expr_target": padded_gen_expressions,
+                "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
+                "drug_ids": drug_ids,
+            }
+        else:
+            data_dict = {
+                "pcpt_gene": padded_pcpt_genes,
+                "pcpt_expr": padded_pcpt_expressions,
+                "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
+                "gen_gene": padded_gen_genes,
+                "gen_expr_target": padded_gen_expressions,
+                "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
+            }
         return data_dict
 
     def _random_split(

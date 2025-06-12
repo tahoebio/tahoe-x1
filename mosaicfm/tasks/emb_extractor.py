@@ -69,6 +69,7 @@ def get_batch_embeddings(
     )
     collate_fn = DataCollator(
         vocab=vocab,
+        drug_to_id_path=collator_cfg.get("drug_to_id_path", None),
         do_padding=collator_cfg.get("do_padding", True),
         unexp_padding=False,  # Disable padding with random unexpressed genes for inference
         pad_token_id=collator_cfg.pad_token_id,
@@ -84,6 +85,8 @@ def get_batch_embeddings(
         data_style="pcpt",  # Disable splitting of genes into pcpt and gen for inference
         num_bins=collator_cfg.get("num_bins", 51),
         right_binning=collator_cfg.get("right_binning", False),
+        keep_first_n_tokens=collator_cfg.get("keep_first_n_tokens", 1),
+        use_chem_token=collator_cfg.get("use_chem_token", False),
     )
     data_loader = torch.utils.data.DataLoader(
         dataset,

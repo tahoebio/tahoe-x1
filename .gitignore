@@ -156,6 +156,6 @@ figures/
 .micromamba/
 scripts/perturbation/debug/
 runai/*/
-vocab.json
+*.json
 debug_notebooks/
 ckpt/
