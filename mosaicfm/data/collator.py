@@ -173,7 +173,7 @@ class DataCollator(DefaultDataCollator):
         Args:
             examples (:obj:`List[Dict[str, torch.Tensor]]`): a list of data dicts.
                 Each dict is for one cell. It contains multiple 1 dimensional tensors
-                like the following example:
+                like the following exmaple:
                     {'id': tensor(184117),
                     'genes': tensor([36572, 17868, ..., 17072]),
                     'expressions': tensor([ 0.,  2., ..., 18.])}
@@ -243,7 +243,9 @@ class DataCollator(DefaultDataCollator):
             raise NotImplementedError
 
         device = examples[0]["genes"].device
-        _max_length = self.max_length
+
+        max_ori_len = max(len(example["genes"]) for example in examples)
+        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
 
         # pad and truncate
         padded_genes = []
@@ -322,7 +324,10 @@ class DataCollator(DefaultDataCollator):
             return NotImplementedError
 
         device = examples[0]["genes"].device
-        _max_length = self.max_length
+
+        max_ori_len = max(len(example["genes"]) for example in examples)
+        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
+
         # pad and truncate
         padded_pcpt_genes = []
         padded_pcpt_expressions = []
@@ -407,11 +412,15 @@ class DataCollator(DefaultDataCollator):
             raise NotImplementedError
 
         if not self.do_mlm:
+            # if not doing mlm, then the perceptrual part is the whole input
             return self._call_gen(examples)
 
         if gen_prob is None:
             gen_prob = self.get_mlm_probability()
-        _max_length = self.max_length
+
+        max_ori_len = max(len(example["genes"]) for example in examples)
+        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
+
         gen_length = int((_max_length - self.keep_first_n_tokens) * gen_prob)
         pcpt_length = _max_length - gen_length  # perception part length
 
