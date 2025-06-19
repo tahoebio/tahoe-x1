@@ -80,6 +80,7 @@ class SCGPTModel(nn.Module):
             self.d_model,
             padding_idx=self.pad_token_id,
             use_norm=self.gene_encoder_config["use_norm"],
+            gene_encoder_cfg=self.gene_encoder_config,
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
 
@@ -121,11 +122,6 @@ class SCGPTModel(nn.Module):
                 activation=chem_encoder_config.get("activation", "leaky_relu"),
                 freeze=chem_encoder_config.get("freeze", False),
             )
-
-            # Disable re-inititialization for the entire subtree of chem_encoder
-            # so that the Embedding layer is correctly initialized with morgan/ibm embeddings.
-            for module in self.chem_encoder.modules():
-                module.skip_init = True
 
         encoder_layers = SCGPTBlock(
             d_model=self.d_model,
@@ -438,7 +434,9 @@ class ComposerSCGPTModel(ComposerModel):
             collator_config=collator_config,
             device=device,
         )
-        self.n_active_params = sum(p.numel() for p in self.model.parameters())
+        self.n_active_params = sum(
+            p.numel() for p in self.model.parameters() if p.requires_grad
+        )
         self.train_metrics = {
             "MSE": MaskedMseMetric(name="MSE"),
             "MVC": MaskedMseMetric(name="MVC"),

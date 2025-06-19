@@ -178,12 +178,13 @@ class RxRxKnownRels(Callback):
         with model_eval_mode(
             self.model.model,
         ), torch.no_grad(), FSDP.summon_full_params(self.model.model, writeback=False):
-
-            # extract gene emebddings from model and prepare for benchmark
-            gene_embs = (
-                self.model.model.gene_encoder.embedding.weight.detach().cpu().numpy()
+            gene_encoder = self.model.model.gene_encoder
+            token_ids = torch.tensor(
+                gene_metadata["token_id"].to_numpy(),
+                dtype=torch.long,
+                device=gene_encoder.embedding.weight.device,
             )
-            gene_embs = gene_embs[gene_metadata["token_id"].to_numpy()]
+            gene_embs = gene_encoder(token_ids.unsqueeze(0)).squeeze(0).cpu().numpy()
 
         # subset to genes used in the original RxRx benchmark
         rxrx_perturbations = pd.read_csv(self.rxrx_perturbations_cfg["local"])

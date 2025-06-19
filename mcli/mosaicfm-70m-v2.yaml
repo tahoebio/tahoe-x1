@@ -1,7 +1,7 @@
 integrations:
 - integration_type: git_repo
   git_repo: tahoebio/mosaicfm
-  git_branch: cellclass-fix
+  git_branch: pretrained_gene_embeddings
   # git_commit:  # OR use your commit hash
   pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
@@ -20,10 +20,10 @@ env_variables:
 name: mosaicfm-70m
 
 compute:
-  gpus: 16 # Number of GPUs to use
+  gpus: 8 # Number of GPUs to use
   cluster: r18z1p1
 scheduling:
-  max_duration: 0.5 # Maximum duration of the run in hours
+  max_duration: 0.1 # Maximum duration of the run in hours
 
   ## These configurations are optional
   # cluster:
@@ -36,7 +36,7 @@ parameters:
   global_seed: 777
   seed: ${global_seed}
   device_train_batch_size: 400
-  global_train_batch_size: 4800
+  global_train_batch_size: 2400
   device_eval_batch_size: 400
   device_train_microbatch_size: "auto"
   vocabulary:
@@ -49,7 +49,7 @@ parameters:
     init_device: cpu
     expansion_ratio: 4
     standard_scale_outputs: False
-    transformer_activation: relu
+    transformer_activation: gelu
     n_heads: 8
     norm_scheme: "pre"
     use_generative_training: True
@@ -73,6 +73,17 @@ parameters:
       use_norm: True
     gene_encoder:
       use_norm: True
+      embeddings:
+        esmc:
+          remote: "s3://vevo-ml-datasets/esm-embeddings/esmc_vocab_aligned_raw.pt"
+          local: "esmc_vocab_aligned_raw.pt"
+          use_norm: False
+          freeze: True
+        evo2:
+          remote: "s3://vevo-ml-datasets/evo2-embeddings/gene_evo27b_250504_embeddings_vocab_aligned.pt"
+          local: "gene_evo27b_250504_embeddings_vocab_aligned.pt"
+          use_norm: False
+          freeze: True
     mvc:
       arch_style: "inner product"
       query_activation: "sigmoid"
@@ -81,6 +92,13 @@ parameters:
       n_outputs: 1
       n_layers: 1
       activation: "leaky_relu"
+    chemical_encoder:
+      drug_fps_path:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_fps_pad.npy"
+        local: "drug_fps.npy"
+      activation: "gelu"
+      padding_idx: 0
+      freeze: False
   collator:
     do_padding: True
     pad_value: -2
@@ -94,6 +112,11 @@ parameters:
     num_bins: 51
     right_binning: False
     use_junk_tokens: False
+    use_chem_token: True
+    drug_to_id_path:
+      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_to_id_pad.json"
+      local: "drug_to_id_pad.json"
+    keep_first_n_tokens: 2
   train_loader:
     dataset:
       streams:
@@ -140,12 +163,12 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 3.0e-4
+    lr: 1.0e-3
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
-    weight_decay: 1.0e-05
+    weight_decay: 1.0e-04
   scheduler:
     name: cosine_with_warmup
     t_warmup: "0.05dur"
@@ -174,6 +197,34 @@ parameters:
     lr_monitor: {}
     memory_monitor: {}
     runtime_estimator: {}
+    rxrx-known-rels:
+      cfg:
+        known_rels:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/known-rels.pkl"
+          local: "/tahoe/data/download/rxrx-known-rels/known-rels.pkl"
+        gene_metadata:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/gene-metadata.csv"
+          local: "/tahoe/data/download/rxrx-known-rels/gene-metadata.csv"
+        rxrx_perturbations:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/example-embs-metadata.csv"
+          local: "/tahoe/data/download/rxrx-known-rels/rxrx-perturbations.csv"
+    marginal-essentiality:
+      cfg:
+        batch_size: 32
+        seq_len: 8192
+        adata:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/ccle.h5ad"
+          local: "ccle.h5ad"
+          gene_column: "feature_id"
+        labels:
+          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/labels.csv"
+          local: "labels.csv"
+          gene_column: "gene_id"
+          label_column: "essential"
+        classifier:
+          n_jobs: 32
+          test_size: 0.2
+          random_state: 42
     cell-classification:
       cfg:
         datasets:
@@ -184,7 +235,7 @@ parameters:
             cell_type_key: "OncotreeLineage"
             gene_id_key: "feature_id"
             seq_len: 8192
-            batch_size: 32
+            batch_size: 4
           tabula:
             train:
               remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_train.h5ad"

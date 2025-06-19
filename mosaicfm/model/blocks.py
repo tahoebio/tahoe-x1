@@ -1,4 +1,5 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+import logging
 from functools import lru_cache
 from typing import Any, Dict, Optional, Tuple, Union
 
@@ -46,6 +47,8 @@ init_config_defaults: Dict = {
 gene_encoder_defaults: Dict = {
     "use_norm": False,
 }
+
+log = logging.getLogger(__name__)
 
 
 class SCGPTBlock(nn.Module):
@@ -361,6 +364,7 @@ class GeneEncoder(nn.Module):
         embedding_dim: int,
         padding_idx: Optional[int] = None,
         use_norm: bool = False,
+        gene_encoder_cfg: Optional[Dict] = None,
     ):
         super().__init__()
         self.embedding = nn.Embedding(
@@ -369,16 +373,66 @@ class GeneEncoder(nn.Module):
             padding_idx=padding_idx,
         )
         self.use_norm = use_norm
+        if not gene_encoder_cfg:
+            gene_encoder_cfg = {}
+        additional_embedding_cfg = gene_encoder_cfg.get("embeddings", {})
+        self.extra_embeddings = nn.ModuleDict()
+        self.extra_norms = nn.ModuleDict()
+
+        for name, e_cfg in additional_embedding_cfg.items():
+            local, remote = e_cfg["local"], e_cfg["remote"]
+            if dist.get_local_rank() == 0:
+                download_file_from_s3_url(remote, local)
+            with dist.local_rank_zero_download_and_wait(local):
+                dist.barrier()
+
+            pretrained_weight = torch.load(local, weights_only=True)["embedding.weight"]
+            pretrained_vocab_size, pretrained_dim = pretrained_weight.shape
+            if pretrained_vocab_size < num_embeddings:
+                log.warning(
+                    f"[{name}] Pretrained embedding size ({pretrained_vocab_size}) is smaller than vocab size ({num_embeddings}). "
+                    f"Filling remaining {num_embeddings - pretrained_vocab_size} rows with zeros.",
+                )
+            weight = torch.zeros(
+                num_embeddings,
+                pretrained_dim,
+                dtype=pretrained_weight.dtype,
+            )
+            weight[:pretrained_vocab_size, :] = pretrained_weight
+            emb = nn.Embedding.from_pretrained(
+                weight,
+                padding_idx=padding_idx,
+                freeze=e_cfg.get("freeze", True),
+            )
+            for m in emb.modules():
+                m.skip_init = True
+            self.extra_embeddings[name] = emb
+
+            if e_cfg.get("use_norm", False):
+                self.extra_norms[name] = nn.LayerNorm(emb.embedding_dim)
+
+        if self.extra_embeddings:
+            concat_dim = embedding_dim + sum(
+                emb.embedding_dim for emb in self.extra_embeddings.values()
+            )
+            self.project = nn.Linear(concat_dim, embedding_dim, bias=False)
+        else:
+            self.project = nn.Identity()
+
         if self.use_norm:
             self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        x = self.embedding(x)  # (batch, seq_len, embsize)
+        reps = [self.embedding(x)]
+        for name, emb in self.extra_embeddings.items():
+            y = emb(x)
+            if name in self.extra_norms:
+                y = self.extra_norms[name](y)
+            reps.append(y)
+        x = torch.cat(reps, dim=-1) if len(reps) > 1 else reps[0]
+        x = self.project(x)
         if self.use_norm:
-            x = self.enc_norm(
-                x,
-            )  # Norm for embedding is not used when using pre-norm transformer.
-
+            x = self.enc_norm(x)
         return x
 
 
@@ -411,6 +465,8 @@ class ChemEncoder(nn.Module):
             padding_idx=padding_idx,
             freeze=freeze,
         )
+        for m in self.embedding.modules():
+            m.skip_init = True
         self.fc = nn.Linear(embedding_dim, d_out)
         self.activation = resolve_ffn_act_fn({"name": activation})
         self.proj = nn.Linear(d_out, d_out)

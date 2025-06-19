@@ -94,10 +94,6 @@ class DataCollator(DefaultDataCollator):
         self.data_style = data_style
         self.num_bins = num_bins
         self.right_binning = right_binning
-        self.drug_token = vocab[
-            "<drug>"
-        ]  # the <drug> token will not be used if use_chem_token is False
-
         # filter non_special gene_ids
         gene_to_id = vocab.get_stoi()
         self.non_special_gene_ids = torch.tensor(
@@ -108,8 +104,12 @@ class DataCollator(DefaultDataCollator):
             ],
         )
         self.vocab = vocab
-
         self.use_chem_token = use_chem_token
+
+        if self.use_chem_token:
+            self.drug_token_id = vocab["<drug>"]
+        else:
+            self.drug_token_id = None
         assert not self.use_chem_token or drug_to_id_path is not None, (
             "If `use_chem_token` is True, `drug_to_id_path` must be provided.",
         )
@@ -440,10 +440,26 @@ class DataCollator(DefaultDataCollator):
             if self.use_chem_token:
                 # add drug token <drug>, and pad_value=-2 expression at location 1  (after <cls>) of genes and expressions
                 genes = torch.cat(
-                    (genes[:1], torch.tensor([self.drug_token]), genes[1:]),
+                    (
+                        genes[:1],
+                        torch.tensor(
+                            [self.drug_token_id],
+                            device=genes.device,
+                            dtype=genes.dtype,
+                        ),
+                        genes[1:],
+                    ),
                 )
                 expressions = torch.cat(
-                    (expressions[:1], torch.tensor([self.pad_value]), expressions[1:]),
+                    (
+                        expressions[:1],
+                        torch.tensor(
+                            [self.pad_value],
+                            device=expressions.device,
+                            dtype=expressions.dtype,
+                        ),
+                        expressions[1:],
+                    ),
                 )
 
             original_expressions = expressions.detach().clone()

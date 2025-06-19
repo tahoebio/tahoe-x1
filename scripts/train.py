@@ -367,7 +367,9 @@ def main(cfg: DictConfig) -> composer.Trainer:
 
     # Build vocab
     vocab = GeneVocab.from_file(vocab_config["local"])
-    special_tokens = ["<pad>", "<cls>", "<eoc>", "<drug>"]
+    special_tokens = ["<pad>", "<cls>", "<eoc>"]
+    if cfg.get("use_chem_token", False):
+        special_tokens.append("<drug>")
 
     for s in special_tokens:
         if s not in vocab:
