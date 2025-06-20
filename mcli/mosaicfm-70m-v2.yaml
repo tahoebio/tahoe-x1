@@ -1,8 +1,8 @@
 integrations:
 - integration_type: git_repo
   git_repo: tahoebio/mosaicfm
-  git_branch: pretrained_gene_embeddings
-  # git_commit:  # OR use your commit hash
+  git_branch: main
+  # git_commit: # OR use your commit hash
   pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
 
@@ -20,14 +20,10 @@ env_variables:
 name: mosaicfm-70m
 
 compute:
-  gpus: 8 # Number of GPUs to use
+  gpus: 64 # Number of GPUs to use
   cluster: r18z1p1
 scheduling:
-  max_duration: 0.1 # Maximum duration of the run in hours
-
-  ## These configurations are optional
-  # cluster:
-  # gpu_type: a100_80gb # Type of GPU to use. We use a100_80gb in our experiments
+  max_duration: 12 # Maximum duration of the run in hours
 
 
 # The below is injected as a YAML file: /mnt/config/parameters.yaml
@@ -35,10 +31,10 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 400
-  global_train_batch_size: 2400
-  device_eval_batch_size: 400
-  device_train_microbatch_size: "auto"
+  device_train_batch_size: 300
+  global_train_batch_size: 19200
+  device_eval_batch_size: 300
+  device_train_microbatch_size: 300
   vocabulary:
     remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
     local: "vocab.json"
@@ -69,21 +65,10 @@ parameters:
       input_emb_style: "continuous"
       dropout: 0.1
       max_value: 512
-      activation: relu
+      activation: gelu
       use_norm: True
     gene_encoder:
       use_norm: True
-      embeddings:
-        esmc:
-          remote: "s3://vevo-ml-datasets/esm-embeddings/esmc_vocab_aligned_raw.pt"
-          local: "esmc_vocab_aligned_raw.pt"
-          use_norm: False
-          freeze: True
-        evo2:
-          remote: "s3://vevo-ml-datasets/evo2-embeddings/gene_evo27b_250504_embeddings_vocab_aligned.pt"
-          local: "gene_evo27b_250504_embeddings_vocab_aligned.pt"
-          use_norm: False
-          freeze: True
     mvc:
       arch_style: "inner product"
       query_activation: "sigmoid"
@@ -91,7 +76,7 @@ parameters:
     expression_decoder:
       n_outputs: 1
       n_layers: 1
-      activation: "leaky_relu"
+      activation: "gelu"
     chemical_encoder:
       drug_fps_path:
         remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_fps_pad.npy"
@@ -163,12 +148,12 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 1.0e-3
+    lr: 2.0e-3
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
-    weight_decay: 1.0e-04
+    weight_decay: 2.0e-04
   scheduler:
     name: cosine_with_warmup
     t_warmup: "0.05dur"
@@ -180,9 +165,9 @@ parameters:
       clipping_threshold: 1.0
     low_precision_layernorm: {}
   precision: amp_bf16
-  eval_interval: "1000ba"
+  eval_interval: "2500ba"
   eval_subset_num_batches: 100
-  max_duration: "100ba"
+  max_duration: "4ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -190,7 +175,6 @@ parameters:
     activation_checkpointing_reentrant: false
     activation_cpu_offload: false
     limit_all_gathers: true
-    verbose: true
   callbacks:
     speed_monitor:
       window_size: 20
