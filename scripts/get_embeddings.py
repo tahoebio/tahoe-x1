@@ -23,11 +23,12 @@ logging.getLogger(__name__).setLevel("INFO")  # Train script
 
 def main(model_name, input_path, output_path, gene_col, n_hvg):
     model_paths = {
-        "scgpt-70m-2048": "/vevo/scgpt/checkpoints/release/scgpt-70m-2048/",
-        "scgpt-70m-1024": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024/",
-        "scgpt-70m-1024-cell-cond": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-cell-cond/",
-        "scgpt-70m-1024-right-bin": "/vevo/scgpt/checkpoints/release/scgpt-70m-1024-right-bin",
-        "scgpt-1_3b-2048": "/vevo/scgpt/checkpoints/release/scgpt-1_3b-2048/",
+        "MFM-10m": "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-9m-final-wo-gene-embed",
+        "MFM-70m": "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB-3datasets-chem",
+        "MFM-25m": "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-25m-final-wo-gene-embed",
+        "MFM-1B": "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-v2-1_3b-merged",
+        "MFM-3B": "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-3b-prod",
+        "test": "/tahoe/data/ckpts/scgpt/70m-bin-flash-nomask/",
     }
     # At the moment only these 4 models have been prepared for inference
     # For a new model, the wandb config needs to be split into model and collator configs and the latest
@@ -38,6 +39,10 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     model_file = os.path.join(model_paths[model_name], "best-model.pt")
 
     model_config = om.load(model_config_path)
+    if model_config["attn_config"]["attn_impl"] == "triton":
+        model_config["attn_config"]["attn_impl"] = "flash"
+        model_config["attn_config"]["use_attn_mask"] = False
+
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
 
@@ -52,7 +57,7 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     model.eval()
     log.info(f"Model loaded from {model_file}")
     # First create context free embeddings as the "default" per gene
-    with torch.no_grad(), torch.amp.autocast(enabled=True, dtype=torch.bfloat16):
+    with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
         gene2idx = vocab.get_stoi()
         all_gene_ids = np.array([list(gene2idx.values())])
         chunk_size = 30000  # Size of each chunk, >30000 OOMs
@@ -95,7 +100,9 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
         log.info(f"Performed HVG selection with n_top_genes = {n_hvg}")
     sc.pp.filter_cells(adata, min_genes=3)
     log.info("Filtered cells with min_genes = 3")
-    adata.var["id_in_vocab"] = [vocab.get(gene, -1) for gene in adata.var[gene_col]]
+    adata.var["id_in_vocab"] = [
+        vocab[gene] if gene in vocab else -1 for gene in adata.var[gene_col]
+    ]
     gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
     log.info(
         f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
@@ -103,9 +110,13 @@ def main(model_name, input_path, output_path, gene_col, n_hvg):
     )
     adata = adata[:, adata.var["id_in_vocab"] >= 0]
 
-    vocab.set_default_index(vocab["<pad>"])
+    vocab.default_index = vocab["<pad>"]
     genes = adata.var[gene_col].tolist()
-    gene_ids = np.array(vocab(genes), dtype=int)
+
+    gene_ids = np.array(
+        [vocab[gene] if gene in vocab else -1 for gene in genes],
+        dtype=int,
+    )
     assert np.all(gene_ids == np.array(adata.var["id_in_vocab"]))
 
     cell_embeddings, gene_embeddings = get_batch_embeddings(
