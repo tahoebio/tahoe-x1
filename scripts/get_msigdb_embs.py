@@ -17,15 +17,20 @@ logging.basicConfig(
 )
 logging.getLogger(__name__).setLevel("INFO")
 
-model_names = os.listdir("/vevo/scgpt/checkpoints/release/")
+model_names = os.listdir("/tahoe/data/ckpts/MFM-v2/release/")
 for model_name in model_names:
-    model_dir = os.path.join("/vevo/scgpt/checkpoints/release/", model_name)
+    model_dir = os.path.join("/tahoe/data/ckpts/MFM-v2/release/", model_name)
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
     vocab_path = os.path.join(model_dir, "vocab.json")
     collator_config_path = os.path.join(model_dir, "collator_config.yml")
     model_file = os.path.join(model_dir, "best-model.pt")
     model_config = om.load(model_config_path)
+
+    if model_config["attn_config"]["attn_impl"] == "triton":
+        model_config["attn_config"]["attn_impl"] = "flash"
+        model_config["attn_config"]["use_attn_mask"] = False
+
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
 
@@ -81,7 +86,7 @@ for model_name in model_names:
     torch.cuda.empty_cache()
     log.info("Context free embeddings created.")
     gene_emb_save_path = os.path.join(
-        f"/vevo/cellxgene/msigdb_gene_emb_subset/gene_embeddings_new/gene_embeddings_{model_name}.npz",
+        f"/tahoe/data/msigdb/gene_embeddings_new/gene_embeddings_{model_name}.npz",
     )
     np.savez(
         gene_emb_save_path,
