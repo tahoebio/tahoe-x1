@@ -2,7 +2,7 @@
 <p align="center">
   <a href="https://github.com/vevotx/mosaicfm">
     <picture>
-      <img alt="vevo-therapeutics" src="./assets/vevo_logo.png" width="95%">
+      <img alt="tahoe-therapeutics" src="./assets/tahoe-navy-logo.png" width="95%">
     </picture>
   </a>
 </p>
