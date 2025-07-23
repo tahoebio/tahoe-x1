@@ -79,7 +79,7 @@ class SCGPTModel(nn.Module):
             self.vocab_size,
             self.d_model,
             padding_idx=self.pad_token_id,
-            use_norm=self.gene_encoder_config["use_norm"],
+            use_norm=self.gene_encoder_config.get("use_norm", False),
             gene_encoder_cfg=self.gene_encoder_config,
         )
         self.flag_encoder = nn.Embedding(2, self.d_model)
