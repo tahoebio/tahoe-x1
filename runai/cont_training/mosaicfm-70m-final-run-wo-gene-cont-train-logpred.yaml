@@ -1,0 +1,258 @@
+global_seed: 777
+seed: ${global_seed}
+device_train_batch_size: 300
+global_train_batch_size: 300
+device_eval_batch_size: 300
+device_train_microbatch_size: "auto"
+vocabulary:
+  remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+  local: "vocab.json"
+model:
+  name: vevo_scgpt
+  d_model: 512
+  n_layers: 12
+  init_device: cpu
+  expansion_ratio: 4
+  standard_scale_outputs: False
+  transformer_activation: "gelu"
+  n_heads: 8
+  norm_scheme: "pre"
+  use_generative_training: True
+  use_cell_conditioned_generation: False
+  use_glu: False
+  cell_emb_style: cls
+  attn_config:
+    attn_impl: flash
+    attn_type: "grouped_query_attention"
+    use_attn_mask: False
+    kv_nheads: 8
+    attn_pdrop: 0.0
+  norm_config:
+    norm_type: "layernorm"
+    eps: 1.0e-5
+  expression_encoder:
+    input_emb_style: "continuous"
+    dropout: 0.1
+    max_value: 512
+    activation: "gelu"
+    use_norm: True
+  gene_encoder:
+    use_norm: True
+  mvc:
+    arch_style: "inner product"
+    query_activation: "sigmoid"
+    scaled_dot_product: True
+  expression_decoder:
+    n_outputs: 1
+    n_layers: 1
+    activation: "gelu"
+  chemical_encoder:
+    drug_fps_path:
+      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_fps_pad.npy"
+      local: "drug_fps_pad.npy"
+    activation: "gelu"
+    padding_idx: 0
+    freeze: False
+collator:
+  do_padding: True
+  pad_value: -2
+  do_mlm: True
+  do_binning: True
+  log_transform: False
+  log_preds: True
+  target_sum: 10000
+  mlm_probability: 0.5
+  mlm_probability_eval: 0.5
+  mask_value: -1
+  max_length: 1024 #2048
+  sampling: True
+  data_style: "both"
+  num_bins: 51
+  right_binning: False
+  use_junk_tokens: False
+  drug_to_id_path:
+    remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_to_id_pad.json"
+    local: "drug_to_id_pad.json"
+  keep_first_n_tokens: 2
+  use_chem_token: True
+train_loader:
+  dataset:
+    streams:
+      cellxgene:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/train/"
+        local: "/home/mds-data-folder/cellxgene/train"
+      tahoe: 
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/train/"
+        local: "/home/mds-data-folder/tahoe/train"
+      scbasecamp:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/train/"
+        local: "/home/mds-data-folder/scbasecamp/train"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: True
+    shuffle_seed: ${global_seed}
+    num_canonical_nodes: 2
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+valid_loader:
+  dataset:
+    streams:
+      cellxgene:
+        remote: " s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/valid/"
+        local: "/home/mds-data-folder/cellxgene/val"
+      tahoe: 
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/valid/"
+        local: "/home/mds-data-folder/tahoe/val"
+      scbasecamp:
+        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/valid/"
+        local: "/home/mds-data-folder/scbasecamp/val"
+    download_timeout: 300
+    allow_unsafe_types: True
+    shuffle: False
+    shuffle_seed: ${global_seed}
+    num_canonical_nodes: 2
+  drop_last: False
+  num_workers: 8
+  pin_memory: True
+  prefetch_factor: 48
+  persistent_workers: True
+optimizer:
+  name: decoupled_adamw
+  lr: 1.0e-3
+  betas:
+    - 0.9
+    - 0.95
+  eps: 1.0e-08
+  weight_decay: 1.0e-04
+scheduler:
+  name: cosine_with_warmup
+  t_warmup: "0.05dur"
+  t_max: "1dur"
+  alpha_f: 0.1
+algorithms:
+  gradient_clipping:
+    clipping_type: norm
+    clipping_threshold: 1.0
+  low_precision_layernorm: {}
+precision: amp_bf16
+eval_interval: "6000ba"
+eval_subset_num_batches: 100
+max_duration: "55582ba" #"1ep"
+fsdp_config:
+  sharding_strategy: FULL_SHARD #in case of problem set to NO_SHARD
+  mixed_precision: DEFAULT
+  activation_checkpointing: false
+  activation_checkpointing_reentrant: false
+  activation_cpu_offload: false
+  limit_all_gathers: true
+  verbose: true
+callbacks:
+  speed_monitor:
+    window_size: 20
+  lr_monitor: {}
+  memory_monitor: {}
+  runtime_estimator: {}
+  rxrx-known-rels:
+    cfg:
+      known_rels:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/known-rels.pkl"
+        local: "known-rels.pkl"
+      gene_metadata:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/gene-metadata.csv"
+        local: "gene-metadata.csv"
+      rxrx_perturbations:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/rxrx-known-rels/example-embs-metadata.csv"
+        local: "rxrx-perturbations.csv"
+  marginal-essentiality:
+    cfg:
+      batch_size: 32
+      seq_len: 8192
+      adata:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/ccle.h5ad"
+        local: "marginal-essentiality/ccle.h5ad"
+        gene_column: "feature_id"
+      labels:
+        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/labels.csv"
+        local: "marginal-essentiality/labels.csv"
+        gene_column: "gene_id"
+        label_column: "essential"
+      classifier:
+        n_jobs: 32
+        test_size: 0.2
+        random_state: 42
+  cell-classification:
+    cfg:
+      datasets:
+        ccle:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/CCLE/ccle.h5ad"
+            local: "cell-classification/ccle.h5ad"
+          cell_type_key: "OncotreeLineage"
+          gene_id_key: "feature_id"
+          seq_len: 4096
+          batch_size: 32
+        tabula:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_train.h5ad"
+            local: "cell-classification/Tabula50k_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_test.h5ad"
+            local: "cell-classification/Tabula50k_test.h5ad"
+          cell_type_key: "cell_ontology_class"
+          gene_id_key: "ensembl_id"
+        tahoe:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_train.h5ad"
+            local: "cell-classification/Tahoe50k_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_test.h5ad"
+            local: "cell-classification/Tahoe50k_test.h5ad"
+          cell_type_key: "cell_line"
+          gene_id_key: "ensembl_id"
+        kim:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_train.h5ad"
+            local: "cell-classification/kim_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_test.h5ad"
+            local: "cell-classification/kim_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
+        zheng:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_train.h5ad"
+            local: "cell-classification/zheng_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_test.h5ad"
+            local: "cell-classification/zheng_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
+        segerstolpe:
+          train:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_train.h5ad"
+            local: "cell-classification/segerstolpe_train.h5ad"
+          test:
+            remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_test.h5ad"
+            local: "cell-classification/Segerstolpe_test.h5ad"
+          cell_type_key: "cell_type"
+          gene_id_key: "ensembl_id"
+      classifier_config:
+        max_iter: 5000
+        solver: "lbfgs"
+        multi_class: "multinomial"
+        random_state: 42
+      batch_size: 100
+      seq_len: 2048
+
+loggers:
+  wandb:
+    project: vevo-MFM-v2
+    log_artifacts: False
+load_path: "s3://vevo-ml-datasets/mosaicfm_v2/models/mosaicfm-70m-VQ9aRB/ep4-ba55552-rank0.pt"
+save_interval: "4000ba"
+save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+run_name: "mosaicfm-70m-final-wo-gene-embed-cont-train-test"
+save_overwrite: True
