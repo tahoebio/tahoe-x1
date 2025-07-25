@@ -386,14 +386,11 @@ class GeneEncoder(nn.Module):
         )
 
         hidden_size = embedding_dim // (len(additional_embedding_cfg) + 1)
-        self.projs = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(embedding_dim, hidden_size, bias=True),
-                    nn.LayerNorm(hidden_size),
-                    nn.SiLU(),
-                ),
-            ],
+        self.projection_layers = nn.ModuleDict()
+        self.projection_layers["primary"] = nn.Sequential(
+            nn.Linear(embedding_dim, hidden_size, bias=True),
+            nn.LayerNorm(hidden_size),
+            nn.SiLU(),
         )
 
         for name, e_cfg in additional_embedding_cfg.items():
@@ -424,26 +421,21 @@ class GeneEncoder(nn.Module):
             for m in emb.modules():
                 m.skip_init = True
             self.extra_embeddings[name] = emb
-
-            if e_cfg.get("use_norm", False):
-                self.extra_norms[name] = nn.LayerNorm(emb.embedding_dim)
-
-            self.projs.append(
-                nn.Sequential(
-                    nn.Linear(pretrained_dim, hidden_size, bias=False),
-                    nn.LayerNorm(hidden_size),
-                    nn.SiLU(),
-                ),
+            self.projection_layers[name] = nn.Sequential(
+                nn.Linear(pretrained_dim, hidden_size, bias=True),
+                nn.LayerNorm(hidden_size),
+                nn.SiLU(),
             )
-
+            if e_cfg.get("use_norm", False):
+                self.extra_norms[name] = nn.LayerNorm(hidden_size)
         if self.use_norm:
             self.enc_norm = nn.LayerNorm(embedding_dim)
 
     def forward(self, x: Tensor) -> Tensor:
-        reps = [self.projs[0](self.embedding(x))]
-        for i, (name, emb) in enumerate(self.extra_embeddings.items()):
+        reps = [self.projection_layers["primary"](self.embedding(x))]
+        for name, emb in self.extra_embeddings.items():
             y = emb(x)
-            y = self.projs[i + 1](y)  # Apply the corresponding projection
+            y = self.projection_layers[name](y)  # Apply the corresponding projection
             if name in self.extra_norms:
                 y = self.extra_norms[name](y)
             reps.append(y)
