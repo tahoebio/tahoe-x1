@@ -94,9 +94,9 @@ class CellClassification(Callback):
                         s3_url=dataset_cfg[split]["remote"],
                         local_file_path=dataset_cfg[split]["local"],
                     )
-            self.cell_classfication(dataset_name, logger)
+            self.cell_classification(dataset_name, logger)
 
-    def cell_classfication(self, dataset: str, logger: Logger) -> None:
+    def cell_classification(self, dataset: str, logger: Logger) -> None:
         """Perform cell classification evaluation for a specific dataset.
 
         This method:

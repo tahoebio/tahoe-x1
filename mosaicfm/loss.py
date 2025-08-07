@@ -65,7 +65,7 @@ def criterion_neg_log_bernoulli(
 def masked_relative_error(
     input: torch.Tensor,
     target: torch.Tensor,
-    mask: torch.LongTensor,
+    mask: torch.Tensor,
 ) -> torch.Tensor:
     """Compute the masked mean absolute relative error between input and target.
 

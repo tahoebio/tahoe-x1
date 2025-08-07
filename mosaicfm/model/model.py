@@ -190,8 +190,7 @@ class SCGPTModel(nn.Module):
         )
         if self.input_emb_style not in ["category", "continuous"]:
             raise ValueError(
-                f"input_emb_style should be one of category or continuous"
-                f"got {self.input_emb_style}",
+                f"input_emb_style should be one of category or continuous, got {self.input_emb_style}",
             )
         if self.input_emb_style == "continuous":
             self.expression_encoder: ContinuousValueEncoder = ContinuousValueEncoder(
@@ -447,7 +446,8 @@ class SCGPTModel(nn.Module):
         elif self.cell_emb_style == "w-pool":
             if weights is None:
                 raise ValueError("weights is required when cell_emb_style is w-pool")
-            if weights.dim() != 2:  # noqa: PLR2004
+            EXPECTED_WEIGHTS_DIMS = 2
+            if weights.dim() != EXPECTED_WEIGHTS_DIMS:
                 raise ValueError("weights should be 2D")
             cell_emb = torch.sum(layer_output * weights.unsqueeze(2), dim=1)
             cell_emb = F.normalize(cell_emb, p=2, dim=1)  # (batch, embsize)
