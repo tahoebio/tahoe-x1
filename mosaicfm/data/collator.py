@@ -222,9 +222,9 @@ class DataCollator(DefaultDataCollator):
                 # if the reserved key is a tensor, stack them
                 data_dict[key] = torch.stack(data_, dim=0).to(device)
             else:
-                data_dict[key] = data_  # if not tensor, just keep the list
+                data_dict[key] = data_  # type: ignore[assignment]  # if not tensor, just keep the list
 
-        return data_dict
+        return data_dict  # type: ignore[return-value]
 
     def _call_pcpt(
         self,
@@ -273,10 +273,13 @@ class DataCollator(DefaultDataCollator):
                 assert not (
                     self.do_binning
                 ), "Only one of `do_binning` and `log_transform` can be True."
-                expressions[self.keep_first_n_tokens :] = log_transform(
+                log_result = log_transform(
                     row=expressions[self.keep_first_n_tokens :],
                     target_sum=self.target_sum,
                 )
+                if isinstance(log_result, np.ndarray):
+                    log_result = torch.from_numpy(log_result)
+                expressions[self.keep_first_n_tokens :] = log_result
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes,
                 expressions,
@@ -361,10 +364,13 @@ class DataCollator(DefaultDataCollator):
                 assert not (
                     self.do_binning
                 ), "Only one of `do_binning` and `log_transform` can be True."
-                expressions[self.keep_first_n_tokens :] = log_transform(
+                log_result = log_transform(
                     row=expressions[self.keep_first_n_tokens :],
                     target_sum=self.target_sum,
                 )
+                if isinstance(log_result, np.ndarray):
+                    log_result = torch.from_numpy(log_result)
+                expressions[self.keep_first_n_tokens :] = log_result
             genes, expressions = self._sample_or_truncate_plus_pad(
                 genes,
                 expressions,
@@ -498,10 +504,13 @@ class DataCollator(DefaultDataCollator):
                 assert not (
                     self.do_binning
                 ), "Only one of `do_binning` and `log_transform` can be True."
-                expressions[self.keep_first_n_tokens :] = log_transform(
+                log_result = log_transform(
                     row=expressions[self.keep_first_n_tokens :],
                     target_sum=self.target_sum,
                 )
+                if isinstance(log_result, np.ndarray):
+                    log_result = torch.from_numpy(log_result)
+                expressions[self.keep_first_n_tokens :] = log_result
 
             (
                 gen_genes,
@@ -734,7 +743,11 @@ class DataCollator(DefaultDataCollator):
                     array,
                     torch.full(
                         (max_length - len(array),),
-                        self.pad_token_id if i == 0 else self.pad_value,
+                        (
+                            self.pad_token_id
+                            if i == 0 and self.pad_token_id is not None
+                            else self.pad_value
+                        ),
                         dtype=array.dtype,
                         device=device,
                     ),
@@ -798,14 +811,14 @@ def log_transform(
         Union[np.ndarray, torch.Tensor]:
             The log-1p-transformed row.
     """
-    dtype = row.dtype
+    original_dtype = row.dtype if hasattr(row, "dtype") else None
     is_tensor = isinstance(row, torch.Tensor)
     if not is_tensor:
         row = torch.as_tensor(row)
-    row = (row / (row.sum(axis=-1, keepdims=True) + eps)) * target_sum
+    row = (row / (row.sum(dim=-1, keepdim=True) + eps)) * target_sum
     row = torch.log1p(row)
-    if not is_tensor:
-        return row.numpy().astype(dtype)
+    if not is_tensor and original_dtype is not None:
+        return row.detach().numpy().astype(original_dtype)  # type: ignore[arg-type]
     return row
 
 
@@ -833,7 +846,7 @@ def binning(
         Union[np.ndarray, torch.Tensor]:
             The binned row.
     """
-    dtype = row.dtype
+    original_dtype = row.dtype if hasattr(row, "dtype") else None
     return_np = not (isinstance(row, torch.Tensor))
     if not isinstance(row, torch.Tensor):
         row = torch.as_tensor(row)
@@ -848,8 +861,8 @@ def binning(
     else:
         bins = torch.quantile(row, GRADES)
         binned_row = torch.bucketize(row, bins, right=right)
-    if return_np:
-        binned_row = binned_row.astype(dtype)
+    if return_np and original_dtype is not None:
+        binned_row = binned_row.detach().numpy().astype(original_dtype)  # type: ignore[arg-type]
     if not (right):
         # Left sided binning satisfies the condition: bins[i - 1] < row < bins[i]
         # For right=False, the smallest binned values is 0

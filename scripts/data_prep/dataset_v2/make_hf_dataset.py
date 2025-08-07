@@ -1,5 +1,4 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
-# flake8: noqa: SIM401
 import gc
 import logging
 import os

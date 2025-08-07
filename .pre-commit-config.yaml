@@ -3,7 +3,7 @@ default_language_version:
 repos:
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.11.7
+  rev: v0.12.8
   hooks:
   - id: ruff
     args: [--fix, --exit-non-zero-on-fix]
@@ -82,7 +82,7 @@ repos:
     args: []
     additional_dependencies: ["pyright@1.1.256"]
 - repo: https://github.com/trufflesecurity/trufflehog.git
-  rev: v3.88.26
+  rev: v3.90.3
   hooks:
   - id: trufflehog
     name: secret scan

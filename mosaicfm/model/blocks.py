@@ -130,8 +130,8 @@ class SCGPTBlock(nn.Module):
             device=device,
             eps=norm_config.get("eps", 1e-5),
         )
-        self.post_sa_dropout = nn.Dropout(dropout)
-        self.post_ffn_dropout = nn.Dropout(dropout)
+        self.post_sa_dropout = nn.Dropout(dropout if dropout is not None else 0.0)
+        self.post_ffn_dropout = nn.Dropout(dropout if dropout is not None else 0.0)
 
         self.activation = self._get_activation_fn(activation)
         self.norm_scheme = norm_scheme
@@ -276,8 +276,8 @@ class SCGPTEncoder(nn.Module):
                         dtype=torch.bool,
                     )  # 1 means attention is allowed
                 key_padding_mask = torch.cat(
-                    [pcpt_key_padding_mask, gen_key_padding_mask],
-                    dim=1,
+                    [pcpt_key_padding_mask, gen_key_padding_mask],  # type: ignore[list-item]
+                    dim=1,  # type: ignore[arg-type]
                 )  # (B, S)
         p_len = pcpt_total_embs.shape[1]
         total_len = total_embs.shape[1]
@@ -328,7 +328,7 @@ class SCGPTEncoder(nn.Module):
         else:
             pcpt_total_embs = total_embs[:, :p_len, :]
             gen_total_embs = total_embs[:, p_len:, :]
-            return pcpt_total_embs, gen_total_embs
+            return pcpt_total_embs, gen_total_embs  # type: ignore[return-value]
 
     @torch.no_grad()
     @lru_cache(maxsize=1)
@@ -610,7 +610,7 @@ class AffineExprDecoder(torch.nn.Module):
             assert hasattr(nn, activation), f"Unknown activation: {activation}"
             self.activation = getattr(nn, activation)()
 
-    def forward(self, x: torch.Tensor, values: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, values: torch.Tensor) -> Dict[str, torch.Tensor]:
         """
         Args:
             x: Tensor, shape [batch_size, seq_len, embsize]

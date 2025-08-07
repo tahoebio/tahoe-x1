@@ -26,6 +26,7 @@ select = [
 ]
 ignore=["PLR0913", # Too many arguments in function
     "PLR0915", # Too many statements
+    "PLC0415", # Import should be at top-level
     "PLR0912", # Too many branches
     "PERF401", # Enforces list comprehensions over for-loops
     "E501", # Line too long
@@ -57,6 +58,7 @@ include = [
 
 # Pyright
 [tool.pyright]
+pythonVersion = "3.10"
 exclude = ['env-**', 'venv*', '.venv']
 stubPath = ""  # suppress useless 'stubPath is not a valid directory' errors
 

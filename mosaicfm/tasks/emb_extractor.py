@@ -3,6 +3,8 @@ from typing import Optional, Tuple, Union
 
 import numpy as np
 import torch
+import torch.amp
+import torch.utils.data
 from anndata import AnnData
 from omegaconf import DictConfig
 from scipy.sparse import csc_matrix, csr_matrix

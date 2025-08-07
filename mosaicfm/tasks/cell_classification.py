@@ -167,6 +167,10 @@ class CellClassification(Callback):
                 max_length=dataset_seq_len,
                 return_gene_embeddings=False,
             )
+            assert isinstance(
+                cell_embeddings_train,
+                np.ndarray,
+            ), "Expected np.ndarray when return_gene_embeddings=False"
             if use_test_split:
                 assert (
                     adata_test is not None and gene_ids_test is not None
