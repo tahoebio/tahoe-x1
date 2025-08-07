@@ -1,11 +1,12 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 import io
-from typing import Union
+from typing import Any, Dict, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
 import scanpy as sc
 import torch
+from anndata import AnnData
 from composer import State
 from composer.core.callback import Callback
 from composer.loggers import Logger
@@ -18,10 +19,49 @@ from mosaicfm.utils import download_file_from_s3_url
 
 
 class CellClassification(Callback):
+    """Callback for evaluating cell type classification using cell embeddings.
+
+    This callback extracts cell embeddings from a trained MosaicFM model and
+    evaluates their quality for cell type classification tasks. It supports
+    multiple datasets with train/test splits, computes classification metrics
+    (F1 score), calculates LISI (Local Inverse Simpson Index) scores for
+    embedding quality assessment, and generates UMAP visualizations of the
+    learned cell representations.
+
+    The cell classification task is a key benchmark for single-cell foundation
+    models, evaluating whether the learned representations capture meaningful
+    biological cell type distinctions that can be used for downstream
+    classification tasks.
+    """
+
     def __init__(
         self,
-        cfg: dict,
-    ):
+        cfg: Dict[str, Any],
+    ) -> None:
+        """Initialize the CellClassification callback.
+
+        Args:
+            cfg: Configuration dictionary containing:
+                - datasets (Dict[str, Dict]): Registry of datasets to evaluate, where each
+                  dataset entry contains:
+                    - train: Configuration for training data:
+                        - remote (str): S3 URL for training data
+                        - local (str): Local path to save training data
+                    - test (Dict, optional): Configuration for test data (same structure as train)
+                    - cell_type_key (str, optional): Column name for cell type labels.
+                      Defaults to "cell_type_label"
+                    - gene_id_key (str, optional): Column name for gene identifiers.
+                      Defaults to "ensembl_id"
+                    - batch_size (int, optional): Dataset-specific batch size
+                    - seq_len (int, optional): Dataset-specific sequence length
+                - classifier_config (Dict): Configuration for logistic regression classifier:
+                    - max_iter (int, optional): Maximum iterations. Defaults to 5000
+                    - solver (str, optional): Solver algorithm. Defaults to "lbfgs"
+                    - multi_class (str, optional): Multi-class strategy. Defaults to "multinomial"
+                    - random_state (int, optional): Random seed. Defaults to 42
+                - batch_size (int, optional): Default batch size for embedding extraction. Defaults to 50
+                - seq_len (int, optional): Default sequence length. Defaults to 2048
+        """
 
         super().__init__()
 
@@ -30,7 +70,16 @@ class CellClassification(Callback):
         self.batch_size = cfg.get("batch_size", 50)
         self.seq_len = cfg.get("seq_len", 2048)
 
-    def fit_end(self, state: State, logger: Logger):
+    def fit_end(self, state: State, logger: Logger) -> None:
+        """Execute cell classification evaluation at the end of training.
+
+        This method iterates through all registered datasets, downloads the required
+        data files from S3, and performs cell classification evaluation for each dataset.
+
+        Args:
+            state: Composer training state containing the trained model and data loaders
+            logger: Composer logger for recording metrics and visualizations
+        """
 
         self.model = state.model
         self.model_config = self.model.model_config
@@ -47,7 +96,21 @@ class CellClassification(Callback):
                     )
             self.cell_classfication(dataset_name, logger)
 
-    def cell_classfication(self, dataset: str, logger: Logger):
+    def cell_classfication(self, dataset: str, logger: Logger) -> None:
+        """Perform cell classification evaluation for a specific dataset.
+
+        This method:
+        1. Loads and prepares training (and optionally test) data
+        2. Extracts cell embeddings using the trained model
+        3. Trains a logistic regression classifier (if test data available)
+        4. Computes LISI scores to assess embedding quality
+        5. Generates UMAP visualizations colored by cell type
+        6. Logs all metrics and visualizations
+
+        Args:
+            dataset: Name of the dataset to evaluate (key in dataset registry)
+            logger: Composer logger for recording results
+        """
         cell_type_key = self.dataset_registry[dataset].get(
             "cell_type_key",
             "cell_type_label",
@@ -157,7 +220,23 @@ class CellClassification(Callback):
         data_path: str,
         gene_id_key: str,
         cell_type_key: str,
-    ):
+    ) -> Tuple[AnnData, np.ndarray]:
+        """Prepare cell annotation data for classification evaluation.
+
+        This method loads an AnnData object, filters out cells with missing cell type
+        annotations, matches genes with the model vocabulary, and returns the processed
+        data along with corresponding gene IDs.
+
+        Args:
+            data_path: Path to the h5ad file containing single-cell data
+            gene_id_key: Column name in adata.var containing gene identifiers
+            cell_type_key: Column name in adata.obs containing cell type labels
+
+        Returns:
+            Tuple containing:
+                - adata: Processed AnnData object with matched genes and filtered cells
+                - gene_ids: NumPy array of gene vocabulary IDs corresponding to the genes
+        """
 
         vocab = self.vocab
         adata = sc.read_h5ad(data_path)

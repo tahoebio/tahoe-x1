@@ -1,5 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 
+from typing import Any, Dict
+
 import numpy as np
 import pandas as pd
 import scanpy as sc
@@ -19,10 +21,44 @@ from mosaicfm.utils import download_file_from_s3_url
 
 
 class MarginalEssentiality(Callback):
+    """Callback for evaluating marginal gene essentiality prediction using gene
+    embeddings.
+
+    This callback extracts gene embeddings from a trained MosaicFM model and
+    uses them to train a Random Forest classifier to predict marginal gene
+    essentiality. The evaluation is performed on CCLE (Cancer Cell Line
+    Encyclopedia) data to assess how well the learned gene representations
+    capture functional relationships related to cellular fitness.
+
+    The marginal essentiality task evaluates whether gene embeddings can
+    distinguish between genes that are essential for cell survival versus those
+    that are not, based on CRISPR knockout screening data from the CCLE.
+    """
+
     def __init__(
         self,
-        cfg: dict,
-    ):
+        cfg: Dict[str, Any],
+    ) -> None:
+        """Initialize the MarginalEssentiality callback.
+
+        Args:
+            cfg: Configuration dictionary containing:
+                - batch_size (int, optional): Batch size for embedding extraction. Defaults to 32.
+                - seq_len (int, optional): Maximum sequence length for model input. Defaults to 8192.
+                - adata: Configuration for AnnData file containing gene expression data:
+                    - remote (str): S3 URL for the AnnData file
+                    - local (str): Local path to save the downloaded file
+                    - gene_column (str): Column name in adata.var containing gene identifiers
+                - labels: Configuration for labels file containing essentiality annotations:
+                    - remote (str): S3 URL for the labels file
+                    - local (str): Local path to save the downloaded file
+                    - gene_column (str): Column name containing gene identifiers
+                    - label_column (str): Column name containing essentiality labels
+                - classifier: Configuration for the Random Forest classifier:
+                    - test_size (float): Fraction of data to use for testing
+                    - random_state (int): Random seed for reproducible splits
+                    - n_jobs (int): Number of parallel jobs for Random Forest
+        """
 
         super().__init__()
         self.batch_size = cfg.get("batch_size", 32)
@@ -31,7 +67,21 @@ class MarginalEssentiality(Callback):
         self.labels_cfg = cfg.get("labels")
         self.classifier_cfg = cfg.get("classifier")
 
-    def fit_end(self, state: State, logger: Logger):
+    def fit_end(self, state: State, logger: Logger) -> None:
+        """Execute marginal essentiality evaluation at the end of training.
+
+        This method:
+        1. Downloads CCLE gene expression data and essentiality labels from S3
+        2. Processes the AnnData object to match genes with the model vocabulary
+        3. Extracts gene embeddings using the trained model
+        4. Trains a Random Forest classifier on gene embeddings to predict essentiality
+        5. Evaluates classifier performance using area under ROC curve (auROC)
+        6. Logs the auROC metric for downstream analysis
+
+        Args:
+            state: Composer training state containing the trained model and data loaders
+            logger: Composer logger for recording metrics and results
+        """
 
         # get variables from state
         self.model = state.model
