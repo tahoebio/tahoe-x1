@@ -1,4 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+from typing import Any
+
 import torch
 import torch.nn.functional as F
 from torchmetrics import Metric
@@ -112,7 +114,7 @@ class MaskedMseMetric(Metric):
         >>> mse_value = metric.compute()
     """
 
-    def __init__(self, name: str, **kwargs) -> None:
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.name = name
         self.add_state(
@@ -189,7 +191,7 @@ class MaskedSpearmanMetric(Metric):
         >>> correlation = metric.compute()
     """
 
-    def __init__(self, name: str, **kwargs) -> None:
+    def __init__(self, name: str, **kwargs: Any) -> None:
         super().__init__(**kwargs)
         self.name = name
         self.add_state(

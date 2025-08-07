@@ -120,7 +120,7 @@ class DataCollator(DefaultDataCollator):
             "If `use_chem_token` is True, we need to keep <cls> and <drug> token in the beggining of pcpt_genes. So `keep_first_n_tokens` must be >=2!",
         )
         # load drug_to_id mapping if present
-        if self.use_chem_token:
+        if self.use_chem_token and drug_to_id_path is not None:
             if dist.get_local_rank() == 0:
                 download_file_from_s3_url(
                     s3_url=drug_to_id_path["remote"],
@@ -156,7 +156,9 @@ class DataCollator(DefaultDataCollator):
         if isinstance(self.reserve_keys, str):
             self.reserve_keys = [self.reserve_keys]
 
-        if self.keep_first_n_tokens < 0 or self.keep_first_n_tokens > self.max_length:
+        if self.max_length is not None and (
+            self.keep_first_n_tokens < 0 or self.keep_first_n_tokens > self.max_length
+        ):
             raise ValueError(
                 "`keep_first_n_tokens` must be between 0 and `max_length` "
                 f"({self.max_length}).",
@@ -210,6 +212,8 @@ class DataCollator(DefaultDataCollator):
             data_dict = self._call_gen(examples)
         elif self.data_style == "both":
             data_dict = self._call_both(examples)
+        else:
+            raise ValueError(f"Unknown data_style: {self.data_style}")
 
         # add reserved keys
         device = examples[0]["genes"].device
@@ -245,7 +249,11 @@ class DataCollator(DefaultDataCollator):
         device = examples[0]["genes"].device
 
         max_ori_len = max(len(example["genes"]) for example in examples)
-        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
+        _max_length = (
+            self.max_length
+            if self.max_length is not None and max_ori_len >= self.max_length
+            else max_ori_len
+        )
 
         # pad and truncate
         padded_genes = []
@@ -321,12 +329,16 @@ class DataCollator(DefaultDataCollator):
         """
 
         if not isinstance(examples[0], Mapping):
-            return NotImplementedError
+            raise NotImplementedError
 
         device = examples[0]["genes"].device
 
         max_ori_len = max(len(example["genes"]) for example in examples)
-        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
+        _max_length = (
+            self.max_length
+            if self.max_length is not None and max_ori_len >= self.max_length
+            else max_ori_len
+        )
 
         # pad and truncate
         padded_pcpt_genes = []
@@ -419,7 +431,11 @@ class DataCollator(DefaultDataCollator):
             gen_prob = self.get_mlm_probability()
 
         max_ori_len = max(len(example["genes"]) for example in examples)
-        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
+        _max_length = (
+            self.max_length
+            if self.max_length is not None and max_ori_len >= self.max_length
+            else max_ori_len
+        )
 
         gen_length = int((_max_length - self.keep_first_n_tokens) * gen_prob)
         pcpt_length = _max_length - gen_length  # perception part length
@@ -431,7 +447,7 @@ class DataCollator(DefaultDataCollator):
         padded_gen_genes = []
         padded_gen_expressions = []
         padded_gen_original_exp = []
-        drug_ids = [] if self.use_chem_token else None
+        drug_ids = []
 
         for i in range(len(examples)):
             genes = examples[i]["genes"]

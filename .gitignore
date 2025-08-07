@@ -141,7 +141,9 @@ dmypy.json
 *.npy
 events.out.tfevents.*
 tmp/
-data/
+/data/
+datasets/
+*.dataset
 save/
 saved/
 output/
