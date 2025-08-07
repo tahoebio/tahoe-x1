@@ -56,7 +56,7 @@ class DataCollator(DefaultDataCollator):
         self,
         vocab: GeneVocab,
         drug_to_id_path: Optional[dict] = None,
-        use_chem_token: int = False,
+        use_chem_token: bool = False,
         do_padding: bool = True,
         unexp_padding: bool = False,
         pad_token_id: Optional[int] = None,
