@@ -161,3 +161,7 @@ runai/*/
 *.json
 debug_notebooks/
 ckpt/
+
+# IDE files
+.idea/
+.vscode/
