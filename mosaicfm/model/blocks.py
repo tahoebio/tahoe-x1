@@ -87,8 +87,8 @@ class SCGPTBlock(nn.Module):
         dropout: Optional[float] = 0.0,
         activation: Optional[str] = "gelu",
         device: Optional[str] = None,
-        dtype=None,
-        norm_scheme="pre",
+        dtype: Optional[torch.dtype] = None,
+        norm_scheme: str = "pre",
         use_glu: bool = False,
         **kwargs: Any,
     ) -> None:
@@ -139,7 +139,7 @@ class SCGPTBlock(nn.Module):
             raise ValueError("norm_scheme must be either pre or post")
 
     @staticmethod
-    def _get_activation_fn(activation):
+    def _get_activation_fn(activation: Optional[str]):
         return resolve_ffn_act_fn({"name": activation})
 
     def forward(
@@ -332,7 +332,7 @@ class SCGPTEncoder(nn.Module):
 
     @torch.no_grad()
     @lru_cache(maxsize=1)
-    def _make_mask(self, p_len, g_len, device):
+    def _make_mask(self, p_len: int, g_len: int, device: torch.device):
         # Mask follows the LLM Foundry convention
         # ie: 0 indicates no-attention, 1 indicates attention is allowed
         total_len = p_len + g_len
@@ -391,7 +391,7 @@ class GeneEncoder(nn.Module):
             if pretrained_vocab_size < num_embeddings:
                 log.warning(
                     f"[{name}] Pretrained embedding size ({pretrained_vocab_size}) is smaller than vocab size ({num_embeddings}). "
-                    f"Filling remaining {num_embeddings - pretrained_vocab_size} rows with zeros.",
+                    + f"Filling remaining {num_embeddings - pretrained_vocab_size} rows with zeros.",
                 )
             weight = torch.zeros(
                 num_embeddings,
@@ -605,7 +605,7 @@ class AffineExprDecoder(torch.nn.Module):
         self.coeff_decoder = ExprDecoder(d_model)
         self.bias_decoder = ExprDecoder(d_model)
 
-        self.activation = activation
+        self.activation: Optional[nn.Module] = None
         if activation is not None:
             assert hasattr(nn, activation), f"Unknown activation: {activation}"
             self.activation = getattr(nn, activation)()

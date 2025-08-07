@@ -127,6 +127,9 @@ class MaskedMseMetric(Metric):
             default=torch.tensor(0.0, dtype=torch.float32),
             dist_reduce_fx="sum",
         )
+        # Type annotations for state variables
+        self.sum_mse: torch.Tensor
+        self.sum_mask: torch.Tensor
 
     def update(
         self,
@@ -204,6 +207,9 @@ class MaskedSpearmanMetric(Metric):
             default=torch.tensor(0.0, dtype=torch.float32),
             dist_reduce_fx="sum",
         )
+        # Type annotations for state variables
+        self.sum_spearman: torch.Tensor
+        self.num_examples: torch.Tensor
 
     def update(
         self,

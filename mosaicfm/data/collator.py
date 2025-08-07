@@ -65,7 +65,7 @@ class DataCollator(DefaultDataCollator):
         do_binning: bool = True,
         log_transform: bool = False,
         target_sum: int = 10000,
-        mlm_probability: float = 0.15,
+        mlm_probability: Union[float, List[float]] = 0.15,
         mask_value: int = -1,
         max_length: Optional[int] = None,
         sampling: bool = True,
@@ -160,8 +160,7 @@ class DataCollator(DefaultDataCollator):
             self.keep_first_n_tokens < 0 or self.keep_first_n_tokens > self.max_length
         ):
             raise ValueError(
-                "`keep_first_n_tokens` must be between 0 and `max_length` "
-                f"({self.max_length}).",
+                f"`keep_first_n_tokens` must be between 0 and `max_length` ({self.max_length}).",
             )
 
         if self.data_style not in ["pcpt", "gen", "both"]:
@@ -630,8 +629,7 @@ class DataCollator(DefaultDataCollator):
             return np.random.choice(self.mlm_probability)
         else:
             raise ValueError(
-                "mlm_probability must be a float or a list of floats, "
-                f"but got {type(self.mlm_probability)} instead.",
+                f"mlm_probability must be a float or a list of floats, but got {type(self.mlm_probability)} instead.",
             )
 
     def _mask(

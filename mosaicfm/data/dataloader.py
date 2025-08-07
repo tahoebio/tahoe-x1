@@ -190,7 +190,7 @@ class CountDataset(torch.utils.data.Dataset):
     def __len__(self) -> int:
         return self.count_matrix.shape[0]
 
-    def __getitem__(self, idx) -> Dict[str, torch.Tensor]:
+    def __getitem__(self, idx: int) -> Dict[str, torch.Tensor]:
         row = self.count_matrix.getrow(idx)
         nonzero_idx = row.indices
         values = row.data
