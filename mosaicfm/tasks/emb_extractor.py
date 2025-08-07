@@ -56,7 +56,7 @@ def get_batch_embeddings(
 
     if gene_ids is None:
         gene_ids = np.array(adata.var["id_in_vocab"])
-        assert np.all(gene_ids >= 0)
+    assert gene_ids is not None and np.all(gene_ids >= 0)
 
     if max_length is None:
         max_length = len(gene_ids)
@@ -100,18 +100,19 @@ def get_batch_embeddings(
 
     device = next(model.parameters()).device
     cell_embeddings = np.zeros((len(dataset), model_cfg["d_model"]), dtype=np.float32)
-    if return_gene_embeddings:
-        gene_embeddings = torch.zeros(
-            len(vocab),
-            model_cfg["d_model"],
-            dtype=torch.float32,
-            device=device,
-        )
-        gene_embedding_counts = torch.zeros(
-            len(vocab),
-            dtype=torch.float32,
-            device=device,
-        )
+
+    # Initialize gene embedding variables (will be used if return_gene_embeddings is True)
+    gene_embeddings = torch.zeros(
+        len(vocab),
+        model_cfg["d_model"],
+        dtype=torch.float32,
+        device=device,
+    )
+    gene_embedding_counts = torch.zeros(
+        len(vocab),
+        dtype=torch.float32,
+        device=device,
+    )
 
     dtype_from_string = {
         "fp32": torch.float32,

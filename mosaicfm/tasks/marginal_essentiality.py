@@ -91,6 +91,16 @@ class MarginalEssentiality(Callback):
         self.vocab = state.train_dataloader.collate_fn.vocab
         self.run_name = state.run_name
 
+        # Validate configuration
+        if (
+            self.adata_cfg is None
+            or self.labels_cfg is None
+            or self.classifier_cfg is None
+        ):
+            raise ValueError(
+                "adata_cfg, labels_cfg, and classifier_cfg must all be provided",
+            )
+
         # download task data from S3
         download_file_from_s3_url(
             s3_url=self.adata_cfg["remote"],

@@ -169,7 +169,7 @@ class DataCollator(DefaultDataCollator):
     def __call__(
         self,
         examples: List[Dict[str, torch.Tensor]],
-    ) -> Dict[str, torch.Tensor]:
+    ) -> Dict[str, Union[torch.Tensor, List[torch.Tensor]]]:
         """
         Args:
             examples (:obj:`List[Dict[str, torch.Tensor]]`): a list of data dicts.
@@ -261,11 +261,14 @@ class DataCollator(DefaultDataCollator):
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
+                binned_result = binning(
                     row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.num_bins,
                     right=self.right_binning,
                 )
+                if isinstance(binned_result, np.ndarray):
+                    binned_result = torch.from_numpy(binned_result)
+                expressions[self.keep_first_n_tokens :] = binned_result
             elif self.log_transform:
                 assert not (
                     self.do_binning
@@ -346,11 +349,14 @@ class DataCollator(DefaultDataCollator):
             genes = examples[i]["genes"]
             expressions = examples[i]["expressions"]
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
+                binned_result = binning(
                     row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.num_bins,
                     right=self.right_binning,
                 )
+                if isinstance(binned_result, np.ndarray):
+                    binned_result = torch.from_numpy(binned_result)
+                expressions[self.keep_first_n_tokens :] = binned_result
             elif self.log_transform:
                 assert not (
                     self.do_binning
@@ -480,11 +486,14 @@ class DataCollator(DefaultDataCollator):
             original_expressions = expressions.detach().clone()
 
             if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
+                binned_result = binning(
                     row=expressions[self.keep_first_n_tokens :],
                     n_bins=self.num_bins,
                     right=self.right_binning,
                 )
+                if isinstance(binned_result, np.ndarray):
+                    binned_result = torch.from_numpy(binned_result)
+                expressions[self.keep_first_n_tokens :] = binned_result
             elif self.log_transform:
                 assert not (
                     self.do_binning

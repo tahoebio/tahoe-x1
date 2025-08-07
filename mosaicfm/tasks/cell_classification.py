@@ -87,6 +87,11 @@ class CellClassification(Callback):
         self.vocab = state.train_dataloader.collate_fn.vocab
         self.run_name = state.run_name
 
+        if self.dataset_registry is None:
+            raise ValueError(
+                "dataset_registry is None but required for cell classification evaluation",
+            )
+
         for dataset_name, dataset_cfg in self.dataset_registry.items():
             for split in ["train", "test"]:
                 if split in dataset_cfg:
@@ -111,6 +116,8 @@ class CellClassification(Callback):
             dataset: Name of the dataset to evaluate (key in dataset registry)
             logger: Composer logger for recording results
         """
+        assert self.dataset_registry is not None, "dataset_registry should not be None"
+
         cell_type_key = self.dataset_registry[dataset].get(
             "cell_type_key",
             "cell_type_label",
@@ -125,6 +132,10 @@ class CellClassification(Callback):
             gene_id_key=gene_id_key,
         )
         use_test_split = False
+        adata_test = None
+        gene_ids_test = None
+        cell_embeddings_test = None
+
         if "test" in self.dataset_registry[dataset]:
             adata_test, gene_ids_test = self.prepare_cell_annotation_data(
                 self.dataset_registry[dataset]["test"]["local"],
@@ -157,6 +168,9 @@ class CellClassification(Callback):
                 return_gene_embeddings=False,
             )
             if use_test_split:
+                assert (
+                    adata_test is not None and gene_ids_test is not None
+                ), "Test data should be available when use_test_split is True"
                 cell_embeddings_test = get_batch_embeddings(
                     adata=adata_test,
                     model=self.model.model,
@@ -171,6 +185,13 @@ class CellClassification(Callback):
 
         if use_test_split:
             # step 3: train classifier if test split is available
+            assert (
+                self.classifier_config is not None
+            ), "classifier_config should not be None"
+            assert (
+                cell_embeddings_test is not None and adata_test is not None
+            ), "Test data should be available"
+
             clf = LogisticRegression(
                 max_iter=self.classifier_config.get("max_iter", 5000),
                 solver=self.classifier_config.get("solver", "lbfgs"),
@@ -248,7 +269,7 @@ class CellClassification(Callback):
         gene_ids_in_vocab = np.array(adata.var["id_in_vocab"])
         print(
             f"match {np.sum(gene_ids_in_vocab >= 0)}/{len(gene_ids_in_vocab)} genes "
-            f"in vocabulary of size {len(vocab)}.",
+            + f"in vocabulary of size {len(vocab)}.",
         )
         adata = adata[:, adata.var["id_in_vocab"] >= 0]
         genes = adata.var[gene_id_key].tolist()

@@ -192,8 +192,11 @@ class SCGPTModel(nn.Module):
             raise ValueError(
                 f"input_emb_style should be one of category or continuous, got {self.input_emb_style}",
             )
+        # Declare expression_encoder type based on input style
+        self.expression_encoder: Union[ContinuousValueEncoder, CategoryValueEncoder]
+
         if self.input_emb_style == "continuous":
-            self.expression_encoder: ContinuousValueEncoder = ContinuousValueEncoder(
+            self.expression_encoder = ContinuousValueEncoder(
                 d_model=self.d_model,
                 dropout=expression_encoder_config.get("dropout", 0.1),
                 max_value=expression_encoder_config.get("max_value", 512),
@@ -202,10 +205,10 @@ class SCGPTModel(nn.Module):
             )
         elif self.input_emb_style == "category":
             assert self.n_input_bins > 0
-            self.expression_encoder: CategoryValueEncoder = CategoryValueEncoder(
+            self.expression_encoder = CategoryValueEncoder(
                 self.n_input_bins,
                 self.d_model,
-                padding_idx=self.pad_value,
+                padding_idx=int(self.pad_value),
                 use_norm=False,
             )
         else:
@@ -281,6 +284,10 @@ class SCGPTModel(nn.Module):
         if hasattr(module, "skip_init") and module.skip_init:
             log.info(f"Skipping re-initializing for {module._get_name()}")
             return
+        if self.init_config is None:
+            raise ValueError(
+                "init_config is None but required for parameter initialization",
+            )
         init_fn_name: str = self.init_config["name"]
         param_init_fns.get(init_fn_name)(
             module=module,
@@ -451,16 +458,18 @@ class SCGPTModel(nn.Module):
                 raise ValueError("weights should be 2D")
             cell_emb = torch.sum(layer_output * weights.unsqueeze(2), dim=1)
             cell_emb = F.normalize(cell_emb, p=2, dim=1)  # (batch, embsize)
+        else:
+            raise ValueError(f"Unknown cell_emb_style: {self.cell_emb_style}")
 
         return cell_emb
 
     def _extend_output(
         self,
-        output: Mapping[str, Tensor],
+        output: Dict[str, Tensor],
         transformer_output: Tensor,
         CLS: bool = False,
         MVC: bool = False,
-    ) -> Mapping[str, Tensor]:
+    ) -> Dict[str, Tensor]:
         """Extend model output with additional decoder predictions.
 
         This method augments the base model output dictionary with additional
@@ -500,8 +509,8 @@ class SCGPTModel(nn.Module):
 
     def forward(
         self,
-        *args,
-        **kwargs,
+        *args: Any,
+        **kwargs: Any,
     ) -> Mapping[str, Tensor]:
         """Forward pass router that delegates to generative or perceptual mode.
 

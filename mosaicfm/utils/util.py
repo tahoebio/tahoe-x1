@@ -22,7 +22,7 @@ def add_file_handler(logger: logging.Logger, log_file_path: Path):
     logger.addHandler(h)
 
 
-def download_file_from_s3_url(s3_url, local_file_path):
+def download_file_from_s3_url(s3_url: str, local_file_path: str):
     """Downloads a file from an S3 URL to the specified local path.
 
     :param s3_url: S3 URL in the form s3://bucket-name/path/to/file
@@ -61,7 +61,12 @@ def download_file_from_s3_url(s3_url, local_file_path):
         return None
 
 
-def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
+def calc_pearson_metrics(
+    preds: np.ndarray,
+    targets: np.ndarray,
+    conditions: np.ndarray,
+    mean_ctrl: np.ndarray,
+):
 
     conditions_unique = np.unique(conditions)
     condition2idx = {c: np.where(conditions == c)[0] for c in conditions_unique}

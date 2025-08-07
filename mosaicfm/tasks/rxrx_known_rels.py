@@ -1,6 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 
 import pickle
+from typing import Callable, Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -86,14 +87,18 @@ def convert_metrics_to_df(metrics: dict, source: str) -> pd.DataFrame:
 def known_relationship_benchmark(
     map_data: Bunch,
     pert_col: str,
-    known_rels: dict,
-    benchmark_sources=["CORUM", "HuMAP", "Reactome", "SIGNOR", "StringDB"],
-    recall_thr_pairs=[(0.05, 0.95)],
-    min_req_entity_cnt=20,
-    log_stats=False,
-    compute_recall_fn=compute_recall,
-    convert_metrics_to_df_fn=convert_metrics_to_df,
+    known_rels: Dict[str, pd.DataFrame],
+    benchmark_sources: Optional[List[str]] = None,
+    recall_thr_pairs: Optional[List[Tuple[float, float]]] = None,
+    min_req_entity_cnt: int = 20,
+    log_stats: bool = False,
+    compute_recall_fn: Callable = compute_recall,
+    convert_metrics_to_df_fn: Callable = convert_metrics_to_df,
 ):
+    if benchmark_sources is None:
+        benchmark_sources = ["CORUM", "HuMAP", "Reactome", "SIGNOR", "StringDB"]
+    if recall_thr_pairs is None:
+        recall_thr_pairs = [(0.05, 0.95)]
 
     md = map_data.metadata
     features = map_data.features.set_index(md[pert_col]).rename_axis(index=None)

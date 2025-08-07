@@ -87,7 +87,7 @@ class GeneVocab:
         ]
         # Sort tokens by frequency (descending) then lexicographically (ascending).
         filtered.sort(key=lambda x: (-x[1], x[0]))
-        tokens = [token for token, freq in filtered]
+        tokens = [token for token, _ in filtered]
         if specials is not None:
             tokens = specials + tokens if special_first else tokens + specials
         return {token: idx for idx, token in enumerate(tokens)}
