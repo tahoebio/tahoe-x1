@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import torch
 
-from mosaicfm.model.blocks import SCGPTBlock, SCGPTEncoder
+from mosaicfm.model.blocks import TransformerBlock, TransformerEncoder
 
 
 def test_encoder():
@@ -12,12 +12,12 @@ def test_encoder():
     # get the available device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    flash_gpt_layer = SCGPTBlock(
+    flash_gpt_layer = TransformerBlock(
         d_model=embed_dim,
         n_heads=n_heads,
         expansion_ratio=1,
     )
-    flash_gpt_generator = SCGPTEncoder(
+    flash_gpt_generator = TransformerEncoder(
         encoder_layer=flash_gpt_layer,
         num_layers=3,
     ).to(device)

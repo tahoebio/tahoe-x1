@@ -30,7 +30,7 @@ class DataCollator(DefaultDataCollator):
         target_sum (int): Target sum before log1p transformation.
         mlm_probability (float | list[float]): Masking probability (or choices).
         mask_value (int): Value filled at masked expression positions.
-        max_length (int, optional): Max sequence length (required if do_padding=True).
+        max_length (int, optional): Max sequence length (2048 typically, required if do_padding=True).
         sampling (bool): If True, sample instead of truncate when length > max_length.
         reserve_keys (List[str], optional): Keys to carry through unchanged in outputs.
         keep_first_n_tokens (int): Number of leading tokens to preserve from sampling.
@@ -38,7 +38,7 @@ class DataCollator(DefaultDataCollator):
             - 'pcpt': returns inputs for perception training (genes + masked expr).
             - 'gen': returns inputs for generative setting as 'pcpt_gene' and 'pcpt_expr'.
             - 'both': returns split perception/generation fields.
-        num_bins (int): Number of bins for bucketing expression values.
+        num_bins (int): Number of bins for bucketing expression values (51 typically).
         right_binning (bool): Use right-sided bucketing (torch default: False).
     """
 
@@ -818,23 +818,22 @@ def binning(
     n_bins: int,
     right: bool = False,
 ) -> Union[np.ndarray, torch.Tensor]:
-    """Binning the row into n_bins.
+    """Quantize gene expression values into discrete bins.
+
+    Converts continuous expression counts into discrete tokens using quantile-based
+    binning for efficient transformer training.
 
     Args:
         row (Union[np.ndarray, torch.Tensor]):
-            The row to be binned.
+            Gene expression counts for a single cell.
         n_bins (int):
-            The number of bins.
+            Number of quantization bins (51 typically).
         right (bool, optional):
-            Argument passed to `torch.bucketize`. if False, return the first suitable location that is found.
-            If True, return the last such index.
-            If no suitable index found, return 0 for non-numerical value (eg. nan, inf) or the size of boundaries
-            (one pass the last index). In other words, if False, gets the lower bound index for each value
-            in input from boundaries. If True, gets the upper bound index instead. Default value is False.
-    .
+            Whether to use right-sided binning for boundary values.
+
     Returns:
         Union[np.ndarray, torch.Tensor]:
-            The binned row.
+            Binned expression values as discrete tokens in range [1, n_bins].
     """
     original_dtype = row.dtype if hasattr(row, "dtype") else None
     return_np = not (isinstance(row, torch.Tensor))

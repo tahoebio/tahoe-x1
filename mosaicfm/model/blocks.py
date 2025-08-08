@@ -51,30 +51,30 @@ gene_encoder_defaults: Dict = {
 log = logging.getLogger(__name__)
 
 
-class SCGPTBlock(nn.Module):
-    r"""TransformerEncoderLayer is made up of self-attn and feedforward network.
-    The class is modified from torch.nn.TransformerEncoderLayer to support the
-    FlashAttention.
+class TransformerBlock(nn.Module):
+    r"""Transformer block with self-attention and feedforward network.
+
+    Supports grouped query attention, pre/post normalization, and GLU activation.
+    Built for efficient training with Flash Attention and memory optimization.
 
     Args:
-        d_model: the number of expected features in the input (required).
-        n_heads: the number of heads in the multiheadattention models (required).
-        dim_feedforward: the dimension of the feedforward network model (default=2048).
-        dropout: the dropout value (default=0.1).
-        activation: the activation function of intermediate layer, relu or gelu (default=relu).
-        layer_norm_eps: the eps value in layer normalization components (default=1e-5).
-        batch_first: If ``True``, then the input and output tensors are provided
-            as (batch, seq, feature). Default: ``False``.
+        d_model: Hidden dimension size.
+        n_heads: Number of attention heads.
+        expansion_ratio: Feed-forward network expansion ratio.
+        attn_config: Attention mechanism configuration.
+        norm_config: Layer normalization configuration.
+        dropout: Dropout probability.
+        activation: Activation function (gelu recommended).
+        device: Device for module parameters.
+        dtype: Data type for parameters.
+        norm_scheme: Normalization scheme ('pre' or 'post').
+        use_glu: Whether to use GLU activation in FFN.
 
     Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = encoder_layer(src)
-
-    Alternatively, when ``batch_first`` is ``True``:
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8, batch_first=True)
-        >>> src = torch.rand(32, 10, 512)
-        >>> out = encoder_layer(src)
+        >>> block = TransformerBlock(d_model=1536, n_heads=24, expansion_ratio=4,
+        ...                    norm_scheme="pre", use_glu=True)
+        >>> src = torch.rand(32, 2048, 1536)
+        >>> out = block(src)
     """
 
     def __init__(
@@ -200,29 +200,29 @@ class SCGPTBlock(nn.Module):
         return self.post_ffn_dropout(x)
 
 
-class SCGPTEncoder(nn.Module):
-    # takes in the set of different inputs in an mapping
-    r"""TransformerEncoder is a stack of N encoder layers. Users can build the
-    BERT(https://arxiv.org/abs/1810.04805) model with corresponding parameters.
+class TransformerEncoder(nn.Module):
+    r"""Transformer encoder for single-cell RNA-seq foundation modeling.
+
+    Processes perception (pcpt) and generation (gen) gene tokens with specialized
+    attention masking. Supports both encoder-only and encoder-decoder modes.
 
     Args:
-        encoder_layer: an instance of the TransformerEncoderLayer() class (required).
-        num_layers: the number of sub-encoder-layers in the encoder (required).
-        norm: the layer normalization component (optional).
-        enable_nested_tensor: if True, input will automatically convert to nested tensor
-            (and convert back on output). This will improve the overall performance of
-            TransformerEncoder when padding rate is high. Default: ``True`` (enabled).
+        encoder_layer: TransforemrBlock instance for transformer layers.
+        num_layers: Number of transformer layers.
+        use_norm: Whether to apply final layer normalization.
+        norm_config: Layer normalization configuration.
+        attn_config: Attention configuration including masking behavior.
 
     Examples::
-        >>> encoder_layer = nn.TransformerEncoderLayer(d_model=512, nhead=8)
-        >>> transformer_encoder = nn.TransformerEncoder(encoder_layer, num_layers=6)
-        >>> src = torch.rand(10, 32, 512)
-        >>> out = transformer_encoder(src)
+        >>> layer = TransformerBlock(d_model=1536, n_heads=24)
+        >>> encoder = TransformerEncoder(layer, num_layers=24)
+        >>> pcpt_embs = torch.rand(32, 1024, 1536)
+        >>> output = encoder(pcpt_embs)
     """
 
     def __init__(
         self,
-        encoder_layer: SCGPTBlock,
+        encoder_layer: TransformerBlock,
         num_layers: int,
         use_norm: bool = False,
         norm_config: Optional[Dict] = None,
@@ -486,7 +486,10 @@ class ChemEncoder(nn.Module):
 
 
 class ContinuousValueEncoder(nn.Module):
-    """Encode real number values to a vector using neural nets projection."""
+    """Encode continuous gene expression values to dense vectors.
+
+    Uses neural network projection for continuous expression modeling.
+    """
 
     def __init__(
         self,
@@ -549,8 +552,10 @@ class CategoryValueEncoder(nn.Module):
 
 
 class ExprDecoder(nn.Module):
-    """Consists of three linear functions and leaky-relu as an activation
-    function."""
+    """MLP decoder for gene expression prediction.
+
+    Predicts continuous expression values from transformer hidden states.
+    """
 
     def __init__(
         self,
@@ -646,7 +651,10 @@ class AffineExprDecoder(torch.nn.Module):
 
 
 class MVCDecoder(nn.Module):
-    """Decoder for the masked value prediction for cell embeddings."""
+    """Masked Value Completion decoder for gene expression prediction.
+
+    Uses inner product attention between cell and gene embeddings.
+    """
 
     def __init__(
         self,

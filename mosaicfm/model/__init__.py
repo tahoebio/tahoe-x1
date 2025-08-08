@@ -5,24 +5,24 @@ from .blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TransformerBlock,
+    TransformerEncoder,
 )
 from .model import (
-    ComposerSCGPTModel,
-    ComposerSCGPTPerturbationModel,
-    SCGPTModel,
+    ComposerMosaicfmModel,
+    ComposerMosaicfmPerturbationModel,
+    MosaicfmModel,
 )
 
 __all__ = [
     "CategoryValueEncoder",
-    "ComposerSCGPTModel",
-    "ComposerSCGPTPerturbationModel",
+    "ComposerMosaicfmModel",
+    "ComposerMosaicfmPerturbationModel",
     "ContinuousValueEncoder",
     "ExprDecoder",
     "GeneEncoder",
     "MVCDecoder",
-    "SCGPTBlock",
-    "SCGPTEncoder",
-    "SCGPTModel",
+    "MosaicfmModel",
+    "TransformerBlock",
+    "TransformerEncoder",
 ]

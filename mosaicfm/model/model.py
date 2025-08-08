@@ -19,8 +19,8 @@ from mosaicfm.model.blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TransformerBlock,
+    TransformerEncoder,
     gene_encoder_defaults,
     init_config_defaults,
 )
@@ -28,12 +28,12 @@ from mosaicfm.model.blocks import (
 log = logging.getLogger(__name__)
 
 
-class SCGPTModel(nn.Module):
-    """Single-Cell Gene Programming Transformer (SCGPT) Model.
+class MosaicfmModel(nn.Module):
+    """MosaicFM Model.
 
     A transformer-based foundation model for single-cell RNA-seq data analysis.
     This model processes gene expression data by tokenizing genes and their expression
-    values, then using transformer architecture to learn representations and perform
+    values, then uses transformer architecture to learn representations for
     various downstream tasks including generative modeling, masked value prediction,
     and cell type classification.
 
@@ -54,12 +54,12 @@ class SCGPTModel(nn.Module):
     Args:
         model_config: Configuration containing model architecture parameters including:
             - vocab_size: Number of genes in vocabulary (~60K for human genome)
-            - n_layers: Number of transformer layers
-            - n_heads: Number of attention heads
-            - d_model: Hidden dimension size
-            - expansion_ratio: Feed-forward network expansion ratio
-            - norm_scheme: Normalization scheme ('pre' or 'post')
-            - transformer_activation: Activation function for transformer blocks
+            - n_layers: Number of transformer layers (24 for 1.3B model)
+            - n_heads: Number of attention heads (24 for 1.3B model)
+            - d_model: Hidden dimension size (1536 for 1.3B model)
+            - expansion_ratio: Feed-forward network expansion ratio (4 for 1.3B model)
+            - norm_scheme: Normalization scheme ('pre' recommended)
+            - transformer_activation: Activation function (gelu recommended)
             - use_generative_training: Whether to enable generative training mode
             - cell_emb_style: Cell embedding aggregation method ('cls', 'avg-pool', 'w-pool')
             - attn_config: Attention mechanism configuration
@@ -72,8 +72,8 @@ class SCGPTModel(nn.Module):
             - chemical_encoder: Chemical encoder configuration (optional)
         collator_config: Data collation configuration containing:
             - pad_token_id: Padding token ID for genes
-            - pad_value: Padding value for expressions
-            - num_bins: Number of bins for categorical expression encoding
+            - pad_value: Padding value for expressions (-2 typically)
+            - num_bins: Number of bins for categorical expression encoding (51 typically)
             - use_chem_token: Whether to use chemical tokens for drug perturbation
         device: Device to place model parameters on ('cpu', 'cuda', etc.)
 
@@ -97,16 +97,16 @@ class SCGPTModel(nn.Module):
 
     Examples:
         >>> model_cfg = DictConfig({
-        ...     'vocab_size': 60000, 'n_layers': 12, 'n_heads': 8, 'd_model': 512,
-        ...     'expansion_ratio': 4, 'expression_encoder': {'input_emb_style': 'continuous'},
+        ...     'vocab_size': 60000, 'n_layers': 24, 'n_heads': 24, 'd_model': 1536,
+        ...     'expansion_ratio': 4, 'expression_encoder': {'input_emb_style': 'category'},
         ...     'expression_decoder': {'n_outputs': 1}
         ... })
-        >>> collator_cfg = DictConfig({'pad_token_id': 0, 'pad_value': -1, 'num_bins': 256})
-        >>> model = SCGPTModel(model_cfg, collator_cfg)
+        >>> collator_cfg = DictConfig({'pad_token_id': 0, 'pad_value': -2, 'num_bins': 51})
+        >>> model = MosaicfmModel(model_cfg, collator_cfg)
         >>> # Forward pass for perceptual mode
-        >>> genes = torch.randint(0, 60000, (32, 2000))  # (batch, seq_len)
-        >>> expressions = torch.randn(32, 2000)  # (batch, seq_len)
-        >>> mask = torch.ones(32, 2000, dtype=torch.bool)  # (batch, seq_len)
+        >>> genes = torch.randint(0, 60000, (32, 2048))  # (batch, seq_len)
+        >>> expressions = torch.randint(1, 52, (32, 2048))  # binned expressions
+        >>> mask = torch.ones(32, 2048, dtype=torch.bool)  # (batch, seq_len)
         >>> output = model(genes, expressions, mask, generative_training=False)
     """
 
@@ -224,7 +224,7 @@ class SCGPTModel(nn.Module):
                 freeze=chem_encoder_config.get("freeze", False),
             )
 
-        encoder_layers: SCGPTBlock = SCGPTBlock(
+        encoder_layers: TransformerBlock = TransformerBlock(
             d_model=self.d_model,
             n_heads=self.n_heads,
             expansion_ratio=self.expansion_ratio,
@@ -235,7 +235,7 @@ class SCGPTModel(nn.Module):
             norm_scheme=self.norm_scheme,
             use_glu=model_config.get("use_glu", False),
         )
-        self.transformer_encoder: SCGPTEncoder = SCGPTEncoder(
+        self.transformer_encoder: TransformerEncoder = TransformerEncoder(
             encoder_layers,
             self.n_layers,
             use_norm=self.norm_scheme == "pre",
@@ -690,9 +690,9 @@ class SCGPTModel(nn.Module):
 
         Returns:
             True if the module should be wrapped with FSDP, False otherwise.
-            Currently returns True only for SCGPTBlock instances.
+            Currently returns True only for TransformerBlock instances.
         """
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TransformerBlock)
 
     def activation_checkpointing_fn(self, module: nn.Module) -> bool:
         """Determine if a module should use activation checkpointing.
@@ -706,16 +706,16 @@ class SCGPTModel(nn.Module):
 
         Returns:
             True if the module should use activation checkpointing, False otherwise.
-            Currently returns True only for SCGPTBlock instances.
+            Currently returns True only for TransformerBlock instances.
         """
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TransformerBlock)
 
 
-class ComposerSCGPTModel(ComposerModel):
-    """Composer wrapper for SCGPTModel enabling distributed training and
+class ComposerMosaicfmModel(ComposerModel):
+    """Composer wrapper for MosaicfmModel enabling distributed training and
     evaluation.
 
-    This class wraps the SCGPTModel with MosaicML Composer's ComposerModel interface,
+    This class wraps the MosaicfmModel with MosaicML Composer's ComposerModel interface,
     providing standardized training loops, metrics computation, loss calculation, and
     distributed training support. It handles the training and validation logic for
     the foundation model pre-training with support for multiple objectives.
@@ -734,12 +734,12 @@ class ComposerSCGPTModel(ComposerModel):
     - Output scaling for normalized training
 
     Args:
-        model_config: Model architecture configuration passed to SCGPTModel.
+        model_config: Model architecture configuration passed to MosaicfmModel.
         collator_config: Data collation configuration for padding and tokenization.
         device: Device for model parameters ('cpu', 'cuda', etc.).
 
     Attributes:
-        model: The underlying SCGPTModel instance
+        model: The underlying MosaicfmModel instance
         criterion: Loss function (masked_mse_loss)
         pad_token_id: Token ID used for padding genes
         use_cell_conditioned_generation: Whether to use cell-conditioned generation
@@ -764,7 +764,7 @@ class ComposerSCGPTModel(ComposerModel):
             "use_cell_conditioned_generation",
             False,
         )
-        self.model: SCGPTModel = SCGPTModel(
+        self.model: MosaicfmModel = MosaicfmModel(
             model_config=model_config,
             collator_config=collator_config,
             device=device,
@@ -798,7 +798,7 @@ class ComposerSCGPTModel(ComposerModel):
     def forward(self, batch: Dict[str, Tensor]) -> Dict[str, Tensor]:
         """Forward pass for training with automatic batch processing.
 
-        This method processes a training batch through the SCGPT model in generative
+        This method processes a training batch through the MosaiFM model in generative
         mode, handling the perception-generation split and optionally performing
         cell-conditioned generation for enhanced training.
 
@@ -1032,10 +1032,10 @@ class ComposerSCGPTModel(ComposerModel):
         return 2 * normalized_value - 1
 
 
-class ComposerSCGPTPerturbationModel(ComposerModel):
-    """Composer wrapper for SCGPT perturbation prediction model.
+class ComposerMosaicfmPerturbationModel(ComposerModel):
+    """Composer wrapper for Mosaifm perturbation prediction model.
 
-    This class specializes the SCGPTModel for perturbation prediction tasks, where
+    This class specializes the MosaicfmModel for perturbation prediction tasks, where
     the model predicts gene expression changes in response to genetic or chemical
     perturbations. It extends the base model with perturbation-specific encoders
     and decoders for modeling intervention effects.
@@ -1046,12 +1046,12 @@ class ComposerSCGPTPerturbationModel(ComposerModel):
     interventions.
 
     Key components:
-    - Base SCGPTModel: Provides the transformer backbone
+    - Base MosaicfmModel: Provides the transformer backbone
     - Perturbation encoder: Embeds perturbation type flags (0: control, 1: perturbed, 2: masked)
     - Affine expression decoder: Predicts expression changes relative to control
 
     Args:
-        model_config: Model architecture configuration for the underlying SCGPTModel.
+        model_config: Model architecture configuration for the underlying MosaicfmModel.
         collator_config: Data collation configuration for tokenization and padding.
         device: Device for model parameters ('cuda', 'cpu', etc.). Defaults to 'cuda'.
 
@@ -1060,7 +1060,7 @@ class ComposerSCGPTPerturbationModel(ComposerModel):
         criterion: Loss function (masked_mse_loss)
         pad_token_id: Token ID for padding genes
         use_cell_conditioned_generation: Whether cell-conditioned generation is enabled
-        model: The underlying SCGPTModel instance
+        model: The underlying MosaicfmModel instance
         pert_encoder: Embedding layer for perturbation flags
         pert_decoder: Affine decoder for predicting expression changes
     """
@@ -1079,7 +1079,7 @@ class ComposerSCGPTPerturbationModel(ComposerModel):
             "use_cell_conditioned_generation",
             False,
         )
-        self.model: SCGPTModel = SCGPTModel(
+        self.model: MosaicfmModel = MosaicfmModel(
             model_config=model_config,
             collator_config=collator_config,
             device=device,

@@ -47,18 +47,18 @@ def dataset_generator(
     cfg: DictConfig,
     vocab: GeneVocab,
 ) -> Generator[Dict, None, None]:
-    """Generator function that processes AnnData files and yields dataset items.
-    Reads configuration parameters from the given DictConfig to set up filters,
-    tokens and metadata.
+    """Generate training samples from single-cell datasets.
+
+    Processes h5ad files into tokenized format suitable for model training.
+    Handles gene vocabulary mapping, expression filtering, and metadata integration.
 
     Args:
-        adata_files (List[str]): List of paths to AnnData files.
-        cfg (DictConfig): Configuration for dataset generation (huggingface section).
-        vocab (GeneVocab): Vocabulary mapping for gene tokens.
+        adata_files (List[str]): Paths to single-cell AnnData files for processing.
+        cfg (DictConfig): Configuration with gene mapping and filtering settings.
+        vocab (GeneVocab): Gene vocabulary with ~60K Ensembl gene mappings.
 
     Yields:
-        Dict: A dictionary representing a single dataset sample with gene tokens,
-              expression values, and additional metadata.
+        Dict: Training examples with tokenized genes, raw expressions, and metadata.
     """
     gene_col = cfg.gene_col
     cls_token = cfg.get("cls_token", "<cls>")
@@ -124,9 +124,11 @@ def dataset_generator(
 
         assert base_obs.shape[0] == adata.obs.shape[0]
         adata.var.reset_index(inplace=True)
+        # Map gene symbols to vocabulary indices
         adata.var["id_in_vocab"] = [
             vocab[gene] if gene in vocab else -1 for gene in adata.var[gene_col]
         ]
+        # Filter to genes present in vocabulary
         adata = adata[:, adata.var["id_in_vocab"] >= 0]
         gene_token_ids = np.array(adata.var["id_in_vocab"])
         count_matrix = adata.X

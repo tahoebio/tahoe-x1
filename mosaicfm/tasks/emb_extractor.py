@@ -11,13 +11,13 @@ from scipy.sparse import csc_matrix, csr_matrix
 from tqdm.auto import tqdm
 
 from mosaicfm.data import CountDataset, DataCollator
-from mosaicfm.model import SCGPTModel
+from mosaicfm.model import MosaicfmModel
 from mosaicfm.tokenizer import GeneVocab
 
 
 def get_batch_embeddings(
     adata: AnnData,
-    model: SCGPTModel,
+    model: MosaicfmModel,
     vocab: GeneVocab,
     model_cfg: DictConfig,
     collator_cfg: DictConfig,
@@ -27,7 +27,11 @@ def get_batch_embeddings(
     max_length: Optional[int] = None,
     return_gene_embeddings: bool = False,
 ) -> Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-    """Get the cell embeddings for a batch of cells.
+    """Extract cell and gene embeddings for a batch of cells.
+
+    Generates dense vector representations from single-cell RNA-seq data.
+    Supports both cell embeddings (from <cls> tokens) and gene
+    embeddings (averaged across cells).
 
     Args:
         adata (AnnData): The AnnData object.
@@ -44,9 +48,9 @@ def get_batch_embeddings(
 
     Returns:
         Union[np.ndarray, Tuple[np.ndarray, np.ndarray]]:
-            - If `return_gene_embeddings` is False, returns a NumPy array of cell embeddings.
-            - If `return_gene_embeddings` is True, returns a tuple of cell embeddings and
-              gene embeddings as NumPy arrays.
+            Cell embeddings (num_cells, d_model) if return_gene_embeddings=False,
+            or tuple of (cell_embeddings, gene_embeddings) if return_gene_embeddings=True.
+            Both arrays are L2-normalized for similarity computation.
     """
     count_matrix = adata.X
     if isinstance(count_matrix, np.ndarray):
