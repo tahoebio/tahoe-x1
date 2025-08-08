@@ -35,7 +35,7 @@ def get_batch_embeddings(
 
     Args:
         adata (AnnData): The AnnData object.
-        model (SCGPTModel): The model.
+        model (MosaicfmModel): The model instance.
         vocab (GeneVocab): The gene-to-ID vocabulary
         model_cfg (DictConfig, optional): The model configuration dictionary.
         collator_cfg (DictConfig, optional): The collator configuration dictionary.
