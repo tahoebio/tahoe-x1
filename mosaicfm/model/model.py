@@ -380,7 +380,7 @@ class SCGPTModel(nn.Module):
             - pcpt_output: Contextualized embeddings for perceptual genes with shape
               (batch_size, pcpt_len, d_model)
             - gen_output: Contextualized embeddings for generative genes with shape
-              (batch_size, gen_len, d_model). Can be None if gen_genes is None.
+              (batch_size, gen_len, d_model)
         """
 
         pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)

@@ -12,44 +12,34 @@ from mosaicfm.utils import download_file_from_s3_url
 
 
 class DataCollator(DefaultDataCollator):
-    """Data collator for the mask value learning task. It pads the sequences to
-    the maximum length in the batch and masks the gene expression values.
+    """Data collator for the masked value learning task.
+
+    Pads sequences to the batch maximum and applies masking/bucketing transforms.
 
     Args:
-        vocab (:obj: GeneVocab): The vocabulary that includes the gene ids, name, special tokens, etc.
-        use_chem_token (:obj:`bool`): whether to create and use the chemical token in the sequence.
-        drug_to_id_path (:obj:`dict`): path to the drug to id .json file.
-        do_padding (:obj:`bool`): whether to pad the sequences to the max length.
-        unexp_padding (:obj:`bool`): whether to pad the sequences with unexpressed genes. If False it pads with pad token.
-        pad_token_id (:obj:`int`, optional): the token id to use for padding.
-            This is required if do_padding is True.
-        pad_value (:obj:`int`): the value to use for padding the expression
-            values to the max length.
-        do_mlm (:obj:`bool`): whether to do masking with MLM.
-        do_binning (:obj:`bool`): whether to bin the expression values.
-        log_transform (:obj:`bool`): whether to transform the gene expression values.
-        target_sum (:obj:`int`): The target sum of the normalized counts before log1p transformation.
-        mlm_probability (:obj:`float`): the probability of masking with MLM.
-        mask_value (:obj:`int`): the value to fill at the expression postions
-            that are masked.
-        max_length (:obj:`int`, optional): the maximum length of the sequences.
-            This is required if do_padding is True.
-        sampling (:obj:`bool`): whether to do sampling instead of truncation if
-            length > max_length.
-        reserve_keys (:obj:`List[str]`, optional): a list of keys in the examples
-            to reserve in the output dictionary. Default to []. These fields
-            will be kept unchanged in the output.
-        keep_first_n_tokens (:obj:`int`): the number of tokens in the beginning
-            of the sequence to keep unchanged from sampling. This is useful when
-            special tokens have been added to the beginning of the sequence.
-            Default to 1.
-        data_style (:obj:`str`): the style of the data. If "pcpt", the data is
-            masked and padded for perception training. If "gen", only the gene
-            tokens are provided, but not the expression values, for pure generative
-            training setting. If "both", the output will contain both fields above.
-            Choices: "pcpt", "gen", "both". Default to "pcpt".
-        num_bins (:obj:`int`): the number of bins to use for binning the expression
-        right_binning (:obj:`bool`): whether to use right sided-binning. Torch default is False
+        vocab (GeneVocab): Vocabulary containing gene IDs and special tokens.
+        use_chem_token (bool): Whether to insert/use a chemical token in the sequence.
+        drug_to_id_path (dict): Paths for drug-to-id JSON (remote/local).
+        do_padding (bool): Whether to pad sequences up to the max length.
+        unexp_padding (bool): If True, pad with unexpressed genes; otherwise, pad token.
+        pad_token_id (int, optional): Pad token ID (required if do_padding=True).
+        pad_value (int): Value used for padding expression values.
+        do_mlm (bool): Whether to apply masking with MLM.
+        do_binning (bool): Whether to bin expression values.
+        log_transform (bool): Whether to log-transform expression values.
+        target_sum (int): Target sum before log1p transformation.
+        mlm_probability (float | list[float]): Masking probability (or choices).
+        mask_value (int): Value filled at masked expression positions.
+        max_length (int, optional): Max sequence length (required if do_padding=True).
+        sampling (bool): If True, sample instead of truncate when length > max_length.
+        reserve_keys (List[str], optional): Keys to carry through unchanged in outputs.
+        keep_first_n_tokens (int): Number of leading tokens to preserve from sampling.
+        data_style (str): One of {'pcpt','gen','both'}.
+            - 'pcpt': returns inputs for perception training (genes + masked expr).
+            - 'gen': returns inputs for generative setting as 'pcpt_gene' and 'pcpt_expr'.
+            - 'both': returns split perception/generation fields.
+        num_bins (int): Number of bins for bucketing expression values.
+        right_binning (bool): Use right-sided bucketing (torch default: False).
     """
 
     def __init__(
@@ -117,7 +107,7 @@ class DataCollator(DefaultDataCollator):
             "If `drug_to_id_path` is provided, `use_chem_token` must be True.",
         )
         assert not self.use_chem_token or self.keep_first_n_tokens > 1, (
-            "If `use_chem_token` is True, we need to keep <cls> and <drug> token in the beggining of pcpt_genes. So `keep_first_n_tokens` must be >=2!",
+            "If `use_chem_token` is True, we need to keep <cls> and <drug> token in the beginning of pcpt_genes. So `keep_first_n_tokens` must be >=2!",
         )
         # load drug_to_id mapping if present
         if self.use_chem_token and drug_to_id_path is not None:
@@ -174,7 +164,7 @@ class DataCollator(DefaultDataCollator):
         Args:
             examples (:obj:`List[Dict[str, torch.Tensor]]`): a list of data dicts.
                 Each dict is for one cell. It contains multiple 1 dimensional tensors
-                like the following exmaple:
+                like the following example:
                     {'id': tensor(184117),
                     'genes': tensor([36572, 17868, ..., 17072]),
                     'expressions': tensor([ 0.,  2., ..., 18.])}
@@ -393,19 +383,19 @@ class DataCollator(DefaultDataCollator):
         examples: List[Dict[str, torch.Tensor]],
         gen_prob: Optional[float] = None,
     ) -> Dict[str, torch.Tensor]:
-        """This method will split the input into the peception part and the
+        """This method will split the input into the perception part and the
         generation part. The perception part will be processed into gene ids and
         expr values, and the generation part will be processed into gene ids
         only.
 
-        By default, the mlm_probability will be used to select the genese assigned to
+        By default, the mlm_probability will be used to select the genes assigned to
         the generation part.
 
         Each example is like:
             {'id': tensor(184117),
             'genes': tensor([36572, 17868, ..., 17072]),
             'expressions': tensor([ 0.,  2., ..., 18.])},
-            'drug_id': Optinal = tensor(256), id 0 refers to <pad> token and indicates that drug is not available
+            'drug_id': Optional = tensor(256), id 0 refers to <pad> token and indicates that drug is not available
 
         Args:
             gen_prob (float, optional): the probability of a gene being assigned to
@@ -798,13 +788,13 @@ def log_transform(
     target_sum: int,
     eps: float = 1e-9,
 ) -> Union[np.ndarray, torch.Tensor]:
-    """Log transform the row.
+    """Log transform a row of counts.
 
     Args:
         row (Union[np.ndarray, torch.Tensor]):
             The row to be log-1p-transformed.
-        target_sum (int, optional):
-            The target sum of the normalized row before log-1p transformation. Default to 10000.
+        target_sum (int):
+            The target sum of the normalized row before log-1p transformation.
         eps (float, optional):
             The epsilon value used for normalization.
     Returns:

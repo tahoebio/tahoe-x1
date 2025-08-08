@@ -297,9 +297,10 @@ class CellClassification(Callback):
         Returns:
             float: The LISI score.
         """
-        # Convert to torch tensors
-        emb = torch.from_numpy(emb).float()
-        _, inverse_labels = np.unique(labels, return_inverse=True)
+        # Convert to tensors/arrays as needed
+        emb = torch.as_tensor(emb, dtype=torch.float32)
+        labels_np = np.asarray(labels)
+        _, inverse_labels = np.unique(labels_np, return_inverse=True)
         labels = torch.from_numpy(inverse_labels).long()
 
         # Compute pairwise distances

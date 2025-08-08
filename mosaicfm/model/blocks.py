@@ -611,13 +611,16 @@ class AffineExprDecoder(torch.nn.Module):
             self.activation = getattr(nn, activation)()
 
     def forward(self, x: torch.Tensor, values: torch.Tensor) -> Dict[str, torch.Tensor]:
-        """
+        """Compute affine expression predictions.
+
         Args:
-            x: Tensor, shape [batch_size, seq_len, embsize]
-            values: Tensor, shape [batch_size, seq_len]
+            x: Transformer outputs with shape (batch_size, seq_len, d_model).
+            values: Input expression values with shape (batch_size, seq_len).
 
         Returns:
-            output Tensor of shape [batch_size, seq_len]
+            Dict with keys:
+            - 'pred': Tensor of shape (batch_size, seq_len) with predicted values
+            - 'zero_probs': Optional Tensor when explicit_zero_prob=True
         """
         coeff = self.coeff_decoder(x)
         bias = self.bias_decoder(x)
@@ -678,7 +681,7 @@ class MVCDecoder(nn.Module):
         self,
         cell_emb: Tensor,
         gene_embs: Tensor,
-    ) -> Union[Tensor, Dict[str, Tensor]]:
+    ) -> Dict[str, Tensor]:
         """
         Args:
             cell_emb: Tensor, shape (batch, embsize=d_model)

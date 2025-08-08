@@ -99,8 +99,8 @@ def build_perturbation_dataloader(
     loader_cfg: DictConfig,
     device_batch_size: int,
     isTrain: bool,
-) -> DataSpec:
-    """Builds a dataloader from a config for perturbation task.
+) -> StreamingDataLoader:
+    """Builds a dataloader from a config for the perturbation task.
 
     Args:
         loader_cfg (DictConfig): An omegaconf dictionary used to configure the loader.
