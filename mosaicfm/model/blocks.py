@@ -577,8 +577,6 @@ class ExprDecoder(nn.Module):
         return {"pred": pred_value}
 
 
-
-
 class MVCDecoder(nn.Module):
     """Decoder for the masked value prediction for cell embeddings."""
 

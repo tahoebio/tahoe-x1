@@ -575,5 +575,3 @@ class ComposerSCGPTModel(ComposerModel):
         normalized_value = (x - min_value) / (max_value - min_value)
         # Scale to -1..1
         return 2 * normalized_value - 1
-
-
