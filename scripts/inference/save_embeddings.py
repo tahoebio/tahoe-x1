@@ -45,7 +45,6 @@ def main(cfg: DictConfig) -> None:
         mask_value=coll_cfg.mask_value,
         max_length=cfg.data.max_length,
         sampling=coll_cfg.sampling,
-        data_style="pcpt",
         num_bins=coll_cfg.get("num_bins", 51),
         right_binning=coll_cfg.get("right_binning", False),
         reserve_keys=cfg.data.reserve_keys,
@@ -112,7 +111,7 @@ def main(cfg: DictConfig) -> None:
         device_type=device.type,
     ):
         for batch in loader:
-            bs = batch["gene"].shape[0]
+            bs = batch["genes"].shape[0]
 
             # Rotate to a new ParquetWriter if starting a shard
             if writer is None:
@@ -129,7 +128,7 @@ def main(cfg: DictConfig) -> None:
             barcodes = batch["BARCODE_SUB_LIB_ID"]
 
             # Compute CLS embeddings
-            ids = batch["gene"].to(device)
+            ids = batch["genes"].to(device)
             expr = batch["expr"].to(device)
             mask = ~ids.eq(coll_cfg.pad_token_id)
             embs = model.model._encode(ids, expr, src_key_padding_mask=mask)

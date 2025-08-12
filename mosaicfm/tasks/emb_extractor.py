@@ -82,7 +82,6 @@ def get_batch_embeddings(
         mask_value=collator_cfg.mask_value,
         max_length=max_length,
         sampling=collator_cfg.sampling,  # Turned on since max-length can be less than the number of genes
-        data_style="pcpt",  # Disable splitting of genes into pcpt and gen for inference
         num_bins=collator_cfg.get("num_bins", 51),
         right_binning=collator_cfg.get("right_binning", False),
         keep_first_n_tokens=collator_cfg.get("keep_first_n_tokens", 1),
@@ -129,7 +128,7 @@ def get_batch_embeddings(
         count = 0
         pbar = tqdm(total=len(dataset), desc="Embedding cells")
         for data_dict in data_loader:
-            input_gene_ids = data_dict["gene"].to(device)
+            input_gene_ids = data_dict["genes"].to(device)
             src_key_padding_mask = ~input_gene_ids.eq(collator_cfg["pad_token_id"])
 
             embeddings = model._encode(
