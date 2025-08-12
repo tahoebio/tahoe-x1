@@ -459,14 +459,22 @@ class ComposerSCGPTModel(ComposerModel):
 
     def forward(self, batch):  # batch is the output of the dataloader
         # specify how batches are passed through the model
-        pcpt_gene = batch["pcpt_gene"]
-        pcpt_expr = batch["pcpt_expr"]
+        genes = batch["genes"]
+        expr = batch["expr"]
+        gen_mask = batch["gen_mask"].bool()
+        drug_ids = batch.get("drug_ids")
+
+        # Assume generative tokens are appended to the end of the sequence
+        gen_len = int(gen_mask.sum(dim=1).max().item())
+        pcpt_len = genes.shape[1] - gen_len
+
+        pcpt_gene = genes[:, :pcpt_len]
+        pcpt_expr = expr[:, :pcpt_len]
+        gen_gene = genes[:, pcpt_len:]
+
         pcpt_key_padding_mask = ~pcpt_gene.eq(self.pad_token_id)
-        drug_ids = (
-            batch["drug_ids"] if "drug_ids" in batch else None
-        )  # drug_ids is None if use_chem_token is set to False
-        gen_gene = batch["gen_gene"]
         gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
+
         output_dict = self.model(
             pcpt_gene,
             pcpt_expr,
@@ -491,6 +499,8 @@ class ComposerSCGPTModel(ComposerModel):
                 generative_training=True,
             )["gen_preds"]
             output_dict["cell_conditioned_gen_preds"] = preds
+        output_dict["pcpt_len"] = pcpt_len
+        output_dict["gen_len"] = gen_len
         return output_dict
 
     def eval_forward(self, batch, outputs: Optional = None):
@@ -503,24 +513,23 @@ class ComposerSCGPTModel(ComposerModel):
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss
-        pcpt_gene = batch["pcpt_gene"]
-        gen_gene = batch["gen_gene"]
-        gen_expr_target = batch["gen_expr_target"]
+        pcpt_len = outputs["pcpt_len"]
+        gen_len = outputs["gen_len"]
+        expr_target = batch["expr_target"][:, pcpt_len: pcpt_len + gen_len]
         if self.standard_scale_outputs:
-            gen_expr_target = self.scale_outputs(gen_expr_target)
-        gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
-        positions_to_match = gen_key_padding_mask
+            expr_target = self.scale_outputs(expr_target)
+        positions_to_match = batch["gen_mask"][:, pcpt_len: pcpt_len + gen_len]
         gen_expr_preds = outputs["gen_preds"]
-        loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
+        loss_mse = self.criterion(gen_expr_preds, expr_target, positions_to_match)
         loss_mvc = self.criterion(
-            outputs["mvc_output"][:, pcpt_gene.shape[1] :],
-            gen_expr_target,
+            outputs["mvc_output"][:, pcpt_len : pcpt_len + gen_len],
+            expr_target,
             positions_to_match,
         )
         if self.use_cell_conditioned_generation:
             loss_gen = self.criterion(
                 outputs["cell_conditioned_gen_preds"],
-                gen_expr_target,
+                expr_target,
                 positions_to_match,
             )
             loss = (loss_mse + loss_mvc + loss_gen) / 3
@@ -529,23 +538,23 @@ class ComposerSCGPTModel(ComposerModel):
         return loss
 
     def update_metric(self, batch, outputs, metric):
-        pcpt_gene = batch["pcpt_gene"]
-        gen_gene = batch["gen_gene"]
-        gen_expr_raw = batch["gen_expr_raw"]
-        mask = ~gen_gene.eq(self.pad_token_id)
-        target = batch["gen_expr_target"]
-        if self.standard_scale_outputs:
-            target = self.scale_outputs(target)
+        pcpt_len = outputs["pcpt_len"]
+        gen_len = outputs["gen_len"]
+        mask = batch["gen_mask"][:, pcpt_len: pcpt_len + gen_len]
+        target_raw = batch["expr_target"][:, pcpt_len: pcpt_len + gen_len]
+        target = (
+            self.scale_outputs(target_raw) if self.standard_scale_outputs else target_raw
+        )
         if metric.name == "MSE":
             preds = outputs["gen_preds"]
         elif metric.name == "MVC":
-            preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
+            preds = outputs["mvc_output"][:, pcpt_len: pcpt_len + gen_len]
         elif metric.name == "GEN":
             assert self.use_cell_conditioned_generation
             preds = outputs["cell_conditioned_gen_preds"]
         elif metric.name == "Spearman":
             preds = outputs["gen_preds"]
-            target = gen_expr_raw
+            target = target_raw
         else:
             raise ValueError(f"metric {metric.name} not recognized")
         metric.update(preds=preds, target=target, mask=mask)
@@ -558,10 +567,10 @@ class ComposerSCGPTModel(ComposerModel):
     def flops_per_batch(self, batch: Mapping) -> int:
         # specify how to compute the number of FLOPs for a batch
         # This assumes non cell-conditioned generation (single forward pass)
-        bs = batch["pcpt_gene"].shape[0]
-        pcpt_len = batch["pcpt_gene"].shape[1]
-        gen_len = batch["gen_gene"].shape[1]
-        msl = pcpt_len + gen_len  # Assumes no-padding (as an approximation)
+        bs = batch["genes"].shape[0]
+        total_len = batch["genes"].shape[1]
+        gen_len = int(batch["gen_mask"].sum(dim=1).max().item())
+        msl = total_len  # Assumes no-padding (as an approximation)
         params = self.n_active_params
         params_flops_per_token = 2 * params
         params_flops_per_seq = params_flops_per_token * msl
