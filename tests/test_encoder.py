@@ -25,13 +25,19 @@ def test_encoder():
     pcpt_total_embs = torch.rand(n_cells, n_genes, embed_dim).to(device)
     gen_total_embs = torch.rand(n_cells, n_genes * 2, embed_dim).to(device)
 
+    total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
+    gen_mask = torch.zeros(n_cells, total_embs.shape[1], dtype=torch.bool).to(device)
+    gen_mask[:, n_genes:] = True
+
     # test forward, run with torch amp
     with torch.cuda.amp.autocast():
-        output1, output2 = flash_gpt_generator(pcpt_total_embs, gen_total_embs)
+        output = flash_gpt_generator(total_embs, gen_mask=gen_mask)
+    output1, output2 = output[:, :n_genes, :], output[:, n_genes:, :]
     assert output1.shape == (n_cells, n_genes, embed_dim)
     assert output2.shape == (n_cells, n_genes * 2, embed_dim)
 
     # test only pcpt_total_embs
+    pcpt_mask = torch.zeros(n_cells, n_genes, dtype=torch.bool).to(device)
     with torch.cuda.amp.autocast():
-        output1 = flash_gpt_generator(pcpt_total_embs)
+        output1 = flash_gpt_generator(pcpt_total_embs, gen_mask=pcpt_mask)
     assert output1.shape == (n_cells, n_genes, embed_dim)

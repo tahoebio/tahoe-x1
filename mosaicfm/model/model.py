@@ -189,10 +189,9 @@ class SCGPTModel(nn.Module):
         values = self.expression_encoder(values)  # (batch, seq_len, embsize)
         total_embs = src + values
         output = self.transformer_encoder(
-            pcpt_total_embs=total_embs,
-            gen_total_embs=None,
-            pcpt_key_padding_mask=src_key_padding_mask,
-            gen_key_padding_mask=None,
+            total_embs=total_embs,
+            gen_mask=None,
+            key_padding_mask=src_key_padding_mask,
         )
         return output  # (batch, seq_len, embsize)
 
@@ -236,12 +235,50 @@ class SCGPTModel(nn.Module):
         if input_cell_emb is not None:
             pcpt_total_embs[:, 0, :] = input_cell_emb
 
-        pcpt_output, gen_output = self.transformer_encoder(
-            pcpt_total_embs=pcpt_total_embs,
-            gen_total_embs=gen_total_embs,
-            pcpt_key_padding_mask=pcpt_key_padding_mask,
-            gen_key_padding_mask=gen_key_padding_mask,
+        if gen_total_embs is not None:
+            total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
+            p_len = pcpt_total_embs.shape[1]
+            gen_mask = torch.zeros(
+                total_embs.shape[0],
+                total_embs.shape[1],
+                dtype=torch.bool,
+                device=total_embs.device,
+            )
+            gen_mask[:, p_len:] = True
+
+            if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
+                key_padding_mask = None
+            else:
+                if pcpt_key_padding_mask is None:
+                    pcpt_key_padding_mask = torch.ones(
+                        (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
+                        device=pcpt_total_embs.device,
+                        dtype=torch.bool,
+                    )
+                if gen_key_padding_mask is None:
+                    gen_key_padding_mask = torch.ones(
+                        (gen_total_embs.shape[0], gen_total_embs.shape[1]),
+                        device=gen_total_embs.device,
+                        dtype=torch.bool,
+                    )
+                key_padding_mask = torch.cat(
+                    [pcpt_key_padding_mask, gen_key_padding_mask],
+                    dim=1,
+                )
+        else:
+            total_embs = pcpt_total_embs
+            gen_mask = None
+            key_padding_mask = pcpt_key_padding_mask
+            p_len = pcpt_total_embs.shape[1]
+
+        total_output = self.transformer_encoder(
+            total_embs=total_embs,
+            gen_mask=gen_mask,
+            key_padding_mask=key_padding_mask,
         )
+
+        pcpt_output = total_output[:, :p_len, :]
+        gen_output = total_output[:, p_len:, :] if gen_total_embs is not None else None
 
         return pcpt_output, gen_output
 
@@ -607,10 +644,9 @@ class ComposerSCGPTPerturbationModel(ComposerModel):
         combined_input_embs = gene_token_emb + gene_expr_emb + pert_flag_emb
 
         transformer_encoding = self.model.transformer_encoder(
-            pcpt_total_embs=combined_input_embs,
-            gen_total_embs=None,
-            pcpt_key_padding_mask=None,
-            gen_key_padding_mask=None,
+            total_embs=combined_input_embs,
+            gen_mask=None,
+            key_padding_mask=None,
         )
         predicted_post_expr = self.pert_decoder(transformer_encoding, ctrl_expr)
         output = {
