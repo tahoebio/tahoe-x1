@@ -1,6 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
-from typing import Mapping, Optional
+from typing import Mapping, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
