@@ -255,7 +255,6 @@ def run_scgpt(base_path, model_path, model_name):
         mask_value=collator_config.mask_value,
         max_length=max_length,
         sampling=False,
-        data_style="pcpt",
         num_bins=collator_config.get("num_bins", 51),
         right_binning=collator_config.get("right_binning", False),
     )
@@ -289,7 +288,7 @@ def run_scgpt(base_path, model_path, model_name):
         for data_dict in data_loader:
 
             # get batch embeddings
-            input_gene_ids = data_dict["gene"].to(device)
+            input_gene_ids = data_dict["genes"].to(device)
             src_key_padding_mask = ~input_gene_ids.eq(collator_config["pad_token_id"])
             batch_embeddings = model.model._encode(
                 src=input_gene_ids,
