@@ -1,6 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
-from typing import Mapping, Optional, Tuple
+from typing import Mapping, Optional
 
 import torch
 import torch.nn.functional as F
@@ -44,7 +44,6 @@ class SCGPTModel(nn.Module):
         self.expansion_ratio = model_config.expansion_ratio
         self.norm_scheme = model_config.get("norm_scheme", "pre")
         self.transformer_activation = model_config.get("transformer_activation", "gelu")
-        self.use_generative_training = model_config.get("use_generative_training", True)
         self.use_chem_token = collator_config.get("use_chem_token", False)
         assert (
             not self.use_chem_token or "chemical_encoder" in model_config
@@ -81,7 +80,7 @@ class SCGPTModel(nn.Module):
             use_norm=self.gene_encoder_config["use_norm"],
             gene_encoder_cfg=self.gene_encoder_config,
         )
-        self.flag_encoder = nn.Embedding(2, self.d_model)
+        self.flag_encoder = nn.Embedding(2, self.d_model, padding_idx=0)
 
         expression_encoder_config = model_config.expression_encoder
         self.input_emb_style = expression_encoder_config.get(
@@ -177,73 +176,6 @@ class SCGPTModel(nn.Module):
             **self.init_config,
         )
 
-    def _encode(
-        self,
-        src: Tensor,
-        values: Tensor,
-        src_key_padding_mask: Tensor,
-    ) -> Tensor:
-        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
-        self.cur_gene_token_embs = src
-        values = self.expression_encoder(values)  # (batch, seq_len, embsize)
-        total_embs = src + values
-        output = self.transformer_encoder(
-            pcpt_total_embs=total_embs,
-            gen_total_embs=None,
-            pcpt_key_padding_mask=src_key_padding_mask,
-            gen_key_padding_mask=None,
-        )
-        return output  # (batch, seq_len, embsize)
-
-    def transformer_generate(
-        self,
-        pcpt_genes: Tensor,
-        pcpt_values: Tensor,
-        pcpt_key_padding_mask: Tensor,
-        gen_genes: Tensor,
-        gen_key_padding_mask: Tensor,
-        input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
-        drug_ids: Optional[
-            Tensor
-        ] = None,  # drug_ids is None if use_chem_token is set to False
-    ) -> Tuple[Tensor, Tensor]:
-
-        pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
-        pcpt_values = self.expression_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
-        pcpt_total_embs = pcpt_token_embs + pcpt_values  # (batch, pcpt_len, embsize)
-
-        if self.use_chem_token:
-            # calculate chemical embedding and put it in its correct place (after <cls>)
-            drug_embs = self.chem_encoder(drug_ids)  # (batch, embsize)
-            pcpt_total_embs[:, 1, :] = drug_embs  # (batch, pcpt_len, embsize)
-
-        if gen_genes is not None:
-            gen_token_embs = self.gene_encoder(gen_genes)  # (batch, gen_len, embsize)
-            self.cur_gene_token_embs = torch.cat(
-                [pcpt_token_embs, gen_token_embs],
-                dim=1,
-            )
-            gen_flags = self.flag_encoder(
-                torch.tensor(1, device=pcpt_values.device),
-            ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
-
-            gen_total_embs = gen_token_embs + gen_flags
-        else:
-            self.cur_gene_token_embs = pcpt_token_embs
-            gen_total_embs = None
-
-        if input_cell_emb is not None:
-            pcpt_total_embs[:, 0, :] = input_cell_emb
-
-        pcpt_output, gen_output = self.transformer_encoder(
-            pcpt_total_embs=pcpt_total_embs,
-            gen_total_embs=gen_total_embs,
-            pcpt_key_padding_mask=pcpt_key_padding_mask,
-            gen_key_padding_mask=gen_key_padding_mask,
-        )
-
-        return pcpt_output, gen_output
-
     def _get_cell_emb_from_layer(
         self,
         layer_output: Tensor,
@@ -294,77 +226,36 @@ class SCGPTModel(nn.Module):
 
     def forward(
         self,
-        *args,
-        **kwargs,
-    ) -> Mapping[str, Tensor]:
-        """Wrapper to call either generative_forward or perceptual_forward,
-        depending on the value of the "generative_training" kwarg."""
-        if "generative_training" not in kwargs:
-            raise ValueError(
-                "Please specify generative_training argument and set to False if doing inference",
-            )
-        # get the generative training flag and pop it out
-        do_generative_training = kwargs.pop("generative_training")
-        if do_generative_training:
-            return self.generative_forward(*args, **kwargs)
-        else:
-            return self.perceptual_forward(*args, **kwargs)
-
-    def generative_forward(
-        self,
-        pcpt_genes: Tensor,
-        pcpt_values: Tensor,
-        pcpt_key_padding_mask: Tensor,
-        gen_genes: Tensor,
-        gen_key_padding_mask: Tensor,
+        genes: Tensor,
+        expr: Tensor,
+        gen_mask: Tensor,
         CLS: bool = False,
         MVC: bool = False,
-        input_cell_emb: Optional[Tensor] = None,
         drug_ids: Optional[Tensor] = None,
     ) -> Mapping[str, Tensor]:
-        """
-        Args:
-            pcpt_genes (:obj:`Tensor`): token ids of the perceptual part, shape
-                [batch_size, seq_len]
-            pcpt_values (:obj:`Tensor`): token values of the perceptual part, shape
-                [batch_size, seq_len]
-            pcpt_key_padding_mask (:obj:`Tensor`): mask for pcpt_genes, shape
-                [batch_size, seq_len]
-            gen_genes (:obj:`Tensor`): token ids of the generative part, shape
-                [batch_size, seq_len]
-            gen_key_padding_mask (:obj:`Tensor`): mask for gen_genes, shape
-                [batch_size, seq_len]
-            input_cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
-                embsize]
-            drug_ids (:obj:`Tensor`): drug ids corresponding to chem_encoder embedding layer, shape
-                [batch_size]
+        gene_embs = self.gene_encoder(genes)
+        self.cur_gene_token_embs = gene_embs
+        expr_embs = self.expression_encoder(expr)
+        expr_embs = expr_embs.masked_fill(gen_mask.unsqueeze(-1), 0.0)
+        flag_embs = self.flag_encoder(gen_mask.long())
+        total_embs = gene_embs + expr_embs + flag_embs
 
-        Returns:
-            :obj:`Mapping[str, Tensor]`:
-                - pred (:obj:`Tensor`): prediction, shape [batch_size, seq_len]
-                - cell_emb (:obj:`Tensor`): cell embeddings, shape [batch_size,
-                    embsize]
-        """
+        if self.use_chem_token:
+            drug_embs = self.chem_encoder(drug_ids)
+            total_embs[:, 1, :] = drug_embs
 
-        pcpt_output, gen_output = self.transformer_generate(
-            pcpt_genes,
-            pcpt_values,
-            pcpt_key_padding_mask,
-            gen_genes,
-            gen_key_padding_mask,
-            input_cell_emb=input_cell_emb,
-            drug_ids=drug_ids,
+        key_padding_mask = ~genes.eq(self.pad_token_id)
+
+        transformer_output = self.transformer_encoder(
+            pcpt_total_embs=total_embs,
+            gen_total_embs=None,
+            pcpt_key_padding_mask=key_padding_mask,
+            gen_key_padding_mask=None,
         )
-        if gen_output is None:  # type: ignore
-            transformer_output = pcpt_output
-        else:
-            transformer_output = torch.cat([pcpt_output, gen_output], dim=1)
 
-        output = {}
+        output: Mapping[str, Tensor] = {}
         decoder_output = self.expression_decoder(transformer_output)
-        full_preds = decoder_output["pred"]  # (batch, seq_len)
-        output["pcpt_preds"] = full_preds[:, : pcpt_genes.shape[1]]
-        output["gen_preds"] = full_preds[:, pcpt_genes.shape[1] :]
+        output["preds"] = decoder_output["pred"]
 
         output = self._extend_output(
             output,
@@ -375,42 +266,6 @@ class SCGPTModel(nn.Module):
 
         return output
 
-    def perceptual_forward(
-        self,
-        src: Tensor,
-        values: Tensor,
-        src_key_padding_mask: Tensor,
-        CLS: bool = False,
-        MVC: bool = False,
-    ) -> Mapping[str, Tensor]:
-        """
-        Args:
-            src (:obj:`Tensor`): token ids, shape [batch_size, seq_len]
-            values (:obj:`Tensor`): token values, shape [batch_size, seq_len]
-            src_key_padding_mask (:obj:`Tensor`): mask for src, shape [batch_size,
-                seq_len]
-            CLS (:obj:`bool`): if True, return the celltype classification objective
-                (CLS) output
-            MVC (:obj:`bool`): if True, return the masked value prediction for cell
-                embedding MVC output
-
-        Returns:
-            dict of output Tensors.
-        """
-        transformer_output = self._encode(src, values, src_key_padding_mask)
-
-        output = {}
-        expression_decoder_output = self.expression_decoder(transformer_output)
-        output["pcpt_preds"] = expression_decoder_output["pred"]  # (batch, seq_len)
-
-        output = self._extend_output(
-            output,
-            transformer_output,
-            CLS=CLS,
-            MVC=MVC,
-        )
-
-        return output
 
     def fsdp_wrap_fn(self, module):
         return isinstance(module, SCGPTBlock)
@@ -424,10 +279,6 @@ class ComposerSCGPTModel(ComposerModel):
         super().__init__()
         self.criterion = masked_mse_loss
         self.pad_token_id = collator_config.pad_token_id
-        self.use_cell_conditioned_generation = model_config.get(
-            "use_cell_conditioned_generation",
-            False,
-        )
         self.model = SCGPTModel(
             model_config=model_config,
             collator_config=collator_config,
@@ -449,47 +300,19 @@ class ComposerSCGPTModel(ComposerModel):
             "MVC": MaskedMseMetric(name="MVC"),
             "Spearman": MaskedSpearmanMetric(name="Spearman"),
         }
-        if self.use_cell_conditioned_generation:
-            self.train_gen = MaskedMseMetric(name="GEN")
-            self.train_metrics.update({"GEN": self.train_gen})
-        if self.use_cell_conditioned_generation:
-            self.val_gen = MaskedMseMetric(name="GEN")
-            self.val_metrics.update({"GEN": self.val_gen})
 
     def forward(self, batch):  # batch is the output of the dataloader
-        # specify how batches are passed through the model
-        pcpt_gene = batch["pcpt_gene"]
-        pcpt_expr = batch["pcpt_expr"]
-        pcpt_key_padding_mask = ~pcpt_gene.eq(self.pad_token_id)
-        drug_ids = (
-            batch["drug_ids"] if "drug_ids" in batch else None
-        )  # drug_ids is None if use_chem_token is set to False
-        gen_gene = batch["gen_gene"]
-        gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
+        genes = batch["genes"]
+        expr = batch["expr"]
+        gen_mask = batch["gen_mask"].bool()
+        drug_ids = batch["drug_ids"] if "drug_ids" in batch else None
         output_dict = self.model(
-            pcpt_gene,
-            pcpt_expr,
-            pcpt_key_padding_mask,
-            gen_gene,
-            gen_key_padding_mask,
+            genes,
+            expr,
+            gen_mask,
             drug_ids=drug_ids,
             MVC=True,
-            generative_training=True,
         )
-        if self.use_cell_conditioned_generation:
-            previous_cell_embs = output_dict["cell_emb"].detach()
-            preds = self.model(
-                pcpt_gene,
-                pcpt_expr,
-                pcpt_key_padding_mask,
-                gen_gene,
-                gen_key_padding_mask,
-                drug_ids=drug_ids,
-                MVC=False,
-                input_cell_emb=previous_cell_embs,
-                generative_training=True,
-            )["gen_preds"]
-            output_dict["cell_conditioned_gen_preds"] = preds
         return output_dict
 
     def eval_forward(self, batch, outputs: Optional = None):
@@ -501,50 +324,32 @@ class ComposerSCGPTModel(ComposerModel):
         return outputs if outputs is not None else self.forward(batch)
 
     def loss(self, outputs, batch):
-        # pass batches and `forward` outputs to the loss
-        pcpt_gene = batch["pcpt_gene"]
-        gen_gene = batch["gen_gene"]
-        gen_expr_target = batch["gen_expr_target"]
+        expr_target = batch["expr"]
         if self.standard_scale_outputs:
-            gen_expr_target = self.scale_outputs(gen_expr_target)
-        gen_key_padding_mask = ~gen_gene.eq(self.pad_token_id)
-        positions_to_match = gen_key_padding_mask
-        gen_expr_preds = outputs["gen_preds"]
-        loss_mse = self.criterion(gen_expr_preds, gen_expr_target, positions_to_match)
+            expr_target = self.scale_outputs(expr_target)
+        mask = batch["gen_mask"].bool()
+        expr_preds = outputs["preds"]
+        loss_mse = self.criterion(expr_preds, expr_target, mask)
         loss_mvc = self.criterion(
-            outputs["mvc_output"][:, pcpt_gene.shape[1] :],
-            gen_expr_target,
-            positions_to_match,
+            outputs["mvc_output"],
+            expr_target,
+            mask,
         )
-        if self.use_cell_conditioned_generation:
-            loss_gen = self.criterion(
-                outputs["cell_conditioned_gen_preds"],
-                gen_expr_target,
-                positions_to_match,
-            )
-            loss = (loss_mse + loss_mvc + loss_gen) / 3
-        else:
-            loss = (loss_mse + loss_mvc) / 2
+        loss = (loss_mse + loss_mvc) / 2
         return loss
 
     def update_metric(self, batch, outputs, metric):
-        pcpt_gene = batch["pcpt_gene"]
-        gen_gene = batch["gen_gene"]
-        gen_expr_raw = batch["gen_expr_raw"]
-        mask = ~gen_gene.eq(self.pad_token_id)
-        target = batch["gen_expr_target"]
+        mask = batch["gen_mask"].bool()
+        target = batch["expr"]
         if self.standard_scale_outputs:
             target = self.scale_outputs(target)
         if metric.name == "MSE":
-            preds = outputs["gen_preds"]
+            preds = outputs["preds"]
         elif metric.name == "MVC":
-            preds = outputs["mvc_output"][:, pcpt_gene.shape[1] :]
-        elif metric.name == "GEN":
-            assert self.use_cell_conditioned_generation
-            preds = outputs["cell_conditioned_gen_preds"]
+            preds = outputs["mvc_output"]
         elif metric.name == "Spearman":
-            preds = outputs["gen_preds"]
-            target = gen_expr_raw
+            preds = outputs["preds"]
+            target = batch["expr_raw"]
         else:
             raise ValueError(f"metric {metric.name} not recognized")
         metric.update(preds=preds, target=target, mask=mask)
@@ -557,17 +362,15 @@ class ComposerSCGPTModel(ComposerModel):
     def flops_per_batch(self, batch: Mapping) -> int:
         # specify how to compute the number of FLOPs for a batch
         # This assumes non cell-conditioned generation (single forward pass)
-        bs = batch["pcpt_gene"].shape[0]
-        pcpt_len = batch["pcpt_gene"].shape[1]
-        gen_len = batch["gen_gene"].shape[1]
-        msl = pcpt_len + gen_len  # Assumes no-padding (as an approximation)
+        bs = batch["genes"].shape[0]
+        msl = batch["genes"].shape[1]
         params = self.n_active_params
         params_flops_per_token = 2 * params
         params_flops_per_seq = params_flops_per_token * msl
         attn_flops_per_seq = (
             self.model.n_layers * 2 * 2 * (self.model.d_model * (msl**2))
         )
-        return (params_flops_per_seq + attn_flops_per_seq) * 3 * bs
+        return (params_flops_per_seq + attn_flops_per_seq) * bs
 
     def scale_outputs(self, x: torch.Tensor) -> torch.Tensor:
         min_value = 1
