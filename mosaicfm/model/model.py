@@ -176,6 +176,110 @@ class SCGPTModel(nn.Module):
             **self.init_config,
         )
 
+    def _encode(
+        self,
+        src: Tensor,
+        values: Tensor,
+        src_key_padding_mask: Tensor,
+    ) -> Tensor:
+        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
+        self.cur_gene_token_embs = src
+        values = self.expression_encoder(values)  # (batch, seq_len, embsize)
+        total_embs = src + values
+        output = self.transformer_encoder(
+            total_embs=total_embs,
+            gen_mask=None,
+            key_padding_mask=src_key_padding_mask,
+        )
+        return output  # (batch, seq_len, embsize)
+
+    def transformer_generate(
+        self,
+        pcpt_genes: Tensor,
+        pcpt_values: Tensor,
+        pcpt_key_padding_mask: Tensor,
+        gen_genes: Tensor,
+        gen_key_padding_mask: Tensor,
+        input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
+        drug_ids: Optional[
+            Tensor
+        ] = None,  # drug_ids is None if use_chem_token is set to False
+    ) -> Tuple[Tensor, Tensor]:
+
+        pcpt_token_embs = self.gene_encoder(pcpt_genes)  # (batch, pcpt_len, embsize)
+        pcpt_values = self.expression_encoder(pcpt_values)  # (batch, pcpt_len, embsize)
+        pcpt_total_embs = pcpt_token_embs + pcpt_values  # (batch, pcpt_len, embsize)
+
+        if self.use_chem_token:
+            # calculate chemical embedding and put it in its correct place (after <cls>)
+            drug_embs = self.chem_encoder(drug_ids)  # (batch, embsize)
+            pcpt_total_embs[:, 1, :] = drug_embs  # (batch, pcpt_len, embsize)
+
+        if gen_genes is not None:
+            gen_token_embs = self.gene_encoder(gen_genes)  # (batch, gen_len, embsize)
+            self.cur_gene_token_embs = torch.cat(
+                [pcpt_token_embs, gen_token_embs],
+                dim=1,
+            )
+            gen_flags = self.flag_encoder(
+                torch.tensor(1, device=pcpt_values.device),
+            ).expand(gen_genes.shape[0], gen_genes.shape[1], -1)
+
+            gen_total_embs = gen_token_embs + gen_flags
+        else:
+            self.cur_gene_token_embs = pcpt_token_embs
+            gen_total_embs = None
+
+        if input_cell_emb is not None:
+            pcpt_total_embs[:, 0, :] = input_cell_emb
+
+        if gen_total_embs is not None:
+            total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
+            p_len = pcpt_total_embs.shape[1]
+            gen_mask = torch.zeros(
+                total_embs.shape[0],
+                total_embs.shape[1],
+                dtype=torch.bool,
+                device=total_embs.device,
+            )
+            gen_mask[:, p_len:] = True
+
+            if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
+                key_padding_mask = None
+            else:
+                if pcpt_key_padding_mask is None:
+                    pcpt_key_padding_mask = torch.ones(
+                        (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
+                        device=pcpt_total_embs.device,
+                        dtype=torch.bool,
+                    )
+                if gen_key_padding_mask is None:
+                    gen_key_padding_mask = torch.ones(
+                        (gen_total_embs.shape[0], gen_total_embs.shape[1]),
+                        device=gen_total_embs.device,
+                        dtype=torch.bool,
+                    )
+                key_padding_mask = torch.cat(
+                    [pcpt_key_padding_mask, gen_key_padding_mask],
+                    dim=1,
+                )
+        else:
+            total_embs = pcpt_total_embs
+            gen_mask = None
+            key_padding_mask = pcpt_key_padding_mask
+            p_len = pcpt_total_embs.shape[1]
+
+        total_output = self.transformer_encoder(
+            total_embs=total_embs,
+            gen_mask=gen_mask,
+            key_padding_mask=key_padding_mask,
+        )
+
+        pcpt_output = total_output[:, :p_len, :]
+        gen_output = total_output[:, p_len:, :] if gen_total_embs is not None else None
+
+        return pcpt_output, gen_output
+
     def _get_cell_emb_from_layer(
         self,
         layer_output: Tensor,
@@ -378,3 +482,57 @@ class ComposerSCGPTModel(ComposerModel):
         normalized_value = (x - min_value) / (max_value - min_value)
         # Scale to -1..1
         return 2 * normalized_value - 1
+
+
+class ComposerSCGPTPerturbationModel(ComposerModel):
+    def __init__(self, model_config, collator_config, device="cuda"):
+        super().__init__()
+        self.device = device
+        self.criterion = masked_mse_loss
+        self.pad_token_id = collator_config.pad_token_id
+        self.use_cell_conditioned_generation = model_config.get(
+            "use_cell_conditioned_generation",
+            False,
+        )
+        self.model = SCGPTModel(
+            model_config=model_config,
+            collator_config=collator_config,
+            device=device,
+        )
+        self.pert_encoder = nn.Embedding(3, self.model.d_model, padding_idx=0)
+        self.pert_decoder = AffineExprDecoder(self.model.d_model)
+
+    def forward(self, batch):
+        gene_ids = batch["genes"]
+        ctrl_expr = batch["expressions_ctrl"]
+        perturbation_flags = batch["perturb_flags"]
+
+        gene_token_emb = self.model.gene_encoder(gene_ids.to(self.device))
+        gene_expr_emb = self.model.expression_encoder(ctrl_expr.to(self.device))
+        pert_flag_emb = self.pert_encoder(perturbation_flags.to(self.device))
+        combined_input_embs = gene_token_emb + gene_expr_emb + pert_flag_emb
+
+        transformer_encoding = self.model.transformer_encoder(
+            total_embs=combined_input_embs,
+            gen_mask=None,
+            key_padding_mask=None,
+        )
+        predicted_post_expr = self.pert_decoder(transformer_encoding, ctrl_expr)
+        output = {
+            "predicted_expr_perturbed": predicted_post_expr["pred"],
+        }
+        return output
+
+    def loss(self, outputs, batch):
+        expr_target = batch["expressions_perturbed"]
+        gene_ids = batch["genes"]
+        mask = torch.ones_like(gene_ids, dtype=torch.bool)
+
+        expr_pred = outputs["predicted_expr_perturbed"]
+
+        loss_mse = self.criterion(
+            expr_pred,
+            expr_target,
+            mask,
+        )
+        return loss_mse
