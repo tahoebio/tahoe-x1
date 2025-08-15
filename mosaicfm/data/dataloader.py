@@ -74,7 +74,6 @@ def build_dataloader(
         mask_value=collator_cfg.mask_value,
         max_length=collator_cfg.max_length,
         sampling=collator_cfg.sampling,
-        data_style=collator_cfg.data_style,
         num_bins=collator_cfg.get("num_bins", 51),
         right_binning=collator_cfg.get("right_binning", False),
         keep_first_n_tokens=collator_cfg.get("keep_first_n_tokens", 1),
