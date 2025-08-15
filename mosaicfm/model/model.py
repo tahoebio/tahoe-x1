@@ -269,7 +269,6 @@ class SCGPTModel(nn.Module):
         values: Tensor,
         gen_masks: Tensor,
         key_padding_mask: Tensor,
-        MVC: bool = False,
         drug_ids: Optional[Tensor] = None,
         inference_mode: bool = False,
     ) -> Mapping[str, Tensor]:
