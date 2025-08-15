@@ -66,6 +66,7 @@ class SCGPTModel(nn.Module):
         self.norm_config = model_config.get("norm_config", None)
         self.init_config = model_config.get("init_config", None)
         self.gene_encoder_config = model_config.get("gene_encoder", None)
+        self.keep_first_n_tokens = collator_config.get("keep_first_n_tokens", 1)
         if self.init_config is None:
             self.init_config = init_config_defaults
         if self.gene_encoder_config is None:
@@ -200,7 +201,6 @@ class SCGPTModel(nn.Module):
         values: Tensor,
         gen_masks: Tensor,  # (batch, seq_len)
         key_padding_mask: Tensor,
-        input_cell_emb: Optional[Tensor] = None,  # (batch, seq_len, embsize)
         drug_ids: Optional[
             Tensor
         ] = None,  # drug_ids is None if use_chem_token is set to False
@@ -223,8 +223,6 @@ class SCGPTModel(nn.Module):
             drug_embs = self.chem_encoder(drug_ids)  # (batch, embsize)
             total_embs[:, 1, :] = drug_embs  # (batch, seq_len, embsize)
 
-        if input_cell_emb is not None:
-            total_embs[:, 0, :] = input_cell_emb
 
         self.cur_gene_token_embs = token_embs
 
@@ -264,36 +262,15 @@ class SCGPTModel(nn.Module):
 
         return cell_emb
 
-    def _extend_output(
-        self,
-        output: Mapping[str, Tensor],
-        transformer_output: Tensor,
-        CLS: bool = False,
-        MVC: bool = False,
-    ) -> Mapping[str, Tensor]:
-        cell_emb = self._get_cell_emb_from_layer(transformer_output)
-        output["cell_emb"] = cell_emb
-
-        if CLS:
-            output["cls_output"] = self.cls_decoder(cell_emb)  # (batch, n_cls)
-        if MVC:
-            mvc_output = self.mvc_decoder(
-                cell_emb,
-                self.cur_gene_token_embs,
-            )
-            output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
-        return output
-
+        
     def forward(
         self,
         genes: Tensor,
         values: Tensor,
         gen_masks: Tensor,
         key_padding_mask: Tensor,
-        MVC: bool = False,
-        CLS: bool = False,
-        input_cell_emb: Optional[Tensor] = None,
         drug_ids: Optional[Tensor] = None,
+        inference_mode: bool = False,
     ) -> Mapping[str, Tensor]:
 
         transformer_output = self.transformer_generate(
@@ -301,21 +278,29 @@ class SCGPTModel(nn.Module):
             values,
             gen_masks,
             key_padding_mask,
-            input_cell_emb=input_cell_emb,
             drug_ids=drug_ids,
         )
 
         output = {}
-        decoder_output = self.expression_decoder(transformer_output)
-        full_preds = decoder_output["pred"]  # (batch, seq_len)
-        output["expr_preds"] = full_preds
+        if not inference_mode:
+            decoder_output = self.expression_decoder(transformer_output)
+            full_preds = decoder_output["pred"]  # (batch, seq_len)
+            output["expr_preds"] = full_preds
 
-        output = self._extend_output(
-            output,
-            transformer_output,
-            CLS=CLS,
-            MVC=MVC,
-        )
+
+
+        #extend the output with cell embeddings and gene embeddings
+        cell_emb = self._get_cell_emb_from_layer(transformer_output)
+        output["cell_emb"] = cell_emb
+        output["gene_ids"] = genes[:, self.keep_first_n_tokens:] 
+        output["gene_emb"] = transformer_output[:, self.keep_first_n_tokens:, :]  
+
+        if not inference_mode:
+            mvc_output = self.mvc_decoder(
+                cell_emb,
+                self.cur_gene_token_embs,
+            )
+            output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
 
         return output
 
@@ -371,8 +356,6 @@ class ComposerSCGPTModel(ComposerModel):
             gen_masks,
             key_padding_mask,
             drug_ids=drug_ids,
-            MVC=True,
-            # generative_training=True,
         )
 
         return output_dict
