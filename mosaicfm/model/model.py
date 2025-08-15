@@ -262,26 +262,7 @@ class SCGPTModel(nn.Module):
 
         return cell_emb
 
-    def _extend_output(
-        self,
-        genes: Tensor,
-        output: Mapping[str, Tensor],
-        transformer_output: Tensor,
-        MVC: bool = False,
-    ) -> Mapping[str, Tensor]:
-        cell_emb = self._get_cell_emb_from_layer(transformer_output)
-        output["cell_emb"] = cell_emb
-        output["gene_ids"] = genes[:, self.keep_first_n_tokens:] 
-        output["gene_emb"] = transformer_output[:, self.keep_first_n_tokens:, :]  
-
-        if MVC:
-            mvc_output = self.mvc_decoder(
-                cell_emb,
-                self.cur_gene_token_embs,
-            )
-            output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
-        return output
-
+        
     def forward(
         self,
         genes: Tensor,
@@ -306,16 +287,26 @@ class SCGPTModel(nn.Module):
             decoder_output = self.expression_decoder(transformer_output)
             full_preds = decoder_output["pred"]  # (batch, seq_len)
             output["expr_preds"] = full_preds
-            MVC = True
-        else:
-            MVC = False
 
-        output = self._extend_output(
-            genes,
-            output,
-            transformer_output,
-            MVC=MVC,
-        )
+
+
+        #extend the output with cell embeddings and gene embeddings
+        cell_emb = self._get_cell_emb_from_layer(transformer_output)
+        output["cell_emb"] = cell_emb
+        output["gene_ids"] = genes[:, self.keep_first_n_tokens:] 
+        output["gene_emb"] = transformer_output[:, self.keep_first_n_tokens:, :]  
+
+        if not inference_mode:
+            mvc_output = self.mvc_decoder(
+                cell_emb,
+                self.cur_gene_token_embs,
+            )
+            output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
+
+            
+        return output
+
+
 
         return output
 
