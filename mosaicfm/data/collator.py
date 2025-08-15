@@ -298,45 +298,6 @@ class DataCollator(DefaultDataCollator):
 
         return data_dict
 
-    def _random_split(
-        self,
-        *arrays: torch.Tensor,
-        ratio: float,
-    ) -> Tuple[torch.Tensor, ...]:
-        """Randomly split the arrays into two parts. The first part will have
-        the.
-
-        length of `ratio * length`, and the second part will have the length of
-        `(1 - ratio) * length`. When multiple arrays are provided, they are supposed
-        to have the same length.
-
-        This method reflects the behavior of `sklearn.model_selection.train_test_split`
-
-        Args:
-            *arrays (torch.Tensor): the arrays to be split.
-            ratio (float): the ratio of the first part.
-
-        Returns:
-            Tuple[torch.Tensor, ...]: the split arrays.
-        """
-        assert len(arrays) > 0
-        assert 0 < ratio < 1
-        if len(arrays) > 1:
-            assert all(
-                array.shape[0] == arrays[0].shape[0] for array in arrays
-            ), "The arrays must have the same length."
-
-        length = arrays[0].shape[0]
-        split_index = int(length * ratio)
-
-        indices = torch.randperm(length, device=arrays[0].device)
-        first_part_indices = indices[:split_index]
-        second_part_indices = indices[split_index:]
-
-        first_parts = tuple(array[first_part_indices] for array in arrays)
-        second_parts = tuple(array[second_part_indices] for array in arrays)
-
-        return first_parts + second_parts
 
     def get_mlm_probability(self) -> float:
         """Get the mlm probability for the current step."""
