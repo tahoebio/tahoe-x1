@@ -269,7 +269,6 @@ class SCGPTModel(nn.Module):
         values: Tensor,
         gen_masks: Tensor,
         key_padding_mask: Tensor,
-        MVC: bool = False,
         drug_ids: Optional[Tensor] = None,
         inference_mode: bool = False,
     ) -> Mapping[str, Tensor]:
@@ -357,8 +356,6 @@ class ComposerSCGPTModel(ComposerModel):
             gen_masks,
             key_padding_mask,
             drug_ids=drug_ids,
-            MVC=True,
-            # generative_training=True,
         )
 
         return output_dict
