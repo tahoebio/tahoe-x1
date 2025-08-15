@@ -303,11 +303,6 @@ class SCGPTModel(nn.Module):
             )
             output["mvc_output"] = mvc_output["pred"]  # (batch, seq_len)
 
-            
-        return output
-
-
-
         return output
 
     def fsdp_wrap_fn(self, module):
