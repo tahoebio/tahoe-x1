@@ -1,0 +1,14 @@
+paths:
+  model_config: /path/to/model_config.yml
+  collator_config: /path/to/collator_config.yml
+  vocab: /path/to/vocab.json
+  checkpoint: /path/to/checkpoint.pt
+  adata_input: /path/to/input.h5ad
+  cell_output: /path/to/cell_embeddings.h5ad
+  gene_output: /path/to/gene_embeddings.npy
+
+predict:
+  batch_size: 8
+  max_length: 1024
+  precision: fp32
+  num_workers: 8

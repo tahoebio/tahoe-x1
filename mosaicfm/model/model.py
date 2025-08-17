@@ -339,8 +339,8 @@ class ComposerSCGPTModel(ComposerModel):
             "Spearman": MaskedSpearmanMetric(name="Spearman"),
         }
 
-    def forward(self, batch):  # batch is the output of the dataloader
-        # specify how batches are passed through the model
+    def forward(self, batch, inference_mode: bool = False):  # batch is the output of the dataloader
+        """Forward pass used for training, evaluation and prediction."""
         genes = batch["gene"]
         exprs = batch["expr"]
         gen_masks = batch["gen_mask"]
@@ -356,6 +356,7 @@ class ComposerSCGPTModel(ComposerModel):
             gen_masks,
             key_padding_mask,
             drug_ids=drug_ids,
+            inference_mode=inference_mode,
         )
 
         return output_dict
@@ -366,7 +367,16 @@ class ComposerSCGPTModel(ComposerModel):
 
         self.model.zero_grad(set_to_none=True)
 
-        return outputs if outputs is not None else self.forward(batch)
+        inference_mode = batch.get("inference_mode", False)
+        return outputs if outputs is not None else self.forward(batch, inference_mode=inference_mode)
+
+    def predict(self, batch):
+        """Prediction step used with :meth:`composer.Trainer.predict`.
+
+        The model is run with ``inference_mode=True`` to skip any loss-only
+        computation and return embeddings for genes and cells.
+        """
+        return self.forward(batch, inference_mode=True)
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss
