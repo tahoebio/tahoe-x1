@@ -25,7 +25,6 @@ def finalize_embeddings(
 ):
     
 
-    print("shape flat_embs", cell_embs[0].shape)
     """Concatenate and finalize cell and gene embeddings."""
     cell_array = torch.cat(cell_embs, dim=0)
     cell_array = cell_array.to("cpu").to(torch.float32).numpy()
