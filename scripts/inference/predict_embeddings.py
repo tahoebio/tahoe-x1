@@ -30,7 +30,7 @@ Example usage:
 
 import logging
 import sys
-from typing import Dict, List
+from typing import Dict, List, Union
 
 import numpy as np
 import torch
@@ -40,12 +40,14 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from torch.utils.data import DataLoader
 import scanpy as sc
-from scipy.sparse import csc_matrix, csr_matrix
 
+from mosaicfm.tasks import get_batch_embeddings
 
 from mosaicfm.data import CountDataset, DataCollator
 from mosaicfm.model import ComposerSCGPTModel
 from mosaicfm.tokenizer import GeneVocab
+
+from mosaicfm.utils.util import finalize_embeddings, loader_from_adata
 
 
 log = logging.getLogger(__name__)
@@ -53,81 +55,47 @@ logging.basicConfig(
     format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
     level=logging.INFO,
 )
+
+
+@staticmethod
 def compute_lisi_scores(
-        emb ,
-        labels ,
-        k: int,
-    ) -> float:
-        """Computes a LISI score. Accepts numpy arrays or torch tensors.
+    emb: Union[np.ndarray, torch.Tensor],
+    labels: Union[np.ndarray, torch.Tensor],
+    k: int,
+) -> float:
+    """Computes a LISI score. Accepts numpy arrays or torch tensors.
 
-        Args:
-            emb (Union[np.ndarray, torch.Tensor]): (n_samples, n_features) embedding matrix.
-            labels (Union[np.ndarray, torch.Tensor]): (n_samples,) label vector, can be strings or ints.
-            k (int): Number of neighbors.
+    Args:
+        emb (Union[np.ndarray, torch.Tensor]): (n_samples, n_features) embedding matrix.
+        labels (Union[np.ndarray, torch.Tensor]): (n_samples,) label vector, can be strings or ints.
+        k (int): Number of neighbors.
+    Returns:
+        float: The LISI score.
+    """
+    # Convert to torch tensors
+    emb = torch.from_numpy(emb).float()
+    _, inverse_labels = np.unique(labels, return_inverse=True)
+    labels = torch.from_numpy(inverse_labels).long()
 
-        Returns:
-            float: The LISI score.
-        """
-        # Convert to torch tensors
-        emb = torch.from_numpy(emb).float()
-        _, inverse_labels = np.unique(labels, return_inverse=True)
-        labels = torch.from_numpy(inverse_labels).long()
+    # Compute pairwise distances
+    distances = torch.cdist(emb, emb, p=2)
 
-        # Compute pairwise distances
-        distances = torch.cdist(emb, emb, p=2)
+    # Get k nearest neighbors for each point (excluding itself)
+    _, knn_indices = torch.topk(distances, k + 1, largest=False)
+    knn_indices = knn_indices[:, 1:]  # exclude self
 
-        # Get k nearest neighbors for each point (excluding itself)
-        _, knn_indices = torch.topk(distances, k + 1, largest=False)
-        knn_indices = knn_indices[:, 1:]  # exclude self
+    # Self vs neighbor labels
+    self_labels = labels.unsqueeze(1).expand(-1, k)
+    neighbor_labels = labels[knn_indices]
 
-        # Self vs neighbor labels
-        self_labels = labels.unsqueeze(1).expand(-1, k)
-        neighbor_labels = labels[knn_indices]
+    # Compute label agreement
+    same_label = (self_labels == neighbor_labels).float().mean()
 
-        # Compute label agreement
-        same_label = (self_labels == neighbor_labels).float().mean()
+    # Theoretical LISI normalization
+    label_counts = torch.bincount(labels)
+    theoretic_score = ((label_counts / label_counts.sum()) ** 2).sum()
 
-        # Theoretical LISI normalization
-        label_counts = torch.bincount(labels)
-        theoretic_score = ((label_counts / label_counts.sum()) ** 2).sum()
-
-        return (same_label / theoretic_score).item()
-
-def _compute_mean_gene_embeddings(
-    gene_ids: torch.Tensor, gene_embs: torch.Tensor, vocab: GeneVocab, pad_token_id: int = -1
-) -> np.ndarray:
-    """Aggregate gene embeddings by taking the mean per vocabulary id."""
-    flat_ids = gene_ids.flatten()
-    flat_embs = gene_embs.flatten(0, 1)
-
-    valid = flat_ids != pad_token_id
-    flat_ids = flat_ids[valid]
-    flat_embs = flat_embs[valid]
-
-    sums = torch.zeros(len(vocab), flat_embs.size(-1), device=flat_embs.device)
-    counts = torch.zeros(len(vocab), device=flat_embs.device)
-
-    sums.index_add_(0, flat_ids, flat_embs)
-    counts.index_add_(0, flat_ids, torch.ones_like(flat_ids, dtype=torch.float32))
-
-    means = sums / counts.unsqueeze(1)
-    means = means.to("cpu").numpy()
-
-
-    counts = np.expand_dims(counts, axis=1)
-
-    means = np.divide(
-        sums,
-        counts,
-        out=np.ones_like(sums) * np.nan,
-        where=counts != 0,
-    )
-
-    gene2idx = vocab.get_stoi()
-    all_gene_ids = np.array(list(gene2idx.values()))
-    means = means[all_gene_ids, :]
- 
-    return means
+    return (same_label / theoretic_score).item()
 
 
 def main(cfg: DictConfig) -> None:
@@ -139,7 +107,9 @@ def main(cfg: DictConfig) -> None:
     cell_type_key = cfg.data.cell_type_key
     gene_id_key = cfg.data.gene_id_key
     return_genes = cfg.predict.get("return_genes", True)
-
+    batch_size = cfg.predict.get("batch_size", 64)
+    max_length = cfg.predict.get("seq_len", 2048)    
+    num_workers = cfg.predict.get("num_workers", 8)
 
     log.info("Loading AnnData file…")
     adata = sc.read_h5ad(cfg.paths.adata_input)
@@ -160,56 +130,18 @@ def main(cfg: DictConfig) -> None:
     assert np.all(gene_ids >= 0), "Some genes are not in the vocabulary."
 
 
-    count_matrix = adata.X
-    if isinstance(count_matrix, np.ndarray):
-        count_matrix = csr_matrix(count_matrix)
-    elif isinstance(count_matrix, csc_matrix):
-        count_matrix = count_matrix.tocsr()
-    elif hasattr(count_matrix, "to_memory"):
-        count_matrix = count_matrix.to_memory().tocsr()
 
-
-    dataset = CountDataset(
-        count_matrix,
-        gene_ids,
-        cls_token_id=vocab["<cls>"],
-        pad_value=coll_cfg.pad_value,
-    )
-    print(f"Dataset is loaded with {len(dataset)} cells and {len(vocab)} genes.")
-
-    collator = DataCollator(
+    log.info("Creating data loader…")
+    loader = loader_from_adata(
+        adata=adata,
+        collator_cfg=coll_cfg,
         vocab=vocab,
-        drug_to_id_path=coll_cfg.get("drug_to_id_path", None),
-        do_padding=coll_cfg.get("do_padding", True),
-        unexp_padding=False,
-        pad_token_id=coll_cfg.pad_token_id,
-        pad_value=coll_cfg.pad_value,
-        do_mlm=False,
-        do_binning=coll_cfg.get("do_binning", True),
-        log_transform=coll_cfg.get("log_transform", False),
-        target_sum=coll_cfg.get("target_sum"),
-        mlm_probability=coll_cfg.mlm_probability,
-        mask_value=coll_cfg.mask_value,
-        max_length=cfg.predict.seq_len_dataset,
-        sampling=coll_cfg.sampling,
-        num_bins=coll_cfg.get("num_bins", 51),
-        right_binning=coll_cfg.get("right_binning", False),
-        reserve_keys=coll_cfg.get("reserve_keys"),
-        keep_first_n_tokens=coll_cfg.get("keep_first_n_tokens", 1),
-        use_chem_token=coll_cfg.get("use_chem_token", False),
+        batch_size=batch_size,
+        max_length=max_length,
+        gene_ids=gene_ids,
+        num_workers=num_workers,
     )
-
-
-    loader = DataLoader(
-        dataset,
-        batch_size=cfg.predict.batch_size,
-        collate_fn=collator,
-        shuffle=False,
-        drop_last=False,
-        num_workers=cfg.predict.num_workers,
-        pin_memory=True,
-        prefetch_factor=48,
-    )
+    
 
     log.info("Initialising model and loading checkpoint…")
 
@@ -229,8 +161,8 @@ def main(cfg: DictConfig) -> None:
         device="gpu" if torch.cuda.is_available() else "cpu",
     )
 
-    log.info("Running prediction…")
-    predictions = trainer.predict(loader, return_outputs=True)
+
+    predictions = trainer.predict(loader, return_outputs=True)    
 
     log.info("Aggregating embeddings…")
     cell_embs: List[torch.Tensor] = []
@@ -239,46 +171,43 @@ def main(cfg: DictConfig) -> None:
     for out in predictions:
         cell_embs.append(out["cell_emb"].cpu())
         gene_embs.append(out["gene_emb"].cpu())
-        gene_ids_list.append(out["gene_ids"].cpu())
+        gene_ids_list.append(out["gene_ids"].cpu()) 
 
-    cell_array = torch.cat(cell_embs, dim=0).numpy()
-    cell_array = cell_array / np.linalg.norm(
-    cell_array,
-    axis=1,
-    keepdims=True,
-)
+    cell_array, gene_array = finalize_embeddings(
+        cell_embs=cell_embs,
+        gene_embs=gene_embs,
+        gene_ids_list=gene_ids_list,
+        vocab=vocab,
+        pad_token_id=coll_cfg["pad_token_id"],
+        return_gene_embeddings=return_genes,
+    )
+    
     
     log.info("Saving outputs…")
-    np.save(cfg.paths.cell_output, cell_array)
     
-    print(f"Cell embeddings shape: {cell_array.shape}")
+    np.save(cfg.paths.cell_output, cell_array)
 
     if return_genes:
-        all_gene_embs = torch.cat(gene_embs, dim=0)
-        all_gene_ids = torch.cat(gene_ids_list, dim=0)
-
-        gene_array = _compute_mean_gene_embeddings(
-            all_gene_ids, all_gene_embs, vocab, coll_cfg["pad_token_id"]
-        )
-        print(f"Gene embeddings shape: {gene_array.shape}")
-
-        np.save(cfg.paths.gene_output, gene_array)
+        np.savez(cfg.paths.gene_output, gene_array=gene_array, gene_ids=gene_ids)
 
 
 
 
     log.info("Finished writing embeddings")
 
-
     lisi_score = compute_lisi_scores(
         cell_array,
         adata.obs[cell_type_key].values.to_numpy(dtype="str"),
         20,
     )
-    print("LiSI score:", lisi_score)
+    print("LISI score:", lisi_score)
+
+
 if __name__ == "__main__":
     if len(sys.argv) != 2:
         raise SystemExit("Usage: predict_embeddings.py <config.yaml>")
     cfg = om.load(sys.argv[1])
     om.resolve(cfg)
     main(cfg)
+
+

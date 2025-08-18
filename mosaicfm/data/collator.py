@@ -99,8 +99,7 @@ class DataCollator(DefaultDataCollator):
         self.vocab = vocab
         self.use_chem_token = use_chem_token
         if self.use_chem_token:
-            if "<drug>" not in vocab:
-                vocab.append_token("<drug>")
+            assert "<drug>" in vocab, "<drug> token must be in the vocabulary."
             self.drug_token_id = vocab["<drug>"]
         else:
             self.drug_token_id = None

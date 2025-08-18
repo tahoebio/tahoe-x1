@@ -292,8 +292,8 @@ class SCGPTModel(nn.Module):
         #extend the output with cell embeddings and gene embeddings
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
-        output["gene_ids"] = genes #[:, self.keep_first_n_tokens:] 
-        output["gene_emb"] = transformer_output #[:, self.keep_first_n_tokens:, :]  
+        output["gene_ids"] = genes
+        output["gene_emb"] = transformer_output
 
         if not inference_mode:
             mvc_output = self.mvc_decoder(
@@ -348,7 +348,8 @@ class ComposerSCGPTModel(ComposerModel):
         key_padding_mask = ~genes.eq(self.pad_token_id)
         drug_ids = (
             batch["drug_ids"] if "drug_ids" in batch else None
-        )  # drug_ids is None if use_chem_token is set to False        
+        )  # drug_ids is None if use_chem_token is set to False     
+           
         output_dict = self.model(
             genes,
             exprs,

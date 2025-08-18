@@ -1,11 +1,143 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
 from pathlib import Path
+from typing import List
 from urllib.parse import urlparse
-
+import torch
 import boto3
+from git import Optional
 import numpy as np
+from scanpy import AnnData
 from scipy.stats import pearsonr
+from scipy.sparse import csc_matrix, csr_matrix
+from mosaicfm.tokenizer import GeneVocab
+
+
+from omegaconf import DictConfig
+
+def finalize_embeddings(
+    cell_embs: List[torch.Tensor],
+    gene_embs: List[torch.Tensor],
+    gene_ids_list: List[torch.Tensor],
+    vocab: GeneVocab,
+    pad_token_id: int = -1,
+    return_gene_embeddings: bool = True,
+):
+    
+
+    print("shape flat_embs", cell_embs[0].shape)
+    """Concatenate and finalize cell and gene embeddings."""
+    cell_array = torch.cat(cell_embs, dim=0)
+    cell_array = cell_array.to("cpu").to(torch.float32).numpy()
+    cell_array = cell_array / np.linalg.norm(
+                cell_array,
+                axis=1,
+                keepdims=True,
+                )
+
+
+    gene_array = None
+    if return_gene_embeddings:
+        gene_embs = torch.cat(gene_embs, dim=0)
+        gene_ids = torch.cat(gene_ids_list, dim=0)
+
+        flat_ids = gene_ids.flatten()
+        flat_embs = gene_embs.flatten(0, 1)
+
+        valid = flat_ids != pad_token_id
+        flat_ids = flat_ids[valid]
+        flat_embs = flat_embs[valid]
+
+        sums = torch.zeros(len(vocab), flat_embs.size(-1), dtype=flat_embs.dtype, device=flat_embs.device)
+        counts = torch.zeros(len(vocab), dtype=flat_embs.dtype, device=flat_embs.device)
+
+        sums.index_add_(0, flat_ids, flat_embs)
+        counts.index_add_(0, flat_ids, torch.ones_like(flat_ids, dtype=flat_embs.dtype))
+
+        means = sums / counts.unsqueeze(1)
+        means = means.to("cpu").to(torch.float32).numpy()
+
+        sums = sums.to("cpu").to(torch.float32).numpy()
+        counts = np.expand_dims(counts.to("cpu").to(torch.float32).numpy(), axis=1)
+
+        means = np.divide(
+            sums,
+            counts,
+            out=np.ones_like(sums) * np.nan,
+            where=counts != 0,
+        )
+
+        gene2idx = vocab.get_stoi()
+        all_gene_ids = np.array(list(gene2idx.values()))
+        gene_array = means[all_gene_ids, :]
+
+
+    return cell_array, gene_array
+    
+def loader_from_adata( adata: AnnData,
+                      collator_cfg: DictConfig,
+                      vocab: GeneVocab,
+                      batch_size: int = 50,
+                      max_length: Optional[int] = None,
+                      gene_ids: Optional[np.ndarray] = None,
+                      num_workers: int = 8,
+       ):
+    count_matrix = adata.X
+    if isinstance(count_matrix, np.ndarray):
+        count_matrix = csr_matrix(count_matrix)
+    elif isinstance(count_matrix, csc_matrix):
+        count_matrix = count_matrix.tocsr()
+    elif hasattr(count_matrix, "to_memory"):
+        count_matrix = count_matrix.to_memory().tocsr()
+
+    if gene_ids is None:
+        gene_ids = np.array(adata.var["id_in_vocab"])
+        assert np.all(gene_ids >= 0)
+
+    if max_length is None:
+        max_length = len(gene_ids)
+    
+    from mosaicfm.data import CountDataset, DataCollator
+
+    dataset = CountDataset(
+        count_matrix,
+        gene_ids,
+        cls_token_id=vocab["<cls>"],
+        pad_value=collator_cfg["pad_value"],
+    )
+    collate_fn = DataCollator(
+        vocab=vocab,
+        drug_to_id_path=collator_cfg.get("drug_to_id_path", None),
+        do_padding=collator_cfg.get("do_padding", True),
+        unexp_padding=False,  # Disable padding with random unexpressed genes for inference
+        pad_token_id=collator_cfg.pad_token_id,
+        pad_value=collator_cfg.pad_value,
+        do_mlm=False,  # Disable masking for inference
+        do_binning=collator_cfg.get("do_binning", True),
+        log_transform=collator_cfg.get("log_transform", False),
+        target_sum=collator_cfg.get("target_sum"),
+        mlm_probability=collator_cfg.mlm_probability,  # Not used
+        mask_value=collator_cfg.mask_value,
+        max_length=max_length,
+        sampling=collator_cfg.sampling,  # Turned on since max-length can be less than the number of genes
+        num_bins=collator_cfg.get("num_bins", 51),
+        right_binning=collator_cfg.get("right_binning", False),
+        keep_first_n_tokens=collator_cfg.get("keep_first_n_tokens", 1),
+        use_chem_token=collator_cfg.get("use_chem_token", False),
+    )
+    data_loader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=batch_size,
+        collate_fn=collate_fn,
+        shuffle=False,
+        drop_last=False,
+        num_workers=num_workers,
+        pin_memory=True,
+        prefetch_factor=48,
+    )
+
+    return data_loader
+
 
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):
