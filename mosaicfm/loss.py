@@ -62,10 +62,13 @@ class MaskedMseMetric(Metric):
     ) -> None:
         if preds.shape != target.shape:
             raise ValueError("preds and target must have the same shape")
-        mask = mask.float()
+        mask = mask.bool()
+        non_masked_preds = preds[mask]
+        non_masked_target = target[mask]
+
         self.sum_mse += torch.nn.functional.mse_loss(
-            preds * mask,
-            target * mask,
+            non_masked_preds,
+            non_masked_target,
             reduction="sum",
         )
         self.sum_mask += mask.sum()

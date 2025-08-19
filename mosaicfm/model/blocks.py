@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
 from functools import lru_cache
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -251,7 +251,7 @@ class SCGPTEncoder(nn.Module):
         total_embs: Tensor,
         key_padding_mask: Optional[Tensor] = None,
         gen_mask: Optional[Tensor] = None,
-    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
+    ) -> Tensor:
 
         flash_attn_padding_info = gen_flash_attn_padding_info(
             bsz=total_embs.shape[0],

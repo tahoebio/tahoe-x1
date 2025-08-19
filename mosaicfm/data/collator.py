@@ -277,14 +277,14 @@ class DataCollator(DefaultDataCollator):
                 drug_ids.append(drug)
 
         data_dict = {
-            "gene": torch.stack(padded_genes, dim=0).to(device),
-            "expr": torch.stack(masked_exprs, dim=0).to(device),
-            "expr_target": torch.stack(expr_targets, dim=0).to(device),
-            "expr_raw": torch.stack(expr_raws, dim=0).to(device),
-            "gen_mask": torch.stack(gen_masks, dim=0).to(device),
+            "gene": torch.stack(padded_genes, dim=0),
+            "expr": torch.stack(masked_exprs, dim=0),
+            "expr_target": torch.stack(expr_targets, dim=0),
+            "expr_raw": torch.stack(expr_raws, dim=0),
+            "gen_mask": torch.stack(gen_masks, dim=0),
         }
         if self.use_chem_token:
-            drug_ids = torch.stack(drug_ids).to(device)
+            drug_ids = torch.stack(drug_ids)
             data_dict["drug_ids"] = drug_ids
 
         # add reserved keys
@@ -297,7 +297,6 @@ class DataCollator(DefaultDataCollator):
                 data_dict[key] = data_  # if not tensor, just keep the list
 
         return data_dict
-
 
     def get_mlm_probability(self) -> float:
         """Get the mlm probability for the current step."""
@@ -314,21 +313,30 @@ class DataCollator(DefaultDataCollator):
 
     def _create_random_mask(
         self,
-        expressions: torch.Tensor,
-        keep_first_n_tokens: int = 0,
+        expressions: torch.Tensor,  # seq_len
     ) -> torch.Tensor:
         """Generate a random mask for expressions based on mlm probability."""
         device = expressions.device
-        shape = expressions.shape
-        probability_matrix = torch.full(
-            shape,
-            self.get_mlm_probability(),
-            device=device,
-        )
-        probability_matrix[expressions.eq(self.pad_value)] = 0
-        if keep_first_n_tokens > 0:
-            probability_matrix[:keep_first_n_tokens] = 0
-        mask = torch.bernoulli(probability_matrix).bool().to(device)
+
+        # Calculate number of valid tokens (non-pad, non-keep_first_n_tokens)
+        pad_mask = expressions.eq(self.pad_value)
+        num_pad_genes = pad_mask.sum().item()
+        seq_len = expressions.shape[0]
+
+        valid_tokens = seq_len - num_pad_genes - self.keep_first_n_tokens
+        num_to_mask = int(valid_tokens * self.get_mlm_probability())
+
+        # Create mask with all False initially
+        mask = torch.zeros(expressions.shape, dtype=torch.bool, device=device)
+
+        # Randomly select exactly num_to_mask indices from valid tokens
+        if num_to_mask > 0 and valid_tokens > 0:
+            indices = (
+                torch.randperm(valid_tokens, device=device)[:num_to_mask]
+                + self.keep_first_n_tokens
+            )
+            mask[indices] = True
+
         return mask
 
     def _sample_or_truncate_plus_pad(
