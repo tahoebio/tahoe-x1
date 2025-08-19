@@ -177,24 +177,6 @@ class SCGPTModel(nn.Module):
             **self.init_config,
         )
 
-    def _encode(
-        self,
-        src: Tensor,
-        values: Tensor,
-        src_key_padding_mask: Tensor,
-    ) -> Tensor:
-        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
-        self.cur_gene_token_embs = src
-        values = self.expression_encoder(values)  # (batch, seq_len, embsize)
-        total_embs = src + values
-        output = self.transformer_encoder(
-            pcpt_total_embs=total_embs,
-            gen_total_embs=None,
-            pcpt_key_padding_mask=src_key_padding_mask,
-            gen_key_padding_mask=None,
-        )
-        return output  # (batch, seq_len, embsize)
-
     def transformer_generate(
         self,
         genes: Tensor,
@@ -222,7 +204,6 @@ class SCGPTModel(nn.Module):
             # calculate chemical embedding and put it in its correct place (after <cls>)
             drug_embs = self.chem_encoder(drug_ids)  # (batch, embsize)
             total_embs[:, 1, :] = drug_embs  # (batch, seq_len, embsize)
-
 
         self.cur_gene_token_embs = token_embs
 
@@ -262,7 +243,6 @@ class SCGPTModel(nn.Module):
 
         return cell_emb
 
-        
     def forward(
         self,
         genes: Tensor,
@@ -287,14 +267,11 @@ class SCGPTModel(nn.Module):
             full_preds = decoder_output["pred"]  # (batch, seq_len)
             output["expr_preds"] = full_preds
 
-
-
-        #extend the output with cell embeddings and gene embeddings
+        # extend the output with cell embeddings and gene embeddings
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
         output["gene_ids"] = genes
         output["gene_emb"] = transformer_output
-
         if not inference_mode:
             mvc_output = self.mvc_decoder(
                 cell_emb,
