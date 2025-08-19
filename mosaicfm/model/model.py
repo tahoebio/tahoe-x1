@@ -223,7 +223,6 @@ class SCGPTModel(nn.Module):
             drug_embs = self.chem_encoder(drug_ids)  # (batch, embsize)
             total_embs[:, 1, :] = drug_embs  # (batch, seq_len, embsize)
 
-
         self.cur_gene_token_embs = token_embs
 
         output = self.transformer_encoder(
@@ -262,7 +261,6 @@ class SCGPTModel(nn.Module):
 
         return cell_emb
 
-        
     def forward(
         self,
         genes: Tensor,
@@ -287,14 +285,11 @@ class SCGPTModel(nn.Module):
             full_preds = decoder_output["pred"]  # (batch, seq_len)
             output["expr_preds"] = full_preds
 
-
-
-        #extend the output with cell embeddings and gene embeddings
+        # extend the output with cell embeddings and gene embeddings
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
-        output["gene_ids"] = genes[:, self.keep_first_n_tokens:] 
-        output["gene_emb"] = transformer_output[:, self.keep_first_n_tokens:, :]  
-
+        output["gene_ids"] = genes
+        output["gene_emb"] = transformer_output
         if not inference_mode:
             mvc_output = self.mvc_decoder(
                 cell_emb,

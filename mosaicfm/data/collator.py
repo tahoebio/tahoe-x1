@@ -298,7 +298,6 @@ class DataCollator(DefaultDataCollator):
 
         return data_dict
 
-
     def get_mlm_probability(self) -> float:
         """Get the mlm probability for the current step."""
         if isinstance(self.mlm_probability, float):
@@ -314,26 +313,29 @@ class DataCollator(DefaultDataCollator):
 
     def _create_random_mask(
         self,
-        expressions: torch.Tensor, #seq_len
+        expressions: torch.Tensor,  # seq_len
         keep_first_n_tokens: int = 0,
     ) -> torch.Tensor:
         """Generate a random mask for expressions based on mlm probability."""
         device = expressions.device
-        
+
         # Calculate number of valid tokens (non-pad, non-keep_first_n_tokens)
         pad_mask = expressions.eq(self.pad_value)
         num_pad_genes = pad_mask.sum().item()
         seq_len = expressions.shape[0]
-        
+
         valid_tokens = seq_len - num_pad_genes - keep_first_n_tokens
         num_to_mask = int(valid_tokens * self.get_mlm_probability())
-        
+
         # Create mask with all False initially
         mask = torch.zeros(expressions.shape, dtype=torch.bool, device=device)
 
         # Randomly select exactly num_to_mask indices from valid tokens
         if num_to_mask > 0 and valid_tokens > 0:
-            indices = torch.randperm(valid_tokens, device=device)[:num_to_mask] + keep_first_n_tokens
+            indices = (
+                torch.randperm(valid_tokens, device=device)[:num_to_mask]
+                + keep_first_n_tokens
+            )
             mask[indices] = True
 
         return mask
