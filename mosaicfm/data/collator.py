@@ -277,14 +277,14 @@ class DataCollator(DefaultDataCollator):
                 drug_ids.append(drug)
 
         data_dict = {
-            "gene": torch.stack(padded_genes, dim=0).to(device),
-            "expr": torch.stack(masked_exprs, dim=0).to(device),
-            "expr_target": torch.stack(expr_targets, dim=0).to(device),
-            "expr_raw": torch.stack(expr_raws, dim=0).to(device),
-            "gen_mask": torch.stack(gen_masks, dim=0).to(device),
+            "gene": torch.stack(padded_genes, dim=0),
+            "expr": torch.stack(masked_exprs, dim=0),
+            "expr_target": torch.stack(expr_targets, dim=0),
+            "expr_raw": torch.stack(expr_raws, dim=0),
+            "gen_mask": torch.stack(gen_masks, dim=0),
         }
         if self.use_chem_token:
-            drug_ids = torch.stack(drug_ids).to(device)
+            drug_ids = torch.stack(drug_ids)
             data_dict["drug_ids"] = drug_ids
 
         # add reserved keys
