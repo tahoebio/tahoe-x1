@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
 from functools import lru_cache
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -248,50 +248,22 @@ class SCGPTEncoder(nn.Module):
 
     def forward(
         self,
-        pcpt_total_embs: Tensor,
-        gen_total_embs: Optional[Tensor] = None,
-        pcpt_key_padding_mask: Optional[Tensor] = None,
-        gen_key_padding_mask: Optional[Tensor] = None,
-    ) -> Union[Tensor, Tuple[Tensor, Tensor]]:
-        if gen_total_embs is None:
-            pcpt_only = True
-            total_embs = pcpt_total_embs
-            key_padding_mask = pcpt_key_padding_mask
-        else:
-            pcpt_only = False
-            total_embs = torch.cat([pcpt_total_embs, gen_total_embs], dim=1)
-            if pcpt_key_padding_mask is None and gen_key_padding_mask is None:
-                key_padding_mask = None
-            else:
-                if pcpt_key_padding_mask is None:
-                    pcpt_key_padding_mask = torch.ones(
-                        (pcpt_total_embs.shape[0], pcpt_total_embs.shape[1]),
-                        device=pcpt_total_embs.device,
-                        dtype=torch.bool,
-                    )  # 1 means attention is allowed
-                elif gen_key_padding_mask is None:
-                    gen_key_padding_mask = torch.ones(
-                        (gen_total_embs.shape[0], gen_total_embs.shape[1]),
-                        device=gen_total_embs.device,
-                        dtype=torch.bool,
-                    )  # 1 means attention is allowed
-                key_padding_mask = torch.cat(
-                    [pcpt_key_padding_mask, gen_key_padding_mask],
-                    dim=1,
-                )  # (B, S)
-        p_len = pcpt_total_embs.shape[1]
-        total_len = total_embs.shape[1]
-        g_len = total_len - p_len
+        total_embs: Tensor,
+        key_padding_mask: Optional[Tensor] = None,
+        gen_mask: Optional[Tensor] = None,
+    ) -> Tensor:
+
         flash_attn_padding_info = gen_flash_attn_padding_info(
             bsz=total_embs.shape[0],
-            S=total_len,
+            S=total_embs.shape[1],
             past_key_len=0,
             attention_mask=key_padding_mask,
             device=total_embs.device,
         )
+
         attn_bias = None
         if self.use_attn_mask:
-            attention_mask = self._make_mask(p_len, g_len, total_embs.device)
+            attention_mask = self._make_mask(gen_mask, total_embs.device)
             attn_bias = torch.zeros_like(
                 attention_mask,
                 dtype=total_embs.dtype,
@@ -323,37 +295,34 @@ class SCGPTEncoder(nn.Module):
 
         if self.use_norm:
             total_embs = self.norm(total_embs)
-        if pcpt_only:
-            return total_embs
-        else:
-            pcpt_total_embs = total_embs[:, :p_len, :]
-            gen_total_embs = total_embs[:, p_len:, :]
-            return pcpt_total_embs, gen_total_embs
+
+        return total_embs
 
     @torch.no_grad()
     @lru_cache(maxsize=1)
-    def _make_mask(self, p_len, g_len, device):
-        # Mask follows the LLM Foundry convention
-        # ie: 0 indicates no-attention, 1 indicates attention is allowed
-        total_len = p_len + g_len
-        attention_mask = torch.ones(
-            (total_len, total_len),
-            device=device,
-            dtype=torch.bool,
-        )  # (pcpt_len+gen_len, pcpt_len+gen_len)
+    def _make_mask(self, gen_mask: Tensor, device) -> Tensor:
+        """
+        gen_mask: (B, S) bool, True = generative token, False = perceptual token
+        Returns: (B, S, S) bool, True = attention allowed.
 
-        if g_len > 0:
-            # pcpt genes should not see gen genes
-            # Equivalent to dense self-attention on pcpt genes
-            attention_mask[0:p_len, -g_len:] = False
-            # gen genes can see all pcpt genes and themselves, not other gen genes.
-            # make the last gen_len by gen_gen to be an identity matrix, attention allowed along the diagonal
-            # Equivalent to cross-attention from pcpt genes to gen genes
-            attention_mask[-g_len:, -g_len:] = torch.eye(
-                g_len,
-                device=device,
-                dtype=torch.bool,
-            )
+        Rules:
+        - pcpt rows (False) cannot attend to gen columns (True)
+        - gen rows (True) can attend to all pcpt columns (False) and themselves (diagonal only among gen)
+        """
+        mask_dim = 2
+        assert gen_mask.dtype == torch.bool and gen_mask.dim() == mask_dim
+        _, S = gen_mask.shape
+        device = gen_mask.device
+
+        # Allow attending to all perceptual columns, for every row.
+        pcpt_cols = (~gen_mask).unsqueeze(1)  # (B, 1, S), broadcasts across rows
+
+        # Allow diagonal for gen rows only.
+        eye = torch.eye(S, dtype=torch.bool, device=device)  # (S, S)
+        gen_diag = gen_mask.unsqueeze(2) & eye  # (B, S, S)
+
+        # Combine: allowed if column is pcpt OR (row is gen AND i==j)
+        attention_mask = pcpt_cols | gen_diag  # (B, S, S) bool
         return attention_mask
 
 

@@ -43,11 +43,6 @@ class DataCollator(DefaultDataCollator):
             of the sequence to keep unchanged from sampling. This is useful when
             special tokens have been added to the beginning of the sequence.
             Default to 1.
-        data_style (:obj:`str`): the style of the data. If "pcpt", the data is
-            masked and padded for perception training. If "gen", only the gene
-            tokens are provided, but not the expression values, for pure generative
-            training setting. If "both", the output will contain both fields above.
-            Choices: "pcpt", "gen", "both". Default to "pcpt".
         num_bins (:obj:`int`): the number of bins to use for binning the expression
         right_binning (:obj:`bool`): whether to use right sided-binning. Torch default is False
     """
@@ -71,7 +66,6 @@ class DataCollator(DefaultDataCollator):
         sampling: bool = True,
         reserve_keys: Optional[List[str]] = None,
         keep_first_n_tokens: int = 1,
-        data_style: str = "pcpt",
         num_bins: int = 51,
         right_binning: bool = False,
         return_tensors: str = "pt",
@@ -91,7 +85,6 @@ class DataCollator(DefaultDataCollator):
         self.sampling = sampling
         self.reserve_keys = reserve_keys if reserve_keys is not None else []
         self.keep_first_n_tokens = keep_first_n_tokens
-        self.data_style = data_style
         self.num_bins = num_bins
         self.right_binning = right_binning
         # filter non_special gene_ids
@@ -162,9 +155,6 @@ class DataCollator(DefaultDataCollator):
                 f"({self.max_length}).",
             )
 
-        if self.data_style not in ["pcpt", "gen", "both"]:
-            raise ValueError("`data_style` must be one of 'pcpt', 'gen', 'both'.")
-
     def __call__(
         self,
         examples: List[Dict[str, torch.Tensor]],
@@ -204,41 +194,6 @@ class DataCollator(DefaultDataCollator):
                 f"Got {self.reserve_keys} but expected keys in {list(examples[0].keys())}."
             )
 
-        if self.data_style == "pcpt":
-            data_dict = self._call_pcpt(examples)
-        elif self.data_style == "gen":
-            data_dict = self._call_gen(examples)
-        elif self.data_style == "both":
-            data_dict = self._call_both(examples)
-
-        # add reserved keys
-        device = examples[0]["genes"].device
-        for key in self.reserve_keys:
-            data_ = [example[key] for example in examples]
-            if isinstance(data_[0], torch.Tensor):
-                # if the reserved key is a tensor, stack them
-                data_dict[key] = torch.stack(data_, dim=0).to(device)
-            else:
-                data_dict[key] = data_  # if not tensor, just keep the list
-
-        return data_dict
-
-    def _call_pcpt(
-        self,
-        examples: List[Dict[str, torch.Tensor]],
-    ) -> Dict[str, torch.Tensor]:
-        """Each example is like:
-
-            {'id': tensor(184117),
-            'genes': tensor([36572, 17868, ..., 17072]),
-            'expressions': tensor([ 0.,  2., ..., 18.])}
-
-        Args:
-            examples (:obj:`List[Dict[str, torch.Tensor]]`): a list of examples.
-                Each example is a dictionary of tensors.
-        Returns:
-            :obj:`Dict[str, torch.Tensor]`: a dictionary of tensors.
-        """
         if not isinstance(examples[0], Mapping):
             raise NotImplementedError
 
@@ -247,198 +202,18 @@ class DataCollator(DefaultDataCollator):
         max_ori_len = max(len(example["genes"]) for example in examples)
         _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
 
-        # pad and truncate
         padded_genes = []
-        padded_expressions = []
-        for i in range(len(examples)):
-            genes = examples[i]["genes"]
-            expressions = examples[i]["expressions"]
-            if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
-                    row=expressions[self.keep_first_n_tokens :],
-                    n_bins=self.num_bins,
-                    right=self.right_binning,
-                )
-            elif self.log_transform:
-                assert not (
-                    self.do_binning
-                ), "Only one of `do_binning` and `log_transform` can be True."
-                expressions[self.keep_first_n_tokens :] = log_transform(
-                    row=expressions[self.keep_first_n_tokens :],
-                    target_sum=self.target_sum,
-                )
-            genes, expressions = self._sample_or_truncate_plus_pad(
-                genes,
-                expressions,
-                max_length=_max_length,
-            )  # torch tensors of length _max_length
-            padded_genes.append(genes)
-            padded_expressions.append(expressions)
-
-        padded_genes = torch.stack(padded_genes, dim=0).to(device)
-        padded_expressions = torch.stack(padded_expressions, dim=0).to(device)
-
-        data_dict = {
-            "gene": padded_genes,
-            "expr": padded_expressions,
-        }
-
-        # mask
-        if self.do_mlm:
-            masked_expressions = self._mask(
-                padded_expressions,
-                self.keep_first_n_tokens,
-            )
-        else:
-            masked_expressions = padded_expressions
-        data_dict["masked_expr"] = masked_expressions
-
-        return data_dict
-
-    def _call_gen(
-        self,
-        examples: List[Dict[str, torch.Tensor]],
-    ) -> Dict[str, torch.Tensor]:
-        """This method will simply return the gene ids, with needed padding.
-        There is no masking for pure generative training, and no input of expr
-        values.
-
-        Each example is like:
-            {'id': tensor(184117),
-            'genes': tensor([36572, 17868, ..., 17072])}
-
-        Returns:
-            Dict[str, torch.Tensor]: a dict of tensors.
-            Example:
-                {'pcpt_gene': tensor([[36572, 17868, ..., 17072],
-                                        [36572, 17868, ..., 17072],
-                                        ...,
-                                        [36572, 17868, ..., 17072]]),
-                'pcpt_expr': tensor([[ 0.,  2., ..., 18.],
-                                        [ 0.,  2., ..., 18.],
-                                        ...,
-                                        [ 0.,  2., ..., 18.]])}
-        """
-
-        if not isinstance(examples[0], Mapping):
-            return NotImplementedError
-
-        device = examples[0]["genes"].device
-
-        max_ori_len = max(len(example["genes"]) for example in examples)
-        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
-
-        # pad and truncate
-        padded_pcpt_genes = []
-        padded_pcpt_expressions = []
-        for i in range(len(examples)):
-            genes = examples[i]["genes"]
-            expressions = examples[i]["expressions"]
-            if self.do_binning:
-                expressions[self.keep_first_n_tokens :] = binning(
-                    row=expressions[self.keep_first_n_tokens :],
-                    n_bins=self.num_bins,
-                    right=self.right_binning,
-                )
-            elif self.log_transform:
-                assert not (
-                    self.do_binning
-                ), "Only one of `do_binning` and `log_transform` can be True."
-                expressions[self.keep_first_n_tokens :] = log_transform(
-                    row=expressions[self.keep_first_n_tokens :],
-                    target_sum=self.target_sum,
-                )
-            genes, expressions = self._sample_or_truncate_plus_pad(
-                genes,
-                expressions,
-                max_length=_max_length,
-            )
-            padded_pcpt_genes.append(genes)
-            padded_pcpt_expressions.append(expressions)
-
-        padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0).to(device)
-        padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0).to(device)
-
-        data_dict = {
-            "pcpt_gene": padded_pcpt_genes,
-            "pcpt_expr": padded_pcpt_expressions,
-        }
-        return data_dict
-
-    def _call_both(
-        self,
-        examples: List[Dict[str, torch.Tensor]],
-        gen_prob: Optional[float] = None,
-    ) -> Dict[str, torch.Tensor]:
-        """This method will split the input into the peception part and the
-        generation part. The perception part will be processed into gene ids and
-        expr values, and the generation part will be processed into gene ids
-        only.
-
-        By default, the mlm_probability will be used to select the genese assigned to
-        the generation part.
-
-        Each example is like:
-            {'id': tensor(184117),
-            'genes': tensor([36572, 17868, ..., 17072]),
-            'expressions': tensor([ 0.,  2., ..., 18.])},
-            'drug_id': Optinal = tensor(256), id 0 refers to <pad> token and indicates that drug is not available
-
-        Args:
-            gen_prob (float, optional): the probability of a gene being assigned to
-                the generation part. If not provided, the mlm_probability will be used.
-
-        Returns:
-            Dict[str, torch.Tensor]: a dict of tensors.
-            Example:
-                {'pcpt_gene': tensor([[36572, 17868, ..., 17072],
-                                        [36572, 17868, ..., 17072],
-                                        ...,
-                                        [36572, 17868, ..., 17072]]),
-                'pcpt_expr': tensor([[ 0.,  2., ..., 18.],
-                                        [ 0.,  2., ..., 18.],
-                                        ...,
-                                        [ 0.,  2., ..., 18.]]),
-                'gen_gene': tensor([[36573, 17869, ..., 17073],
-                                        [36573, 17869, ..., 17073],
-                                        ...,
-                                        [36573, 17869, ..., 17073]]),
-                'gen_expr_target': tensor([[ 1.,  3., ..., 19.],
-                                        [ 1.,  3., ..., 19.],
-                                        ...,
-                                        [ 1.,  3., ..., 19.]])}
-        """
-        if not isinstance(examples[0], Mapping):
-            raise NotImplementedError
-
-        if not self.do_mlm:
-            # if not doing mlm, then the perceptrual part is the whole input
-            return self._call_gen(examples)
-
-        if gen_prob is None:
-            gen_prob = self.get_mlm_probability()
-
-        max_ori_len = max(len(example["genes"]) for example in examples)
-        _max_length = self.max_length if max_ori_len >= self.max_length else max_ori_len
-
-        gen_length = int((_max_length - self.keep_first_n_tokens) * gen_prob)
-        pcpt_length = _max_length - gen_length  # perception part length
-
-        # pad and truncate
-        padded_pcpt_genes = []
-        padded_pcpt_expressions = []
-        padded_pcpt_original_exp = []
-        padded_gen_genes = []
-        padded_gen_expressions = []
-        padded_gen_original_exp = []
+        masked_exprs = []
+        expr_targets = []
+        expr_raws = []
+        gen_masks = []
         drug_ids = [] if self.use_chem_token else None
 
-        for i in range(len(examples)):
-            genes = examples[i]["genes"]
-            expressions = examples[i]["expressions"]
+        for example in examples:
+            genes = example["genes"]
+            expressions = example["expressions"]
 
             if self.use_chem_token:
-                # add drug token <drug>, and pad_value=-2 expression at location 1  (after <cls>) of genes and expressions
                 genes = torch.cat(
                     (
                         genes[:1],
@@ -461,9 +236,7 @@ class DataCollator(DefaultDataCollator):
                         expressions[1:],
                     ),
                 )
-
-            original_expressions = expressions.detach().clone()
-
+            raw_expressions = expressions.detach().clone()
             if self.do_binning:
                 expressions[self.keep_first_n_tokens :] = binning(
                     row=expressions[self.keep_first_n_tokens :],
@@ -471,139 +244,59 @@ class DataCollator(DefaultDataCollator):
                     right=self.right_binning,
                 )
             elif self.log_transform:
-                assert not (
-                    self.do_binning
-                ), "Only one of `do_binning` and `log_transform` can be True."
                 expressions[self.keep_first_n_tokens :] = log_transform(
                     row=expressions[self.keep_first_n_tokens :],
                     target_sum=self.target_sum,
                 )
 
-            (
-                gen_genes,
-                gen_expressions,
-                gen_original_exp,
-                pcpt_genes,
-                pcpt_expressions,
-                pcpt_original_exp,
-            ) = self._random_split(
-                genes[self.keep_first_n_tokens :],
-                expressions[self.keep_first_n_tokens :],
-                original_expressions[self.keep_first_n_tokens :],
-                ratio=gen_prob,
-            )
-            pcpt_genes = torch.cat(
-                (genes[: self.keep_first_n_tokens], pcpt_genes),
-                dim=0,
-            )
-            pcpt_expressions = torch.cat(
-                (expressions[: self.keep_first_n_tokens], pcpt_expressions),
-                dim=0,
+            genes, expressions, raw_expressions = self._sample_or_truncate_plus_pad(
+                genes,
+                expressions,
+                raw_expressions,
+                max_length=_max_length,
             )
 
-            pcpt_original_exp = torch.cat(
-                (original_expressions[: self.keep_first_n_tokens], pcpt_original_exp),
-                dim=0,
-            )
+            # creating the gen mask which is 1 for masked genes(gen genes) and 0 for unmasked genes(pcpt genes)
+            if self.do_mlm:
+                gen_mask = self._create_random_mask(expressions)
+            else:
+                gen_mask = torch.zeros_like(expressions, dtype=torch.bool)
 
-            pcpt_genes, pcpt_expressions, pcpt_original_exp = (
-                self._sample_or_truncate_plus_pad(
-                    pcpt_genes,
-                    pcpt_expressions,
-                    pcpt_original_exp,
-                    max_length=pcpt_length,
-                )
-            )  # torch tensors of length pcpt_length
-            padded_pcpt_genes.append(pcpt_genes)
-            padded_pcpt_expressions.append(pcpt_expressions)
-            padded_pcpt_original_exp.append(pcpt_original_exp)
+            expr_target = expressions.detach().clone()
+            masked_expr = expressions.masked_fill(gen_mask, self.mask_value)
 
-            gen_genes, gen_expressions, gen_original_exp = (
-                self._sample_or_truncate_plus_pad(
-                    gen_genes,
-                    gen_expressions,
-                    gen_original_exp,
-                    max_length=gen_length,
-                )
-            )  # torch tensors of length gen_length
-            padded_gen_genes.append(gen_genes)
-            padded_gen_expressions.append(gen_expressions)
-            padded_gen_original_exp.append(gen_original_exp)
+            padded_genes.append(genes)
+            masked_exprs.append(masked_expr)
+            expr_targets.append(expr_target)
+            expr_raws.append(raw_expressions)
+            gen_masks.append(gen_mask)
 
             if self.use_chem_token:
                 # add drug id, id=0 corresponds to <pad> which indicates that drug is not available
-                drug = examples[i]["drug_id"]
+                drug = example["drug_id"]
                 drug_ids.append(drug)
 
-        padded_pcpt_genes = torch.stack(padded_pcpt_genes, dim=0)
-        padded_pcpt_expressions = torch.stack(padded_pcpt_expressions, dim=0)
-        padded_pcpt_original_exp = torch.stack(padded_pcpt_original_exp, dim=0)
-        padded_gen_genes = torch.stack(padded_gen_genes, dim=0)
-        padded_gen_expressions = torch.stack(padded_gen_expressions, dim=0)
-        padded_gen_original_exp = torch.stack(padded_gen_original_exp, dim=0)
-
+        data_dict = {
+            "gene": torch.stack(padded_genes, dim=0),
+            "expr": torch.stack(masked_exprs, dim=0),
+            "expr_target": torch.stack(expr_targets, dim=0),
+            "expr_raw": torch.stack(expr_raws, dim=0),
+            "gen_mask": torch.stack(gen_masks, dim=0),
+        }
         if self.use_chem_token:
             drug_ids = torch.stack(drug_ids)
+            data_dict["drug_ids"] = drug_ids
 
-            data_dict = {
-                "pcpt_gene": padded_pcpt_genes,
-                "pcpt_expr": padded_pcpt_expressions,
-                "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
-                "gen_gene": padded_gen_genes,
-                "gen_expr_target": padded_gen_expressions,
-                "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
-                "drug_ids": drug_ids,
-            }
-        else:
-            data_dict = {
-                "pcpt_gene": padded_pcpt_genes,
-                "pcpt_expr": padded_pcpt_expressions,
-                "pcpt_expr_raw": padded_pcpt_original_exp,  # "raw" means "not binned"
-                "gen_gene": padded_gen_genes,
-                "gen_expr_target": padded_gen_expressions,
-                "gen_expr_raw": padded_gen_original_exp,  # "raw" means "not binned"
-            }
+        # add reserved keys
+        for key in self.reserve_keys:
+            data_ = [example[key] for example in examples]
+            if isinstance(data_[0], torch.Tensor):
+                # if the reserved key is a tensor, stack them
+                data_dict[key] = torch.stack(data_, dim=0).to(device)
+            else:
+                data_dict[key] = data_  # if not tensor, just keep the list
+
         return data_dict
-
-    def _random_split(
-        self,
-        *arrays: torch.Tensor,
-        ratio: float,
-    ) -> Tuple[torch.Tensor, ...]:
-        """Randomly split the arrays into two parts. The first part will have
-        the.
-
-        length of `ratio * length`, and the second part will have the length of
-        `(1 - ratio) * length`. When multiple arrays are provided, they are supposed
-        to have the same length.
-
-        This method reflects the behavior of `sklearn.model_selection.train_test_split`
-
-        Args:
-            *arrays (torch.Tensor): the arrays to be split.
-            ratio (float): the ratio of the first part.
-
-        Returns:
-            Tuple[torch.Tensor, ...]: the split arrays.
-        """
-        assert len(arrays) > 0
-        assert 0 < ratio < 1
-        if len(arrays) > 1:
-            assert all(
-                array.shape[0] == arrays[0].shape[0] for array in arrays
-            ), "The arrays must have the same length."
-
-        length = arrays[0].shape[0]
-        split_index = int(length * ratio)
-
-        indices = torch.randperm(length, device=arrays[0].device)
-        first_part_indices = indices[:split_index]
-        second_part_indices = indices[split_index:]
-
-        first_parts = tuple(array[first_part_indices] for array in arrays)
-        second_parts = tuple(array[second_part_indices] for array in arrays)
-
-        return first_parts + second_parts
 
     def get_mlm_probability(self) -> float:
         """Get the mlm probability for the current step."""
@@ -618,33 +311,33 @@ class DataCollator(DefaultDataCollator):
                 f"but got {type(self.mlm_probability)} instead.",
             )
 
-    def _mask(
+    def _create_random_mask(
         self,
-        expressions: torch.Tensor,
-        keep_first_n_tokens: int = 0,
+        expressions: torch.Tensor,  # seq_len
     ) -> torch.Tensor:
-        """Mask the expression values with MLM."""
-        if keep_first_n_tokens > 0:
-            result_ = self._mask(
-                expressions[:, keep_first_n_tokens:],
-                keep_first_n_tokens=0,
-            )
-            return torch.cat([expressions[:, :keep_first_n_tokens], result_], dim=1)
-
+        """Generate a random mask for expressions based on mlm probability."""
         device = expressions.device
-        shape = expressions.shape
 
-        probability_matrix = torch.full(shape, self.get_mlm_probability())
-        # set padded postion probability to 0
-        probability_matrix[expressions.eq(self.pad_value)] = 0
-        if self.keep_first_n_tokens > 0:
-            probability_matrix[:, : self.keep_first_n_tokens] = 0
+        # Calculate number of valid tokens (non-pad, non-keep_first_n_tokens)
+        pad_mask = expressions.eq(self.pad_value)
+        num_pad_genes = pad_mask.sum().item()
+        seq_len = expressions.shape[0]
 
-        mask = torch.bernoulli(probability_matrix).bool()
-        mask = mask.to(device)
+        valid_tokens = seq_len - num_pad_genes - self.keep_first_n_tokens
+        num_to_mask = int(valid_tokens * self.get_mlm_probability())
 
-        masked_expressions = expressions.masked_fill(mask, self.mask_value)
-        return masked_expressions
+        # Create mask with all False initially
+        mask = torch.zeros(expressions.shape, dtype=torch.bool, device=device)
+
+        # Randomly select exactly num_to_mask indices from valid tokens
+        if num_to_mask > 0 and valid_tokens > 0:
+            indices = (
+                torch.randperm(valid_tokens, device=device)[:num_to_mask]
+                + self.keep_first_n_tokens
+            )
+            mask[indices] = True
+
+        return mask
 
     def _sample_or_truncate_plus_pad(
         self,
