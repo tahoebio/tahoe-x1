@@ -252,7 +252,7 @@ class SCGPTModel(nn.Module):
         drug_ids: Optional[Tensor] = None,
         inference_mode: bool = False,
     ) -> Mapping[str, Tensor]:
-        
+
         transformer_output = self.transformer_generate(
             genes,
             values,
@@ -317,7 +317,7 @@ class ComposerSCGPTModel(ComposerModel):
         }
 
     def forward(self, batch, inference_mode: bool = False):  # batch is the output of the dataloader
-        """Forward pass used for training, evaluation and prediction."""
+        # specify how batches are passed through the model
         genes = batch["gene"]
         exprs = batch["expr"]
         gen_masks = batch["gen_mask"]
@@ -325,8 +325,8 @@ class ComposerSCGPTModel(ComposerModel):
         key_padding_mask = ~genes.eq(self.pad_token_id)
         drug_ids = (
             batch["drug_ids"] if "drug_ids" in batch else None
-        )  # drug_ids is None if use_chem_token is set to False     
-           
+        )  # drug_ids is None if use_chem_token is set to False
+
         output_dict = self.model(
             genes,
             exprs,
