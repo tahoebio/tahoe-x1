@@ -89,15 +89,11 @@ def get_batch_embeddings(
         for data_dict in data_loader:
             input_gene_ids = data_dict["gene"].to(device)
             src_key_padding_mask = ~input_gene_ids.eq(collator_cfg["pad_token_id"])
-            gen_mask = torch.zeros(
-                data_dict["expr"].shape,
-                dtype=torch.bool,
-                device=device,
-            )
+
             output = model(
                 genes=input_gene_ids,
                 values=data_dict["expr"].to(device),
-                gen_masks=gen_mask,
+                gen_masks=data_dict["gen_mask"].to(device),
                 key_padding_mask=src_key_padding_mask,
                 drug_ids=data_dict["drug_ids"].to(device),
                 inference_mode=True,
@@ -118,7 +114,9 @@ def get_batch_embeddings(
         pad_token_id=collator_cfg["pad_token_id"],
         return_gene_embeddings=return_gene_embeddings,
     )
-    
+
+    log.info(f"Extracted  cell embeddings of shape {cell_array.shape}.  ")
+
     if return_gene_embeddings:
         return cell_array, gene_array
     else:
