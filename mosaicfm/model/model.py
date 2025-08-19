@@ -177,24 +177,6 @@ class SCGPTModel(nn.Module):
             **self.init_config,
         )
 
-    def _encode(
-        self,
-        src: Tensor,
-        values: Tensor,
-        src_key_padding_mask: Tensor,
-    ) -> Tensor:
-        src = self.gene_encoder(src)  # (batch, seq_len, embsize)
-        self.cur_gene_token_embs = src
-        values = self.expression_encoder(values)  # (batch, seq_len, embsize)
-        total_embs = src + values
-        output = self.transformer_encoder(
-            pcpt_total_embs=total_embs,
-            gen_total_embs=None,
-            pcpt_key_padding_mask=src_key_padding_mask,
-            gen_key_padding_mask=None,
-        )
-        return output  # (batch, seq_len, embsize)
-
     def transformer_generate(
         self,
         genes: Tensor,
