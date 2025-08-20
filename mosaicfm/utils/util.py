@@ -26,8 +26,7 @@ def finalize_embeddings(
     
 
     """Concatenate and finalize cell and gene embeddings."""
-    cell_array = torch.cat(cell_embs, dim=0).to(torch.float32)
-    cell_array = cell_array.to("cpu").numpy()
+    cell_array = torch.cat(cell_embs, dim=0).numpy()
     cell_array = cell_array / np.linalg.norm(
                 cell_array,
                 axis=1,
@@ -45,7 +44,7 @@ def finalize_embeddings(
 
         valid = flat_ids != pad_token_id
         flat_ids = flat_ids[valid]
-        flat_embs = flat_embs[valid].to(torch.float32)
+        flat_embs = flat_embs[valid]
 
         sums = torch.zeros(len(vocab), flat_embs.size(-1), dtype=torch.float32, device=flat_embs.device)
         counts = torch.zeros(len(vocab),  dtype=torch.float32, device=flat_embs.device)
@@ -55,9 +54,9 @@ def finalize_embeddings(
 
         means = sums / counts.unsqueeze(1)
 
-        means = means.to("cpu").to(torch.float32).numpy()
-        sums = sums.to("cpu").to(torch.float32).numpy()
-        counts = np.expand_dims(counts.to("cpu").to(torch.float32).numpy(), axis=1)
+        means = means.numpy()
+        sums = sums.numpy()
+        counts = np.expand_dims(counts.numpy(), axis=1)
 
         means = np.divide(
             sums,

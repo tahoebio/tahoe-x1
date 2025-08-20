@@ -54,7 +54,7 @@ def get_batch_embeddings(
               gene embeddings as NumPy arrays.
     """
     device = next(model.parameters()).device
-
+    print(f"Using device {device} for inference.")
     collator_cfg["do_mlm"] = False
     data_loader = loader_from_adata(
         adata=adata,
@@ -68,8 +68,20 @@ def get_batch_embeddings(
 
 
     cell_embs: List[torch.Tensor] = []
-    gene_embs: List[torch.Tensor] = []
-    gene_ids_list: List[torch.Tensor] = []
+
+    if return_gene_embeddings:
+        gene_array = torch.zeros(
+            len(vocab),
+            model_cfg["d_model"],
+            dtype=torch.float32,
+            device=device,
+        )
+        gene_array_counts = torch.zeros(
+            len(vocab),
+            dtype=torch.float32,
+            device=device,
+        )
+
 
     dtype_from_string = {
         "fp32": torch.float32,
@@ -95,25 +107,64 @@ def get_batch_embeddings(
                 values=data_dict["expr"].to(device),
                 gen_masks=data_dict["gen_mask"].to(device),
                 key_padding_mask=src_key_padding_mask,
-                drug_ids=data_dict["drug_ids"].to(device),
+                drug_ids=data_dict["drug_ids"].to(device) if "drug_ids" in data_dict else None,
                 inference_mode=True,
             )
 
-            cell_embs.append(output["cell_emb"])
-            gene_embs.append(output["gene_emb"])
-            gene_ids_list.append(output["gene_ids"])
+            cell_embs.append(output["cell_emb"].to("cpu").to(dtype=torch.float32))
+
+
+
+            gene_embs = output.get("gene_emb")
+            if return_gene_embeddings:
+                flat_gene_ids = input_gene_ids.view(-1)
+                flat_embeddings = gene_embs.view(-1, gene_embs.shape[-1])
+
+                valid = flat_gene_ids != collator_cfg["pad_token_id"]
+                flat_gene_ids = flat_gene_ids[valid]
+                flat_embeddings = flat_embeddings[valid]
+                flat_embeddings = flat_embeddings.to(gene_embs.dtype)
+
+                gene_array.index_add_(0, flat_gene_ids, flat_embeddings)
+                gene_array_counts.index_add_(
+                    0,
+                    flat_gene_ids,
+                    torch.ones_like(flat_gene_ids, dtype=torch.float32),
+                )
+
+
+
             pbar.update(len(input_gene_ids))
 
 
 
-    cell_array, gene_array = finalize_embeddings(
+    cell_array, _ = finalize_embeddings(
         cell_embs=cell_embs,
         gene_embs=gene_embs,
-        gene_ids_list=gene_ids_list,
+        gene_ids_list=None,
         vocab=vocab,
         pad_token_id=collator_cfg["pad_token_id"],
-        return_gene_embeddings=return_gene_embeddings,
+        return_gene_embeddings=False,
     )
+
+
+    if return_gene_embeddings:
+        gene_array = gene_array.to("cpu").to(torch.float32).numpy()
+        gene_array_counts = gene_array_counts.to("cpu").to(torch.float32).numpy()
+        gene_array_counts = np.expand_dims(gene_array_counts, axis=1)
+
+        gene_array = np.divide(
+            gene_array,
+            gene_array_counts,
+            out=np.ones_like(gene_array) * np.nan,
+            where=gene_array_counts != 0,
+        )
+
+        gene2idx = vocab.get_stoi()
+        all_gene_ids = np.array(list(gene2idx.values()))
+        gene_array = gene_array[all_gene_ids, :]
+
+
 
     log.info(f"Extracted  cell embeddings of shape {cell_array.shape}.  ")
 
