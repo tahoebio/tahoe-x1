@@ -5,20 +5,7 @@ import anndata
 import scanpy as sc
 import numpy as np
 import pandas as pd
-from benchmark_utils import read_sigs, read_embeddings
-
-
-def read_all_embs(embs_path):
-    embs = {}
-    for fn in [fn for fn in os.listdir(embs_path) if fn.endswith(".npz")]:
-        emb_name = os.path.splitext(fn)[0]
-        emb = read_embeddings(os.path.join(embs_path, fn))
-        emb.index = emb.index.astype(str)
-        emb.columns = emb.columns.astype(str)
-        embs[emb_name] = emb
-    return embs
-
-
+from data import read_sigs, load_all_embeddings
 def create_anndata(embs, sigs):
     shared_genes = set(sigs.gene)
     for emb in embs.values():
@@ -38,7 +25,7 @@ def create_anndata(embs, sigs):
 
 
 def main(embs_path, sigs_path, filter, min_sig_size, max_sig_size, min_hits_per_gene):
-    embs = read_all_embs(embs_path)
+    embs = load_all_embeddings(embs_path)
     sigs = read_sigs(sigs_path)
     adata = create_anndata(embs, sigs)
 

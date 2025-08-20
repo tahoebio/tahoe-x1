@@ -1,30 +1,32 @@
 import os
-from typing import Optional
+from typing import Optional, Dict
+
 import numpy as np
 import pandas as pd
 
 
-def read_sigs_and_embeddings(sigs_path, emb_path, **kwargs):
-    """read and filter signatures and gene embeddings"""
-    return filter_genes_and_embeddings(
-        read_sigs(sigs_path), read_embeddings(emb_path), **kwargs
-    )
-
-
-def read_embeddings(path):
+def read_embeddings(path: str) -> pd.DataFrame:
     embs = np.load(path, allow_pickle=True)
-    return pd.DataFrame(
-        embs["gene_embeddings"],
-        index=embs["gene_names"],
-    )
+    return pd.DataFrame(embs["gene_embeddings"], index=embs["gene_names"])
 
 
-def read_sigs(path):
+def load_all_embeddings(embs_path: str) -> Dict[str, pd.DataFrame]:
+    embs: Dict[str, pd.DataFrame] = {}
+    for fn in [fn for fn in os.listdir(embs_path) if fn.endswith(".npz")]:
+        emb_name = os.path.splitext(fn)[0]
+        emb = read_embeddings(os.path.join(embs_path, fn))
+        emb.index = emb.index.astype(str)
+        emb.columns = emb.columns.astype(str)
+        embs[emb_name] = emb
+    return embs
+
+
+def read_sigs(path: str) -> pd.DataFrame:
     return pd.DataFrame(_read_sigs_rec(path), columns=["sig", "gene"])
 
 
-def _read_sigs_rec(path):
-    """read signatures from a .GMT file or list of .GMT files"""
+def _read_sigs_rec(path: str):
+    """Read signatures from a .GMT file or list of .GMT files"""
     if os.path.isdir(path):
         for fn in [f for f in os.listdir(path) if f.endswith(".gmt")]:
             for pair in _read_sigs_rec(os.path.join(path, fn)):
@@ -35,6 +37,11 @@ def _read_sigs_rec(path):
                 line = line.strip().split("\t")
                 for gene in line[2:]:
                     yield (line[0], gene)
+
+
+def read_sigs_and_embeddings(sigs_path, emb_path, **kwargs):
+    """Read and filter signatures and gene embeddings"""
+    return filter_genes_and_embeddings(read_sigs(sigs_path), read_embeddings(emb_path), **kwargs)
 
 
 def filter_genes_and_embeddings(
@@ -69,3 +76,4 @@ def filter_genes_and_embeddings(
     sigs = sigs.loc[sigs.gene.isin(good_genes)].copy()
 
     return sigs, embs
+

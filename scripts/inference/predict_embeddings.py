@@ -40,9 +40,48 @@ def main(cfg: DictConfig) -> None:
     coll_cfg = om.load(cfg.paths.collator_config)
     model_cfg = om.load(cfg.paths.model_config)
 
+    context_free = cfg.predict.get("context_free", False)
+    return_genes = cfg.predict.get("return_genes", True)
+
+    log.info("Initialising model and loading checkpoint…")
+    if model_cfg["attn_config"]["attn_impl"] == "triton":
+        model_cfg["attn_config"]["attn_impl"] = "flash"
+        model_cfg["attn_config"]["use_attn_mask"] = False
+    model_cfg["return_genes"] = True  # always compute gene encoder
+
+    model = ComposerSCGPTModel(model_cfg, coll_cfg)
+    state = torch.load(cfg.paths.checkpoint, map_location="cpu")["state"]["model"]
+    model.load_state_dict(state, strict=True)
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    model.eval()
+
+    if context_free:
+        log.info("Computing context-free GE and TE embeddings…")
+        gene2idx = vocab.get_stoi()
+        all_gene_ids = np.array(list(gene2idx.values()))
+        chunk_size = cfg.predict.get("chunk_size", 30000)
+        ge_chunks = []
+        te_chunks = []
+        flag = model.model.flag_encoder(torch.tensor(1, device=device)).reshape(1, 1, -1)
+        with torch.no_grad():
+            for i in range(0, len(all_gene_ids), chunk_size):
+                ids = torch.tensor(all_gene_ids[i : i + chunk_size], dtype=torch.long, device=device).unsqueeze(0)
+                token_embs = model.model.gene_encoder(ids)
+                ge_chunks.append(token_embs[0].cpu().to(torch.float32).numpy())
+                total = token_embs + flag
+                te = model.model.transformer_encoder(total)
+                te_chunks.append(te[0].cpu().to(torch.float32).numpy())
+        ge_array = np.concatenate(ge_chunks, axis=0)
+        te_array = np.concatenate(te_chunks, axis=0)
+        np.save(cfg.paths.ge_output, ge_array)
+        np.save(cfg.paths.te_output, te_array)
+        log.info("Finished writing context-free embeddings")
+        return
+
+    # Expression-aware embedding path
     cell_type_key = cfg.data.cell_type_key
     gene_id_key = cfg.data.gene_id_key
-    return_genes = cfg.predict.get("return_genes", True)
     batch_size = cfg.predict.get("batch_size", 64)
     max_length = cfg.predict.get("seq_len", 2048)
     num_workers = cfg.predict.get("num_workers", 8)
@@ -75,19 +114,6 @@ def main(cfg: DictConfig) -> None:
         num_workers=num_workers,
     )
 
-    log.info("Initialising model and loading checkpoint…")
-
-    if model_cfg["attn_config"]["attn_impl"] == "triton":
-        model_cfg["attn_config"]["attn_impl"] = "flash"
-        model_cfg["attn_config"]["use_attn_mask"] = False
-    model_cfg["return_genes"] = return_genes
-
-    model = ComposerSCGPTModel(model_cfg, coll_cfg)
-    state = torch.load(cfg.paths.checkpoint, map_location="cpu")["state"]["model"]
-    model.load_state_dict(state, strict=True)
-
-    print(f"Model is loaded with {model.model.n_layers} transformer layers.")
-
     trainer = Trainer(
         model=model,
         device="gpu" if torch.cuda.is_available() else "cpu",
@@ -97,19 +123,16 @@ def main(cfg: DictConfig) -> None:
 
     log.info("Aggregating embeddings…")
     cell_embs: List[torch.Tensor] = []
-
     if return_genes:
         gene_embs: List[torch.Tensor] = []
         gene_ids_list: List[torch.Tensor] = []
 
     for out in predictions:
         cell_embs.append(out["cell_emb"].cpu())
-
         if return_genes:
             gene_embs.append(out["gene_emb"].cpu())
             gene_ids_list.append(out["gene_ids"].cpu())
 
-    """Concatenate and finalize cell and gene embeddings."""
     cell_array = torch.cat(cell_embs, dim=0).numpy()
     cell_array = cell_array / np.linalg.norm(
         cell_array,
@@ -154,12 +177,9 @@ def main(cfg: DictConfig) -> None:
         gene_array = means[all_gene_ids, :]
 
     log.info("Saving outputs…")
-
     np.save(cfg.paths.cell_output, cell_array)
-
     if return_genes:
         np.savez(cfg.paths.gene_output, gene_array=gene_array, gene_ids=gene_ids)
-
     log.info("Finished writing embeddings")
 
 
