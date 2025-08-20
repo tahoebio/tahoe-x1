@@ -1,7 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 import logging
 from pathlib import Path
-from typing import List
 from urllib.parse import urlparse
 
 import boto3
@@ -14,6 +13,7 @@ from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import pearsonr
 
 from mosaicfm.tokenizer import GeneVocab
+
 
 def loader_from_adata(
     adata: AnnData,
