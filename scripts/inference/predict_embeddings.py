@@ -178,7 +178,7 @@ if __name__ == "__main__":
     for arg in sys.argv[num_mand_args:]:
         # Convert --key=value to key=value format for OmegaConf
         if arg.startswith("--"):
-            cli_args.append(arg[num_mand_args:])
+            cli_args.append(arg[2:])
         else:
             cli_args.append(arg)
 
