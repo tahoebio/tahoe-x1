@@ -1,24 +1,19 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
-from typing import List, Optional, Tuple, Union
-
 import logging
-import composer
+from typing import List, Optional
+
 import numpy as np
 import torch
 from anndata import AnnData
 from omegaconf import DictConfig
-from scipy.sparse import csc_matrix, csr_matrix
 from tqdm.auto import tqdm
 
-from mosaicfm.data import CountDataset, DataCollator
 from mosaicfm.model import SCGPTModel
 from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.model import ComposerSCGPTModel
-
 from mosaicfm.utils.util import finalize_embeddings, loader_from_adata
 
-
 log = logging.getLogger(__name__)
+
 
 def get_batch_embeddings(
     adata: AnnData,
@@ -66,7 +61,6 @@ def get_batch_embeddings(
         num_workers=num_workers,
     )
 
-
     cell_embs: List[torch.Tensor] = []
 
     if return_gene_embeddings:
@@ -81,7 +75,6 @@ def get_batch_embeddings(
             dtype=torch.float32,
             device=device,
         )
-
 
     dtype_from_string = {
         "fp32": torch.float32,
@@ -107,13 +100,15 @@ def get_batch_embeddings(
                 values=data_dict["expr"].to(device),
                 gen_masks=data_dict["gen_mask"].to(device),
                 key_padding_mask=src_key_padding_mask,
-                drug_ids=data_dict["drug_ids"].to(device) if "drug_ids" in data_dict else None,
+                drug_ids=(
+                    data_dict["drug_ids"].to(device)
+                    if "drug_ids" in data_dict
+                    else None
+                ),
                 inference_mode=True,
             )
 
             cell_embs.append(output["cell_emb"].to("cpu").to(dtype=torch.float32))
-
-
 
             gene_embs = output.get("gene_emb")
             if return_gene_embeddings:
@@ -132,11 +127,7 @@ def get_batch_embeddings(
                     torch.ones_like(flat_gene_ids, dtype=torch.float32),
                 )
 
-
-
             pbar.update(len(input_gene_ids))
-
-
 
     cell_array, _ = finalize_embeddings(
         cell_embs=cell_embs,
@@ -146,7 +137,6 @@ def get_batch_embeddings(
         pad_token_id=collator_cfg["pad_token_id"],
         return_gene_embeddings=False,
     )
-
 
     if return_gene_embeddings:
         gene_array = gene_array.to("cpu").to(torch.float32).numpy()
@@ -164,12 +154,9 @@ def get_batch_embeddings(
         all_gene_ids = np.array(list(gene2idx.values()))
         gene_array = gene_array[all_gene_ids, :]
 
-
-
     log.info(f"Extracted  cell embeddings of shape {cell_array.shape}.  ")
 
     if return_gene_embeddings:
         return cell_array, gene_array
     else:
         return cell_array
-

@@ -3,17 +3,18 @@ import logging
 from pathlib import Path
 from typing import List
 from urllib.parse import urlparse
-import torch
+
 import boto3
-from git import Optional
 import numpy as np
+import torch
+from git import Optional
+from omegaconf import DictConfig
 from scanpy import AnnData
-from scipy.stats import pearsonr
 from scipy.sparse import csc_matrix, csr_matrix
+from scipy.stats import pearsonr
+
 from mosaicfm.tokenizer import GeneVocab
 
-
-from omegaconf import DictConfig
 
 def finalize_embeddings(
     cell_embs: List[torch.Tensor],
@@ -23,16 +24,13 @@ def finalize_embeddings(
     pad_token_id: int = -1,
     return_gene_embeddings: bool = True,
 ):
-    
-
     """Concatenate and finalize cell and gene embeddings."""
     cell_array = torch.cat(cell_embs, dim=0).numpy()
     cell_array = cell_array / np.linalg.norm(
-                cell_array,
-                axis=1,
-                keepdims=True,
-                )
-
+        cell_array,
+        axis=1,
+        keepdims=True,
+    )
 
     gene_array = None
     if return_gene_embeddings:
@@ -46,8 +44,13 @@ def finalize_embeddings(
         flat_ids = flat_ids[valid]
         flat_embs = flat_embs[valid]
 
-        sums = torch.zeros(len(vocab), flat_embs.size(-1), dtype=torch.float32, device=flat_embs.device)
-        counts = torch.zeros(len(vocab),  dtype=torch.float32, device=flat_embs.device)
+        sums = torch.zeros(
+            len(vocab),
+            flat_embs.size(-1),
+            dtype=torch.float32,
+            device=flat_embs.device,
+        )
+        counts = torch.zeros(len(vocab), dtype=torch.float32, device=flat_embs.device)
 
         sums.index_add_(0, flat_ids, flat_embs)
         counts.index_add_(0, flat_ids, torch.ones_like(flat_ids, dtype=torch.float32))
@@ -69,17 +72,18 @@ def finalize_embeddings(
         all_gene_ids = np.array(list(gene2idx.values()))
         gene_array = means[all_gene_ids, :]
 
-
     return cell_array, gene_array
-    
-def loader_from_adata( adata: AnnData,
-                      collator_cfg: DictConfig,
-                      vocab: GeneVocab,
-                      batch_size: int = 50,
-                      max_length: Optional[int] = None,
-                      gene_ids: Optional[np.ndarray] = None,
-                      num_workers: int = 8,
-       ):
+
+
+def loader_from_adata(
+    adata: AnnData,
+    collator_cfg: DictConfig,
+    vocab: GeneVocab,
+    batch_size: int = 50,
+    max_length: Optional[int] = None,
+    gene_ids: Optional[np.ndarray] = None,
+    num_workers: int = 8,
+):
     count_matrix = adata.X
     if isinstance(count_matrix, np.ndarray):
         count_matrix = csr_matrix(count_matrix)
@@ -94,7 +98,7 @@ def loader_from_adata( adata: AnnData,
 
     if max_length is None:
         max_length = len(gene_ids)
-    
+
     from mosaicfm.data import CountDataset, DataCollator
 
     dataset = CountDataset(
@@ -135,7 +139,6 @@ def loader_from_adata( adata: AnnData,
     )
 
     return data_loader
-
 
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):

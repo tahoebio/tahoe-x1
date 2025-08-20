@@ -316,7 +316,11 @@ class ComposerSCGPTModel(ComposerModel):
             "Spearman": MaskedSpearmanMetric(name="Spearman"),
         }
 
-    def forward(self, batch, inference_mode: bool = False):  # batch is the output of the dataloader
+    def forward(
+        self,
+        batch,
+        inference_mode: bool = False,
+    ):  # batch is the output of the dataloader
         # specify how batches are passed through the model
         genes = batch["gene"]
         exprs = batch["expr"]
@@ -344,7 +348,11 @@ class ComposerSCGPTModel(ComposerModel):
 
         self.model.zero_grad(set_to_none=True)
 
-        return outputs if outputs is not None else self.forward(batch, inference_mode=False)
+        return (
+            outputs
+            if outputs is not None
+            else self.forward(batch, inference_mode=False)
+        )
 
     def predict(self, batch):
         """Prediction step used with :meth:`composer.Trainer.predict`.
