@@ -15,66 +15,6 @@ from scipy.stats import pearsonr
 
 from mosaicfm.tokenizer import GeneVocab
 
-
-def finalize_embeddings(
-    cell_embs: List[torch.Tensor],
-    gene_embs: List[torch.Tensor],
-    gene_ids_list: List[torch.Tensor],
-    vocab: GeneVocab,
-    pad_token_id: int = -1,
-    return_gene_embeddings: bool = True,
-):
-    """Concatenate and finalize cell and gene embeddings."""
-    cell_array = torch.cat(cell_embs, dim=0).numpy()
-    cell_array = cell_array / np.linalg.norm(
-        cell_array,
-        axis=1,
-        keepdims=True,
-    )
-
-    gene_array = None
-    if return_gene_embeddings:
-        gene_embs = torch.cat(gene_embs, dim=0)
-        gene_ids = torch.cat(gene_ids_list, dim=0)
-
-        flat_ids = gene_ids.flatten()
-        flat_embs = gene_embs.flatten(0, 1)
-
-        valid = flat_ids != pad_token_id
-        flat_ids = flat_ids[valid]
-        flat_embs = flat_embs[valid]
-
-        sums = torch.zeros(
-            len(vocab),
-            flat_embs.size(-1),
-            dtype=torch.float32,
-            device=flat_embs.device,
-        )
-        counts = torch.zeros(len(vocab), dtype=torch.float32, device=flat_embs.device)
-
-        sums.index_add_(0, flat_ids, flat_embs)
-        counts.index_add_(0, flat_ids, torch.ones_like(flat_ids, dtype=torch.float32))
-
-        means = sums / counts.unsqueeze(1)
-
-        means = means.numpy()
-        sums = sums.numpy()
-        counts = np.expand_dims(counts.numpy(), axis=1)
-
-        means = np.divide(
-            sums,
-            counts,
-            out=np.ones_like(sums) * np.nan,
-            where=counts != 0,
-        )
-
-        gene2idx = vocab.get_stoi()
-        all_gene_ids = np.array(list(gene2idx.values()))
-        gene_array = means[all_gene_ids, :]
-
-    return cell_array, gene_array
-
-
 def loader_from_adata(
     adata: AnnData,
     collator_cfg: DictConfig,
