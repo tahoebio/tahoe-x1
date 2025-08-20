@@ -3,28 +3,13 @@
 
 This script loads a trained :class:`~mosaicfm.model.ComposerSCGPTModel` and
 produces embeddings for an input AnnData file. Configuration is provided via a
-YAML file with two top-level sections:
-
-``paths``
-    ``model_config`` – path to the model configuration YAML.
-    ``collator_config`` – path to the data collator configuration YAML.
-    ``vocab`` – path to the gene vocabulary JSON file.
-    ``checkpoint`` – path to the model checkpoint.
-    ``adata_input`` – input AnnData (``.h5ad``) file.
-    ``cell_output`` – where to save the AnnData with cell embeddings stored in
-    ``obsm['X_scGPT']``.
-    ``gene_output`` – path to ``.npy`` file for gene embeddings ordered by
-    vocabulary index.
-
-``predict``
-    Runtime options such as ``batch_size``, ``max_length``, ``precision`` and
-    ``num_workers``.
+YAML file.
 
 Example usage:
 
 .. code-block:: bash
 
-    python scripts/inference/predict_embeddings.py configs/predict.yaml
+    python scripts/inference/predict_embeddings.py configs/predict.yaml [--key=value ...]
 
 """
 
@@ -55,47 +40,6 @@ logging.basicConfig(
     format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
     level=logging.INFO,
 )
-
-
-@staticmethod
-def compute_lisi_scores(
-    emb: Union[np.ndarray, torch.Tensor],
-    labels: Union[np.ndarray, torch.Tensor],
-    k: int,
-) -> float:
-    """Computes a LISI score. Accepts numpy arrays or torch tensors.
-
-    Args:
-        emb (Union[np.ndarray, torch.Tensor]): (n_samples, n_features) embedding matrix.
-        labels (Union[np.ndarray, torch.Tensor]): (n_samples,) label vector, can be strings or ints.
-        k (int): Number of neighbors.
-    Returns:
-        float: The LISI score.
-    """
-    # Convert to torch tensors
-    emb = torch.from_numpy(emb).float()
-    _, inverse_labels = np.unique(labels, return_inverse=True)
-    labels = torch.from_numpy(inverse_labels).long()
-
-    # Compute pairwise distances
-    distances = torch.cdist(emb, emb, p=2)
-
-    # Get k nearest neighbors for each point (excluding itself)
-    _, knn_indices = torch.topk(distances, k + 1, largest=False)
-    knn_indices = knn_indices[:, 1:]  # exclude self
-
-    # Self vs neighbor labels
-    self_labels = labels.unsqueeze(1).expand(-1, k)
-    neighbor_labels = labels[knn_indices]
-
-    # Compute label agreement
-    same_label = (self_labels == neighbor_labels).float().mean()
-
-    # Theoretical LISI normalization
-    label_counts = torch.bincount(labels)
-    theoretic_score = ((label_counts / label_counts.sum()) ** 2).sum()
-
-    return (same_label / theoretic_score).item()
 
 
 def main(cfg: DictConfig) -> None:
@@ -195,18 +139,28 @@ def main(cfg: DictConfig) -> None:
 
     log.info("Finished writing embeddings")
 
-    lisi_score = compute_lisi_scores(
-        cell_array,
-        adata.obs[cell_type_key].values.to_numpy(dtype="str"),
-        20,
-    )
-    print("LISI score:", lisi_score)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        raise SystemExit("Usage: predict_embeddings.py <config.yaml>")
+    if len(sys.argv) < 2:
+        raise SystemExit("Usage: predict_embeddings.py <config.yaml> [--key=value ...]")
+    
+    # Load base config from YAML file
     cfg = om.load(sys.argv[1])
+    
+    # Merge with command line arguments
+    cli_args = []
+    for arg in sys.argv[2:]:
+        # Convert --key=value to key=value format for OmegaConf
+        if arg.startswith('--'):
+            cli_args.append(arg[2:])
+        else:
+            cli_args.append(arg)
+    
+    cli_cfg = om.from_cli(cli_args)
+    cfg = om.merge(cfg, cli_cfg)
+
+    
     om.resolve(cfg)
     main(cfg)
 
