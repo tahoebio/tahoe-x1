@@ -67,6 +67,8 @@ class SCGPTModel(nn.Module):
         self.init_config = model_config.get("init_config", None)
         self.gene_encoder_config = model_config.get("gene_encoder", None)
         self.keep_first_n_tokens = collator_config.get("keep_first_n_tokens", 1)
+        self.return_genes = model_config.get("return_genes", True)
+
         if self.init_config is None:
             self.init_config = init_config_defaults
         if self.gene_encoder_config is None:
@@ -270,8 +272,9 @@ class SCGPTModel(nn.Module):
         # extend the output with cell embeddings and gene embeddings
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
-        output["gene_ids"] = genes
-        output["gene_emb"] = transformer_output
+        if self.return_genes:
+            output["gene_ids"] = genes
+            output["gene_emb"] = transformer_output
         if not inference_mode:
             mvc_output = self.mvc_decoder(
                 cell_emb,

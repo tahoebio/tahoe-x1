@@ -25,7 +25,7 @@ from omegaconf import OmegaConf as om
 
 from mosaicfm.model import ComposerSCGPTModel
 from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils.util import finalize_embeddings, loader_from_adata
+from mosaicfm.utils.util import loader_from_adata
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -80,6 +80,7 @@ def main(cfg: DictConfig) -> None:
     if model_cfg["attn_config"]["attn_impl"] == "triton":
         model_cfg["attn_config"]["attn_impl"] = "flash"
         model_cfg["attn_config"]["use_attn_mask"] = False
+    model_cfg["return_genes"] = return_genes
 
     model = ComposerSCGPTModel(model_cfg, coll_cfg)
     state = torch.load(cfg.paths.checkpoint, map_location="cpu")["state"]["model"]
@@ -96,21 +97,61 @@ def main(cfg: DictConfig) -> None:
 
     log.info("Aggregating embeddings…")
     cell_embs: List[torch.Tensor] = []
-    gene_embs: List[torch.Tensor] = []
-    gene_ids_list: List[torch.Tensor] = []
+
+    if return_genes:
+        gene_embs: List[torch.Tensor] = []
+        gene_ids_list: List[torch.Tensor] = []
+
     for out in predictions:
         cell_embs.append(out["cell_emb"].cpu())
-        gene_embs.append(out["gene_emb"].cpu())
-        gene_ids_list.append(out["gene_ids"].cpu())
 
-    cell_array, gene_array = finalize_embeddings(
-        cell_embs=cell_embs,
-        gene_embs=gene_embs,
-        gene_ids_list=gene_ids_list,
-        vocab=vocab,
-        pad_token_id=coll_cfg["pad_token_id"],
-        return_gene_embeddings=return_genes,
+        if return_genes:
+            gene_embs.append(out["gene_emb"].cpu())
+            gene_ids_list.append(out["gene_ids"].cpu())
+
+    """Concatenate and finalize cell and gene embeddings."""
+    cell_array = torch.cat(cell_embs, dim=0).numpy()
+    cell_array = cell_array / np.linalg.norm(
+        cell_array,
+        axis=1,
+        keepdims=True,
     )
+
+    if return_genes:
+        gene_embs = torch.cat(gene_embs, dim=0)
+        gene_ids = torch.cat(gene_ids_list, dim=0)
+
+        flat_ids = gene_ids.flatten()
+        flat_embs = gene_embs.flatten(0, 1)
+
+        valid = flat_ids != coll_cfg["pad_token_id"]
+        flat_ids = flat_ids[valid]
+        flat_embs = flat_embs[valid]
+
+        sums = torch.zeros(
+            len(vocab),
+            flat_embs.size(-1),
+            dtype=torch.float32,
+            device=flat_embs.device,
+        )
+        counts = torch.zeros(len(vocab), dtype=torch.float32, device=flat_embs.device)
+
+        sums.index_add_(0, flat_ids, flat_embs)
+        counts.index_add_(0, flat_ids, torch.ones_like(flat_ids, dtype=torch.float32))
+
+        sums = sums.numpy()
+        counts = np.expand_dims(counts.numpy(), axis=1)
+
+        means = np.divide(
+            sums,
+            counts,
+            out=np.ones_like(sums) * np.nan,
+            where=counts != 0,
+        )
+
+        gene2idx = vocab.get_stoi()
+        all_gene_ids = np.array(list(gene2idx.values()))
+        gene_array = means[all_gene_ids, :]
 
     log.info("Saving outputs…")
 

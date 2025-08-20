@@ -10,7 +10,7 @@ from tqdm.auto import tqdm
 
 from mosaicfm.model import SCGPTModel
 from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils.util import finalize_embeddings, loader_from_adata
+from mosaicfm.utils.util import loader_from_adata
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +49,8 @@ def get_batch_embeddings(
               gene embeddings as NumPy arrays.
     """
     device = next(model.parameters()).device
+    model.return_genes = return_gene_embeddings
+
     print(f"Using device {device} for inference.")
     collator_cfg["do_mlm"] = False
     data_loader = loader_from_adata(
@@ -110,32 +112,29 @@ def get_batch_embeddings(
 
             cell_embs.append(output["cell_emb"].to("cpu").to(dtype=torch.float32))
 
-            gene_embs = output.get("gene_emb")
             if return_gene_embeddings:
+                gene_embs = output.get("gene_emb").to(torch.float32)
                 flat_gene_ids = input_gene_ids.view(-1)
                 flat_embeddings = gene_embs.view(-1, gene_embs.shape[-1])
 
                 valid = flat_gene_ids != collator_cfg["pad_token_id"]
                 flat_gene_ids = flat_gene_ids[valid]
-                flat_embeddings = flat_embeddings[valid]
-                flat_embeddings = flat_embeddings.to(gene_embs.dtype)
+                flat_embeddings = flat_embeddings[valid].to(gene_embs.dtype)
 
                 gene_array.index_add_(0, flat_gene_ids, flat_embeddings)
                 gene_array_counts.index_add_(
                     0,
                     flat_gene_ids,
-                    torch.ones_like(flat_gene_ids, dtype=torch.float32),
+                    torch.ones_like(flat_gene_ids, dtype=gene_embs.dtype),
                 )
 
             pbar.update(len(input_gene_ids))
 
-    cell_array, _ = finalize_embeddings(
-        cell_embs=cell_embs,
-        gene_embs=gene_embs,
-        gene_ids_list=None,
-        vocab=vocab,
-        pad_token_id=collator_cfg["pad_token_id"],
-        return_gene_embeddings=False,
+    cell_array = torch.cat(cell_embs, dim=0).numpy()
+    cell_array = cell_array / np.linalg.norm(
+        cell_array,
+        axis=1,
+        keepdims=True,
     )
 
     if return_gene_embeddings:
