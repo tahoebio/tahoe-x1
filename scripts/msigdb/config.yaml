@@ -1,0 +1,16 @@
+model_name: MFM-10m
+input_path: path/to/input.h5ad
+output_dir: path/to/output
+gene_col: feature_name
+n_hvg: null
+embeddings_path: path/to/embeddings
+signatures_path: path/to/signatures
+aadata_path: path/to/adata.h5ad
+benchmark:
+  seeds: [0]
+  reps: [GE, TE, EA]
+  gene_set_paths: []
+  output_dir: path/to/benchmark_output
+visualization:
+  pred_dir: path/to/benchmark_output
+  output: path/to/plot.png

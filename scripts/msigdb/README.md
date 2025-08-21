@@ -1,67 +1,52 @@
-MsigDB benchmark
+# MSigDB Benchmark Pipeline
 
-# Steps to reproduce:
+This folder provides a YAML-driven workflow for generating gene embeddings, building an AnnData object, running the MLP benchmark and visualizing results. Existing scripts are kept for backward compatibility but the recommended entrypoints are the new ones below.
 
-1. Download the sigs folder from s3 to your pvs:
-s3://vevo-drives/drive_3/ANALYSIS/analysis_107/sigs/
+## 1. Configure paths
+Edit `config.yaml` to point to your input data and desired outputs:
 
-2. You also need the gene embeddings in your pvc.
-You can find gene embeddings for some of the models in here:
-    - s3://vevo-drives/drive_3/ANALYSIS/analysis_107/gene_embs_v2
-    - s3://vevo-drives/drive_3/ANALYSIS/analysis_107/gene_embs_v3
+```yaml
+model_name: MFM-10m
+input_path: path/to/input.h5ad
+output_dir: path/to/output
+embeddings_path: path/to/embeddings
+signatures_path: path/to/signatures
+aadata_path: path/to/adata.h5ad
+benchmark:
+  seeds: [0]
+  reps: [GE, TE, EA]
+  output_dir: path/to/benchmark_output
+visualization:
+  pred_dir: path/to/benchmark_output
+  output: path/to/plot.png
+```
 
-    - If the gene embeddings for your desired model doesn't exist you need to generate the mebeddings yourself using either by https://github.com/vevotx/vevo-scgpt-private/blob/main/scripts/get_embeddings.py or https://github.com/vevotx/vevo-scgpt-private/blob/main/scripts/get_msigdb_embs.py. 
+## 2. Generate embeddings
+Create TE (transformer context-free), GE (gene encoder) and EA (expression aware) embeddings:
 
-    - To generate the embeddings for your own model you first need to prepare your model for inference by https://github.com/vevotx/vevo-scgpt-private/blob/main/scripts/prepare_for_inference.py
+```bash
+python scripts/msigdb/generate_embeddings.py scripts/msigdb/config.yaml --modes GE TE EA
+```
 
-    - Example:
-    ``` 
-        python scripts/prepare_for_inference.py --model_name scgpt-70m-1024-fix-norm-apr24-data --wandb_id 55n5wvdm --save_dir /vevo/scgpt/checkpoints/release/
-    ```
+## 3. Build AnnData
+Combine embeddings with MSigDB signatures into a single AnnData object:
 
-    - Remember to copy the best-mpdel.pt to your release foler and upload everything to s3 under releases/.
+```bash
+python scripts/msigdb/build_anndata.py scripts/msigdb/config.yaml
+```
 
-    - get_embeddings.py generate the context free embeddings (GE and TE)
-    
-    - Example:
-    ```
-    python scripts/get_msigdb_embs.py --releases_path /vevo/scgpt/checkpoints/release/ --save_path /vevo/datasets/msigdb_gene_emb_subset/gene_embeds_new/      
-    ```
-    - get_msigdb_embs.py generates the transformer-based context free and expression aware embeddings (TE and EA). You need to provide one subset of cellxgene as the --input_path. You can download such subset from s3 (s3://vevo-drives/drive_3/ANALYSIS/analysis_107/cellxgene_data/ds_data/rep_1.h5ad.gz).
+## 4. Run benchmark
+Train the MLP predictor for each embedding representation and seed defined in the config:
 
-    - Example:
-    ``` 
-    python scripts/get_embeddings.py --model_name scgpt-1_3b-2048 --input_path /vevo/datasets/msigdb_gene_emb_subset/cellxgene_subset/rep_1.h5ad.gz 
-    ```
-    - After creating the embeddings you then need to parse them using parse_embeddings.py
-    Note that for all the steps above scgpt-dev environment was used. 
-    - Example:
-    ``` 
-    python analysis/04_msigdb_benchmark/parse_embeddings.py "/vevo/datasets/msigdb_gene_emb_subset/gene_embeddings_new/" ./analysis/04_msigdb_benchmark/gene_embs_v2/
-    ```
+```bash
+python scripts/msigdb/run_benchmark.py scripts/msigdb/config.yaml
+```
 
-3. Now generate the environment for running MsigDB task using the environment.yml file
-4. Run generate_anndata.py. 
- This code read sigs and embs and create an anndata object which is a specific data structure for single cell genomics data. It reads gene expression embeddings and gene set signatures, integrates them into an AnnData object, optionally filters the data, and saves the results.
+## 5. Visualize results
+Aggregate prediction CSVs and create simple bar plots:
 
-    - Example:
-    ``` 
-    python analysis/04_msigdb_benchmark/generate_anndata.py ./analysis/04_msigdb_benchmark/gene_embs_v2/ ./analysis/04_msigdb_benchmark/sigs/
-    ```
+```bash
+python scripts/msigdb/visualize_results.py scripts/msigdb/config.yaml
+```
 
-    - Note that if you want the results per strata you can provide the sigs for that gene set (e.g. sigs/hallmarks/)
-
- 5.  Run run_benchmark_reps.sh 
-    - The script runs benchmark_mlp.py for 4 times and saves the results. benchmark_mlp.py trains a neural network sigpredictor  based on the given data.
-
-    -  Example: 
-    ```
-    bash run_benchmark_reps.sh gene_embs_v3/embs_adata.h5ad.gz v1
-    ```
-
-    - You can similarly run the run_benchmark_reps_per_gene_set.sh by providing the partitioned sigs folder to get msigdb results per gene set.
-
-6. Modify preds_directory in mlp_benchmark/viz_preds.ipynb and run it to compute the AUPRCs per replicate
-7. Modify csv_paths in plot_reps.ipynb to refer to the results of viz_preds.ipynb. It will plot the AUPRCs across reps.
-
-- Remember to run scripts on single gpu as pytorch lightning does weird stuff with dist training. 
+Legacy notebooks (`viz_preds.ipynb`, `plot_reps.ipynb`) and helper scripts remain available but may be removed in the future.
