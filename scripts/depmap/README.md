@@ -1,12 +1,12 @@
 # DepMap benchmarks
 
-This folder contains the scripts required to evaluate models on three benchmarks centered around the DepMap dataset.
+This folder contains the scripts required to evaluate MosaicFM on three benchmarks centered around the DepMap dataset.
 
 1. separate cancer cell lines by tissue of origin.
-2. predict gene essentiality in a cell line specific manner.
-3. predict whether genes are broadly essential or inessential.
+2. predict whether genes are broadly essential or inessential.
+3. predict gene essentiality in a cell line specific manner.
 
-This README explains how to set up and run these benchmarks. For a complete writeup on what these benchmarks involve and results from the first half of 2024, see [here](https://docs.google.com/document/d/1yBAXkhriSCzdmDWeewAEKO3rOC4RFfnw1cuJtDSvIaY/edit?usp=sharing). 
+This README explains how to set up and run these benchmarks. 
 
 ---
 
@@ -20,21 +20,31 @@ base-folder             Root directory.
   gene-embs             Contains gene embeddings.
     npz                 Contains archives of cell line and mean gene embeddings.
     results             Contains results from random forests trained on gene embeddings.
-  geneformer            Contains direct inputs and outputs for Geneformer model.
   misc                  Miscellaneous files for benchmarks.
-  nvidia-gf-preds       Contains predictions from and files to work with NVIDIA Geneformer models.
   raw                   Raw DepMap and CCLE data.
 ```
 
-All of these folders need to at least exist for the scripts to work. The following S3 URI contains this base folder, populated with all files from experiments performed in the first half of 2024 (including some unnecessary for the final versions of these benchmarks).
+All of these folders need to at least exist for the scripts to work. The following S3 URI contains this base folder, populated with embeddings and results from the following models.
+
+- PCA (baseline)
+- Geneformer (Theodoris Lab, trained on Genecorpus-103M, ~95M parameters)
+- Geneformer (NVIDIA BioNeMo, trained on CZ CELLxGENE, ~10M parameters)
+- Geneformer (NVIDIA BioNeMo, trained on CZ CELLxGENE, ~100M parameters)
+- scGPT
+- UCE (4 layer) *cell embeddings only*
+- UCE (33 layer) *cell embeddings only*
+- TranscriptFormer (Sapiens)
+- TranscriptFormer (Exemplar)
+- TranscriptFormer (Metazoa)
+- STATE
 
 ```
-s3://vevo-ml-datasets/umair/scgpt-depmap/
+s3://tahoe-hackathon-data/MFM/benchmarks/depmap/
 ```
 
-**If you sync the entire directory, you can skip to step 4 and start evaluating new models.**
+**If you sync the entire directory (71GB), you can skip to step 4 and start evaluating new models.**
 
-**If you sync only the raw data, you need to go through steps 1-3.**
+**If you sync only the raw data (919MB), you need to go through steps 1-3.**
 
 ---
 
@@ -50,10 +60,10 @@ This script requires the following files in the base folder.
 
 ```
 raw/ccle-counts.gct
+raw/depmap-gene-dependencies.csv
 raw/depmap-gene-effects.csv
 raw/depmap-metadata.csv
 raw/scgpt-genes.csv
-raw/depmap-gene-dependencies.csv
 ```
 
 This script will create the following files.
@@ -63,10 +73,6 @@ counts.h5ad
 misc/genes-by-mean-disc.csv
 misc/split-cls.csv
 misc/split-genes-lt5gt70.csv
-geneformer/ccle-nonzero-medians.pkl
-geneformer/adata.h5ad
-geneformer/tokenized.dataset
-geneformer/tokenized-new-medians.dataset
 ```
 
 ---

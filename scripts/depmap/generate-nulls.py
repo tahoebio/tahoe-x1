@@ -22,7 +22,7 @@ logging.getLogger(__name__).setLevel("INFO")
 # save null predictions for marginal task
 def null_marginal_task(base_path):
     obs = sc.read_h5ad(
-        os.path.join(base_path, "gene-embs/loading15-lt5gt70-bin.h5ad"),
+        os.path.join(base_path, "gene-embs/pcloading-lt5gt70-bin.h5ad"),
     ).obs
     splits = pd.read_csv(os.path.join(base_path, "misc/split-genes-lt5gt70.csv"))
     for fold in range(5):
@@ -60,7 +60,7 @@ def null_marginal_task(base_path):
 # save null predictions for cell line specific task (for given subset)
 def null_cell_line_specific_task(base_path, null_dict, subset):
     obs = sc.read_h5ad(
-        os.path.join(base_path, f"gene-embs/gene_idx+pca15-{subset}.h5ad"),
+        os.path.join(base_path, f"gene-embs/gene_idx+pca-{subset}.h5ad"),
     ).obs
     splits = pd.read_csv(os.path.join(base_path, "misc/split-cls.csv"))
     for fold in range(5):

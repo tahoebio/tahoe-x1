@@ -40,7 +40,7 @@ def main(base_path):
     log.info(f"computed PCA and saved cell line embeddings to {outpath}")
 
     # load genes and scores for marginal essentiality task
-    genes, scores = utils.get_marginal_genes_scores(base_path)
+    genes, scores = utils.get_marginal_genes_scores(base_path, log)
 
     # compute gene loadings for all genes
     log.info("computing gene loadings for all genes")
@@ -68,7 +68,7 @@ def main(base_path):
     )
 
     # save AnnData
-    outpath = os.path.join(base_path, "gene-embs/loading15-lt5gt70-bin.h5ad")
+    outpath = os.path.join(base_path, "gene-embs/pcloading-lt5gt70-bin.h5ad")
     loadings.write_h5ad(outpath)
     log.info(f"saved gene loading AnnData to {outpath}")
 
@@ -85,7 +85,7 @@ def main(base_path):
     genes = sorted(gene_dict.keys())
 
     # iterate over cell lines
-    log.info("creating gene_idx+pca15 embeddings")
+    log.info("creating gene_idx+pca embeddings")
     labels = []
     embeddings = []
     for cl in tqdm(cell_lines):
@@ -114,7 +114,7 @@ def main(base_path):
         log,
         labels,
         embeddings,
-        "gene_idx+pca15",
+        "gene_idx+pca",
     )
 
 
