@@ -37,12 +37,16 @@ All of these folders need to at least exist for the scripts to work. The followi
 - TranscriptFormer (Exemplar)
 - TranscriptFormer (Metazoa)
 - STATE
+- MosaicFM (~70M parameters)
+- MosaicFM (~1.3B parameters)
+- MosaicFM (~3B parameters)
+- MosaicFM (~3B parameters, training continued with alternate gene encoder)
 
 ```
 s3://tahoe-hackathon-data/MFM/benchmarks/depmap/
 ```
 
-**If you sync the entire directory (71GB), you can skip to step 4 and start evaluating new models.**
+**If you sync the entire directory (415GB), you can skip to step 4 and start evaluating new models.**
 
 **If you sync only the raw data (919MB), you need to go through steps 1-3.**
 
