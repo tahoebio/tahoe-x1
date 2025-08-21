@@ -101,31 +101,17 @@ python generate-nulls.py --base-path [path]
 
 ### Step 4: generate embeddings for the model being evaluated
 
-When you have a new model to evaluate, use `generate-embs-model.py` to extract the embeddings needed for the DepMap benchmarks. Currently, the script can extract embeddings scGPT models developed internally at Vevo and Geneformer models that follow the Hugging Face framework. It can also operate on inference results from the NVIDIA Geneformer models (see [here](https://github.com/vevotx/vevo-eval/blob/main/wrangle/scgpt-depmap/depmap_nvidia_geneformer.ipynb) for some more details.)
-
-Note that in all the following examples, the model name is something you can choose. File names are based this parameter, and you'll use it in steps 5 and 6. For the most seamless operation, specify the model name with nothing but hyphens. In step 5, and for task #2 and task #3 in step 6, the hyphens will be replaced with underscores.
+When you have a new MosaicFM model to evaluate, use `generate-embs-model.py` to extract the embeddings needed for the DepMap benchmarks. Note that in all the following examples, the model name is something you can choose. File names are based this parameter, and you'll use it in steps 5 and 6. For the most seamless operation, specify the model name with nothing but hyphens. In step 5, and for task #2 and task #3 in step 6, the hyphens will be replaced with underscores.
 
 ```
-model name: scgpt-70m-verify-script
-downstream: scgpt_70m_verify_script
+model name: mosaicfm-70m-verify-script
+downstream: mosaicfm_70m_verify_script
 ```
 
-To run the script with an scGPT model, you'll need a directory containing `best-model.pt`, `collator_config.yml`, `model_config.yml`, and `vocab.json`. Pass the location of this directory to the script using the `--model-path` argument.
+To run the script, you'll need a directory containing `best-model.pt`, `collator_config.yml`, `model_config.yml`, and `vocab.json`. Pass the location of this directory to the script using the `--model-path` argument.
 
 ```
-python generate-embs-model.py --base-path [path] --model-type scgpt --model-name [name] --model-path [path]
-```
-
-To run the script with a Geneformer model, you'll need a directory containing `config.json`, `pytorch_model.bin`, and `training_args.bin`. Pass the location of this directory to the script using the `--model-path` argument. Additionally, you'll need to pass in a path to a dataset processed by Geneformer's `TranscriptomeTokenizer` class. (You should have at least two tokenized datasets in the `geneformer` subdirectory in the base folder by this point.)
-
-```
-python generate-embs-model.py --base-path [path] --model-type gf --model-name [name] --model-path [path] --gf-data-path [path]
-```
-
-To operate on inference results from the NVIDIA Geneformer models, you'll need to place `{prefix}_depmap.pkl` and `{prefix}_vocab.json` in the `nvidia-gf-preds` subdirectory in the base folder for the model you want. (If you synced everything from the S3 URI in Step 0, these already exist.)
-
-```
-python generate-embs-model.py --base-path [path] --model-type nvidia-gf --model-name [name] --nvidia-gf-data-prefix [prefix]
+python generate-embs-model.py --base-path [path] --model-name [name] --model-path [path]
 ```
 
 ---
