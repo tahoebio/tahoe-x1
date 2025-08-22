@@ -1,4 +1,4 @@
-model_name: MFM-10m
+models_dir_path: "/tahoe/data/ckpts/MFM-v2/test_rel/"
 input_path: path/to/input.h5ad
 output_dir: path/to/output
 gene_col: feature_name
@@ -6,9 +6,12 @@ n_hvg: null
 embeddings_path: path/to/embeddings
 signatures_path: path/to/signatures
 aadata_path: path/to/adata.h5ad
+chunk_size: 30000
+batch_size: 32
+max_length: 8192
 benchmark:
   seeds: [0]
-  reps: [GE, TE, EA]
+  mods: [GE, TE, EA]
   gene_set_paths: []
   output_dir: path/to/benchmark_output
 visualization:

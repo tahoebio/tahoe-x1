@@ -3,16 +3,51 @@ import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
+log = logging.getLogger(__name__)
+
+
+import os
+
 import boto3
 import numpy as np
 import torch
 from git import Optional
 from omegaconf import DictConfig
+from omegaconf import OmegaConf as om
 from scanpy import AnnData
 from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import pearsonr
 
 from mosaicfm.tokenizer import GeneVocab
+
+
+def load_model(model_dir: str, device: torch.device):
+    from mosaicfm.model.model import ComposerSCGPTModel
+
+    model_config_path = os.path.join(model_dir, "model_config.yml")
+    vocab_path = os.path.join(model_dir, "vocab.json")
+    collator_config_path = os.path.join(model_dir, "collator_config.yml")
+    ckpt = os.path.join(model_dir, "best-model.pt")
+
+    model_config = om.load(model_config_path)
+    if model_config["attn_config"]["attn_impl"] == "triton":
+        model_config["attn_config"]["attn_impl"] = "flash"
+        model_config["attn_config"]["use_attn_mask"] = False
+
+    model_config["do_mlm"] = False  # Disable MLM for embeddings generation
+    collator_config = om.load(collator_config_path)
+    vocab = GeneVocab.from_file(vocab_path)
+
+    model = ComposerSCGPTModel(
+        model_config=model_config,
+        collator_config=collator_config,
+    )
+    model.load_state_dict(torch.load(ckpt)["state"]["model"])
+    model.to(device)
+    model.eval()
+    log.info(f"Model loaded from {ckpt}")
+
+    return model, vocab, model_config, collator_config
 
 
 def loader_from_adata(
