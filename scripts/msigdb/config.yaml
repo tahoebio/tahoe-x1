@@ -15,7 +15,7 @@ chunk_size: 30000
 batch_size: 32
 max_length: 8192
 benchmark:
-  seeds: [0]
+  seeds: [0, 1, 2]
   mods: [GE, TE, EA]
   gene_set_paths: []
   output_dir: ./results
@@ -24,6 +24,6 @@ benchmark:
     hidden_size: [64, 512, 1024, 2048]
     n_hidden_layers: [1, 2]
     dropout: [0.0, 0.1, 0.5]
-visualization:
-  pred_dir: path/to/benchmark_output
-  output: path/to/plot.png
+vis:
+  pred_dir: v19/
+  output: v19/plot.png
