@@ -1,11 +1,18 @@
-#!/opt/conda/bin/python
-
+#!/usr/bin/env python
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+import argparse
 import os
+
 import anndata
-import scanpy as sc
-import numpy as np
 import pandas as pd
-from benchmark_utils import read_sigs, read_embeddings
+import scanpy as sc
+import yaml
+from benchmark_utils import read_embeddings, read_sigs
+
+
+def load_config(path: str) -> dict:
+    with open(path, "r") as fin:
+        return yaml.safe_load(fin)
 
 
 def read_all_embs(embs_path):
@@ -37,46 +44,31 @@ def create_anndata(embs, sigs):
     )
 
 
-def main(embs_path, sigs_path, filter, min_sig_size, max_sig_size, min_hits_per_gene):
-    embs = read_all_embs(embs_path)
-    sigs = read_sigs(sigs_path)
+def main(cfg: dict):
+    embs = read_all_embs(cfg["embeddings_path"])
+    sigs = read_sigs(cfg["signatures_path"])
     adata = create_anndata(embs, sigs)
 
-    if filter:
-        sc.pp.filter_genes(adata, min_cells=min_sig_size, max_cells=max_sig_size)
-        sc.pp.filter_cells(adata, min_genes=min_hits_per_gene)
+    if cfg.get("filter", False):
+        sc.pp.filter_genes(adata, min_cells=cfg.get("min_sig_size", 25), max_cells=cfg.get("max_sig_size", None))
+        sc.pp.filter_cells(adata, min_genes=cfg.get("min_hits_per_gene", 10))
 
-
+    out_path = cfg.get(
+        "output_dir",
+        os.path.join(cfg["embeddings_path"], "embs_adata"),
+    )
     try:
-        adata.write(os.path.join(embs_path, "embs_adata.h5ad.gz"), compression="gzip")
-    except:
-        adata.write_zarr(os.path.join(embs_path, "embs_adata.zarr"))
-    (
-        open(os.path.join(embs_path, "gene_names.txt"), "w").write(
-            "\n".join(adata.obs.gene.values) + "\n"
-        )
-    )
+        adata.write(out_path + ".h5ad.gz", compression="gzip")
+    except Exception:
+        adata.write_zarr(out_path + ".zarr")
+
+    with open(os.path.join(cfg["embeddings_path"], "gene_names.txt"), "w") as fout:
+        fout.write("\n".join(adata.obs.gene.values) + "\n")
 
 
-
-# CLI
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument("embs_path", type=str)
-    parser.add_argument("sigs_path", type=str)
-    parser.add_argument("--filter", action="store_true")
-    parser.add_argument("--min_sig_size", type=int, default=25)
-    parser.add_argument("--max_sig_size", type=int, default=None)
-    parser.add_argument("--min_hits_per_gene", type=int, default=10)
+    parser = argparse.ArgumentParser(description="Build AnnData object from config")
+    parser.add_argument("config", type=str, help="Path to YAML config file")
     args = parser.parse_args()
-
-    main(
-        args.embs_path,
-        args.sigs_path,
-        args.filter,
-        args.min_sig_size,
-        args.max_sig_size,
-        args.min_hits_per_gene,
-    )
+    cfg = load_config(args.config)
+    main(cfg)

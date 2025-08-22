@@ -2,6 +2,8 @@ import argparse
 import logging
 import os
 from typing import Sequence
+import json 
+
 
 import numpy as np
 import scanpy as sc
@@ -72,7 +74,12 @@ def generate_embeddings(config: dict, modes: Sequence[str]):
 
         gene2idx = vocab.get_stoi()
         all_gene_ids = np.array([list(gene2idx.values())])
-        gene_names = list(gene2idx.keys())
+
+        with open(config["ensembl_to_gene_path"], 'r') as f:
+            ensemble_to_name = json.load(f)
+
+        gene_ensembles = list(gene2idx.keys())
+        gene_names = [ensemble_to_name.get(ens, ens) for ens in gene_ensembles]
         gene_ids = list(gene2idx.values())
 
         if "TE" in modes or "GE" in modes:
