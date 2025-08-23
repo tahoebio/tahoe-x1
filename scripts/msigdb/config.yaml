@@ -1,5 +1,5 @@
 models_dir_path: "/tahoe/data/ckpts/MFM-v2/test_rel/"
-input_path: "/tahoe/data/msigdb/cellxgene_data/rep_1.h5ad.gz"
+dataset_path: "/tahoe/data/msigdb/cellxgene_data/rep_1.h5ad.gz"
 output_dir: "./gene_embs"
 adata_path: "/tahoe/gits/mosaicfm-release/gene_embs/embs_adata.h5ad.gz"
 ensembl_to_gene_path: "/tahoe/gits/shreshth_sandbox/msigdb_notebooks/vevo_v2_ensembl_to_gene_name.json"
@@ -16,7 +16,7 @@ batch_size: 32
 max_length: 8192
 benchmark:
   seeds: [0, 1, 2]
-  mods: [GE, TE, EA]
+  mods: [GE, TE] #All options [GE, TE, EA]
   gene_set_paths: []
   output_dir: ./results
   verbose: True
@@ -25,5 +25,4 @@ benchmark:
     n_hidden_layers: [1, 2]
     dropout: [0.0, 0.1, 0.5]
 vis:
-  pred_dir: v19/
-  output: v19/plot.png
+  pred_dir: ./results

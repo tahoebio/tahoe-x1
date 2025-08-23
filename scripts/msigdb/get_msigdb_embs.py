@@ -69,7 +69,7 @@ def generate_embeddings(config: dict, modes: Sequence[str]):
         composer_model, vocab, model_cfg, coll_cfg = load_model(model_dir, device)
 
 
-        output_path = config["output_dir"]
+        output_path = config["embeddings_path"]
         os.makedirs(output_path, exist_ok=True)
 
         gene2idx = vocab.get_stoi()
@@ -106,10 +106,10 @@ def generate_embeddings(config: dict, modes: Sequence[str]):
                 log.info("Saved GE embeddings")
 
         if "EA" in modes:
-            input_path = config["input_path"]
+            dataset_path = config["dataset_path"]
             gene_col = config.get("gene_col", "feature_name")
             n_hvg = config.get("n_hvg")
-            adata = sc.read_h5ad(input_path)
+            adata = sc.read_h5ad(dataset_path)
             if n_hvg is not None:
                 sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, flavor="seurat_v3")
                 adata = adata[:, adata.var["highly_variable"]]

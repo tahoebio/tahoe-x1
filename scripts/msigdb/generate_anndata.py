@@ -53,10 +53,8 @@ def main(cfg: dict):
         sc.pp.filter_genes(adata, min_cells=cfg.get("min_sig_size", 25), max_cells=cfg.get("max_sig_size", None))
         sc.pp.filter_cells(adata, min_genes=cfg.get("min_hits_per_gene", 10))
 
-    out_path = cfg.get(
-        "output_dir",
-        os.path.join(cfg["embeddings_path"], "embs_adata"),
-    )
+    out_path = os.path.join(cfg["embeddings_path"], "embs_adata")
+
     try:
         adata.write(out_path + ".h5ad.gz", compression="gzip")
     except Exception:

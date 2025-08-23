@@ -55,9 +55,7 @@ def compute_auprc_single_rep(results_dir, sigs):
     return pd.DataFrame(list(auprc_scores.items()), columns=["emb", "AUPRC"]).sort_values("AUPRC", ascending=False)
 
 
-
-
-def plot_multi_rep(results_dir, sigs, output_path=None, title="AUPRC Across Replicates"):
+def plot_multi_rep(results_dir, sigs, title="AUPRC Across Replicates"):
     """Plot across multiple replicates - simplified version of plot_reps.ipynb."""
     
     # Find replicate directories or CSV files
@@ -94,7 +92,7 @@ def plot_multi_rep(results_dir, sigs, output_path=None, title="AUPRC Across Repl
     sns.stripplot(data=combined, x='emb', y='AUPRC', color='black', size=5, jitter=True, alpha=0.6)
     
     # Add mean values as text
-    for i, (emb_name, mean_val) in enumerate(mean_auprc.items()):
+    for i, (_, mean_val) in enumerate(mean_auprc.items()):
         fontweight = "bold" if i == 0 else "normal"
         ax.text(i, mean_val + 0.01, f"{mean_val:.4f}", color='black', ha="center", va="bottom", fontweight=fontweight)
     
@@ -109,46 +107,17 @@ def plot_multi_rep(results_dir, sigs, output_path=None, title="AUPRC Across Repl
         tick_labels[0].set_fontweight('bold')
     
     plt.tight_layout()
-    if output_path:
-        plt.savefig(output_path, dpi=300, bbox_inches="tight")
-        print(f"Saved plot to {output_path}")
+
+    plt_name = os.path.join(results_dir, "auprc_with_reps.png")
+    plt.savefig(plt_name, dpi=300, bbox_inches="tight")
+    print(f"Saved plot to {plt_name}")
+
     plt.show()
 
 
 def load_config(path: str) -> dict:
     with open(path, "r") as fin:
         return yaml.safe_load(fin)
-
-
-def visualize_from_config(cfg: dict):
-    vis_cfg = cfg.get("visualization", {})
-    pred_dir = vis_cfg.get("pred_dir")
-    output = vis_cfg.get("output", "benchmark_plot.png")
-    frames = []
-    print(f"Loading predictions from {os.listdir(pred_dir)}")
-    for seed in os.listdir(pred_dir):
-        print("seed", seed, pred_dir)
-        path = os.path.join(pred_dir, seed)
-        for fn in os.listdir(path):
-
-            if fn.endswith("_benchmark_predictions.csv"):
-                df = pd.read_csv(os.path.join(path, fn), index_col=0)
-                melted = (
-                    df.mean()
-                    .to_frame(name="prediction")
-                    .reset_index()
-                    .rename(columns={"index": "sig"})
-                )
-                melted["embedding"] = fn.replace("_benchmark_predictions.csv", "")
-                frames.append(melted)
-        if not frames:
-            raise ValueError(f"No prediction files found in {path}")
-    data = pd.concat(frames)
-    plt.figure(figsize=(8, 4))
-    sns.barplot(data=data, x="sig", y="prediction", hue="embedding")
-    plt.xticks(rotation=90)
-    plt.tight_layout()
-    plt.savefig(output)
 
 
 def main():
@@ -170,7 +139,7 @@ def main():
     sns.set_style("whitegrid")
     
 
-    plot_multi_rep(cfg["vis"]["pred_dir"], sigs, cfg["vis"]["output"], cfg["vis"].get("title", "AUPRC Across Replicates"))
+    plot_multi_rep(cfg["vis"]["pred_dir"], sigs, cfg["vis"].get("title", "AUPRC Across Replicates"))
 
 
 if __name__ == "__main__":
