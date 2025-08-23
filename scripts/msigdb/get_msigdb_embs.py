@@ -152,7 +152,6 @@ def main():
             cli_args.append(arg)
     
     cli_cfg = om.from_cli(cli_args)
-    print("cli confiiiiiiiig", cli_cfg)
     cfg = om.merge(cfg, cli_cfg)
     
     om.resolve(cfg)
