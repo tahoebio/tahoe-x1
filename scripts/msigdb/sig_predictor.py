@@ -1,11 +1,12 @@
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.optim.lr_scheduler import ReduceLROnPlateau
 import pytorch_lightning as pl
+import torch
+import torch.nn.functional as F
 from pytorch_lightning.callbacks import EarlyStopping
+from torch import nn
+from torch.optim.lr_scheduler import ReduceLROnPlateau
 
 
 class GeneSigDataset(torch.utils.data.Dataset):
@@ -82,13 +83,15 @@ class SigPredictor:
 
     @torch.no_grad()
     def predict(self, dataset: GeneSigDataset):
-        """Predict on a dataset and return the predictions"""
+        """Predict on a dataset and return the predictions."""
         assert self.trained, "Model has not been trained"
         self.model.eval()
         preds = []
         gene_names = []
         for inputs, _, names in torch.utils.data.DataLoader(
-            dataset, batch_size=256, shuffle=False
+            dataset,
+            batch_size=256,
+            shuffle=False,
         ):
             preds.append(self.model(inputs).detach().numpy())
             gene_names += names
@@ -121,10 +124,14 @@ class _SigPredictorModule(pl.LightningModule):
         ]
         for _ in range(n_hidden_layers - 1):
             layers.extend(
-                [nn.Dropout(dropout), nn.Linear(hidden_size, hidden_size), nn.LeakyReLU()]
+                [
+                    nn.Dropout(dropout),
+                    nn.Linear(hidden_size, hidden_size),
+                    nn.LeakyReLU(),
+                ],
             )
         layers.extend(
-            [nn.Dropout(dropout), nn.Linear(hidden_size, output_size), nn.Sigmoid()]
+            [nn.Dropout(dropout), nn.Linear(hidden_size, output_size), nn.Sigmoid()],
         )
 
         self.net = nn.Sequential(*layers)
@@ -177,7 +184,7 @@ class _SigPredictorModule(pl.LightningModule):
                 "monitor": "val_loss",
                 "interval": "epoch",
                 "reduce_on_plateau": True,
-            }
+            },
         ]
 
     def configure_callbacks(self):

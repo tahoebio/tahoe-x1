@@ -89,8 +89,8 @@ def generate_embeddings(config, modes: Sequence[str]):
                     gene_ids=gene_ids,
                 )
                 print("TE embeddings shape:", te.shape)
-                log.info("Saved TE embeddings")
-                
+                log.info(f"Saved TE embeddings at {output_path}")
+
             if "GE" in modes:
                 np.savez_compressed(
                     os.path.join(output_path, f"{model_name}_GE.npz"),
@@ -99,7 +99,7 @@ def generate_embeddings(config, modes: Sequence[str]):
                     gene_ids=gene_ids,
                 )
                 print("GE embeddings shape:", ge.shape)
-                log.info("Saved GE embeddings")
+                log.info(f"Saved GE embeddings at {output_path}")
 
         if "EA" in modes:
             dataset_path = config["dataset_path"]
