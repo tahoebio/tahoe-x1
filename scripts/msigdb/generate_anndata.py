@@ -1,18 +1,15 @@
 #!/usr/bin/env python
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
-import argparse
 import os
+import sys
 
 import anndata
 import pandas as pd
 import scanpy as sc
-import yaml
+from omegaconf import OmegaConf as om
 from benchmark_utils import read_embeddings, read_sigs
 
 
-def load_config(path: str) -> dict:
-    with open(path, "r") as fin:
-        return yaml.safe_load(fin)
 
 
 def read_all_embs(embs_path):
@@ -44,7 +41,7 @@ def create_anndata(embs, sigs):
     )
 
 
-def main(cfg: dict):
+def main(cfg):
     embs = read_all_embs(cfg["embeddings_path"])
     sigs = read_sigs(cfg["signatures_path"])
     adata = create_anndata(embs, sigs)
@@ -65,8 +62,18 @@ def main(cfg: dict):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Build AnnData object from config")
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    args = parser.parse_args()
-    cfg = load_config(args.config)
+    cfg = om.load(sys.argv[1])
+    
+    num_mand_args = 2
+    cli_args = []
+    for arg in sys.argv[num_mand_args:]:
+        if arg.startswith("--"):
+            cli_args.append(arg[2:])
+        else:
+            cli_args.append(arg)
+    
+    cli_cfg = om.from_cli(cli_args)
+    cfg = om.merge(cfg, cli_cfg)
+    
+    om.resolve(cfg)
     main(cfg)

@@ -1,10 +1,10 @@
 #!/usr/bin/env python
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
-import argparse
 import os
+import sys
 
 import seaborn as sns
-import yaml
+from omegaconf import OmegaConf as om
 
 import glob
 import pandas as pd
@@ -115,20 +115,21 @@ def plot_multi_rep(results_dir, sigs, title="AUPRC Across Replicates"):
     plt.show()
 
 
-def load_config(path: str) -> dict:
-    with open(path, "r") as fin:
-        return yaml.safe_load(fin)
-
-
 def main():
-    parser = argparse.ArgumentParser(
-        description="Visualize benchmark results from YAML config",
-    )
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    args = parser.parse_args()
-    cfg = load_config(args.config)
-    # visualize_from_config(cfg)
-
+    cfg = om.load(sys.argv[1])
+    
+    num_mand_args = 2
+    cli_args = []
+    for arg in sys.argv[num_mand_args:]:
+        if arg.startswith("--"):
+            cli_args.append(arg[2:])
+        else:
+            cli_args.append(arg)
+    
+    cli_cfg = om.from_cli(cli_args)
+    cfg = om.merge(cfg, cli_cfg)
+    
+    om.resolve(cfg)
 
     print("Loading signatures...")
     sigs = load_signatures(cfg["signatures_path"])

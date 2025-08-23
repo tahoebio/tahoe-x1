@@ -1,6 +1,6 @@
-import argparse
 import logging
 import os
+import sys
 from typing import Sequence
 import json 
 
@@ -8,7 +8,6 @@ import json
 import numpy as np
 import scanpy as sc
 import torch
-import yaml
 from omegaconf import OmegaConf as om
 
 from mosaicfm.model import ComposerSCGPTModel
@@ -24,9 +23,6 @@ logging.basicConfig(
 logging.getLogger(__name__).setLevel("INFO")
 
 
-def load_config(path: str) -> dict:
-    with open(path, "r") as fin:
-        return yaml.safe_load(fin)
 
 
 def _create_context_free_embeddings(cfg, model, all_gene_ids, device):
@@ -57,7 +53,7 @@ def _create_context_free_embeddings(cfg, model, all_gene_ids, device):
 
 
 
-def generate_embeddings(config: dict, modes: Sequence[str]):
+def generate_embeddings(config, modes: Sequence[str]):
 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     models_dir_path = os.listdir(config["models_dir_path"])
@@ -145,18 +141,25 @@ def generate_embeddings(config: dict, modes: Sequence[str]):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Generate MSigDB embeddings from config")
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    parser.add_argument(
-        "--modes",
-        nargs="*",
-        default=["GE", "TE", "EA"],
-        help="Embedding types to generate",
-    )
-    args = parser.parse_args()
-    config = load_config(args.config)
-    print(config)
-    generate_embeddings(config, args.modes)
+    cfg = om.load(sys.argv[1])
+    
+    num_mand_args = 2
+    cli_args = []
+    for arg in sys.argv[num_mand_args:]:
+        if arg.startswith("--"):
+            cli_args.append(arg[2:])
+        else:
+            cli_args.append(arg)
+    
+    cli_cfg = om.from_cli(cli_args)
+    print("cli confiiiiiiiig", cli_cfg)
+    cfg = om.merge(cfg, cli_cfg)
+    
+    om.resolve(cfg)
+    
+    modes = cfg.get("mods", ["GE", "TE"])
+    print(f"config file {cfg}")
+    generate_embeddings(cfg, modes)
 
 
 if __name__ == "__main__":

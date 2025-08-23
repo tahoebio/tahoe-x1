@@ -22,6 +22,10 @@ conda activate msigdb
 
 ## Usage
 
+All scripts support command-line overrides: `python msigdb/*.py config.yaml --key=value --nested.key=value`
+
+Example: `python scripts/msigdb/get_msigdb_embs.py config.yaml --embeddings_path=./custom_embs --batch_size=16`
+
 ### 1. Configure paths
 Edit `config.yaml` to point to your input data and desired outputs.
 
@@ -29,7 +33,7 @@ Edit `config.yaml` to point to your input data and desired outputs.
 Create TE (transformer context-free), GE (gene encoder) and EA (expression aware) embeddings:
 
 ```bash
-python scripts/msigdb/get_msigdb_embs.py scripts/msigdb/config.yaml
+python scripts/msigdb/get_msigdb_embs.py scripts/msigdb/config.yaml --embeddings_path="./new"
 ```
 
 ### 3. Build AnnData

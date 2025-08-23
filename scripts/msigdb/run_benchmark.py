@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 
-import argparse
 import logging
 import os
+import sys
 import warnings
 
 import anndata
@@ -11,7 +11,7 @@ import numpy as np
 import pandas as pd
 import torch
 import tqdm
-import yaml
+from omegaconf import OmegaConf as om
 from sig_predictor import GeneSigDataset, SigPredictor
 from sklearn.metrics import log_loss
 from torch import multiprocessing
@@ -197,12 +197,9 @@ def run_all(adata, output_path, cfg, seed=0):
         )
 
 
-def load_config(path: str) -> dict:
-    with open(path, "r") as fin:
-        return yaml.safe_load(fin)
 
 
-def run_from_config(cfg: dict):
+def run_from_config(cfg):
     if "h5ad" in cfg["adata_path"]:
         adata = anndata.read_h5ad(cfg["adata_path"])
     elif "zarr" in cfg["adata_path"]:
@@ -222,10 +219,20 @@ def run_from_config(cfg: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Run MLP benchmark from YAML config")
-    parser.add_argument("config", type=str, help="Path to YAML config file")
-    args = parser.parse_args()
-    cfg = load_config(args.config)
+    cfg = om.load(sys.argv[1])
+    
+    num_mand_args = 2
+    cli_args = []
+    for arg in sys.argv[num_mand_args:]:
+        if arg.startswith("--"):
+            cli_args.append(arg[2:])
+        else:
+            cli_args.append(arg)
+    
+    cli_cfg = om.from_cli(cli_args)
+    cfg = om.merge(cfg, cli_cfg)
+    
+    om.resolve(cfg)
     run_from_config(cfg)
 
 

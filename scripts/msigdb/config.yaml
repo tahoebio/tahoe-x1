@@ -1,6 +1,5 @@
 models_dir_path: "/tahoe/data/ckpts/MFM-v2/test_rel/"
 dataset_path: "/tahoe/data/msigdb/cellxgene_data/rep_1.h5ad.gz"
-output_dir: "./gene_embs"
 adata_path: "/tahoe/gits/mosaicfm-release/gene_embs/embs_adata.h5ad.gz"
 ensembl_to_gene_path: "/tahoe/gits/shreshth_sandbox/msigdb_notebooks/vevo_v2_ensembl_to_gene_name.json"
 gene_col: feature_name
