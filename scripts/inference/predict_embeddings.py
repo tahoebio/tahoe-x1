@@ -23,9 +23,7 @@ from composer import Trainer
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
-from mosaicfm.model import ComposerSCGPTModel
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils.util import loader_from_adata
+from mosaicfm.utils.util import load_model, loader_from_adata
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -34,18 +32,20 @@ logging.basicConfig(
 )
 
 
-def main(cfg: DictConfig) -> None:
-    log.info("Loading vocabulary and collator configuration…")
-    vocab = GeneVocab.from_file(cfg.paths.vocab)
-    coll_cfg = om.load(cfg.paths.collator_config)
-    model_cfg = om.load(cfg.paths.model_config)
+def predict_embeddings(cfg: DictConfig) -> None:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     cell_type_key = cfg.data.cell_type_key
     gene_id_key = cfg.data.gene_id_key
-    return_genes = cfg.predict.get("return_genes", True)
+    return_genes = cfg.predict.get("return_genes", False)
     batch_size = cfg.predict.get("batch_size", 64)
     max_length = cfg.predict.get("seq_len", 2048)
     num_workers = cfg.predict.get("num_workers", 8)
+    save = cfg.predict.get("save", True)
+
+    log.info("Loading vocabulary and collator configuration and model checkpoints")
+    model, vocab, _, coll_cfg = load_model(cfg.paths.model_dir, device=device, return_genes=return_genes)
+    print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 
     log.info("Loading AnnData file…")
     adata = sc.read_h5ad(cfg.paths.adata_input)
@@ -74,19 +74,6 @@ def main(cfg: DictConfig) -> None:
         gene_ids=gene_ids,
         num_workers=num_workers,
     )
-
-    log.info("Initialising model and loading checkpoint…")
-
-    if model_cfg["attn_config"]["attn_impl"] == "triton":
-        model_cfg["attn_config"]["attn_impl"] = "flash"
-        model_cfg["attn_config"]["use_attn_mask"] = False
-    model_cfg["return_genes"] = return_genes
-
-    model = ComposerSCGPTModel(model_cfg, coll_cfg)
-    state = torch.load(cfg.paths.checkpoint, map_location="cpu")["state"]["model"]
-    model.load_state_dict(state, strict=True)
-
-    print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 
     trainer = Trainer(
         model=model,
@@ -153,14 +140,17 @@ def main(cfg: DictConfig) -> None:
         all_gene_ids = np.array(list(gene2idx.values()))
         gene_array = means[all_gene_ids, :]
 
-    log.info("Saving outputs…")
+    if save:
+        log.info("Saving outputs…")
 
-    np.save(cfg.paths.cell_output, cell_array)
+        np.save(cfg.paths.cell_output, cell_array)
 
-    if return_genes:
-        np.savez(cfg.paths.gene_output, gene_array=gene_array, gene_ids=gene_ids)
+        if return_genes:
+            np.savez(cfg.paths.gene_output, gene_array=gene_array, gene_ids=gene_ids)
 
-    log.info("Finished writing embeddings")
+        log.info("Finished writing embeddings")
+
+    return adata, cell_array, gene_array if return_genes else None
 
 
 if __name__ == "__main__":
@@ -186,4 +176,4 @@ if __name__ == "__main__":
     cfg = om.merge(cfg, cli_cfg)
 
     om.resolve(cfg)
-    main(cfg)
+    predict_embeddings(cfg)

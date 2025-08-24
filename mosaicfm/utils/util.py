@@ -3,16 +3,54 @@ import logging
 from pathlib import Path
 from urllib.parse import urlparse
 
+log = logging.getLogger(__name__)
+
+
+import os
+
 import boto3
 import numpy as np
+import pandas as pd
 import torch
 from git import Optional
 from omegaconf import DictConfig
+from omegaconf import OmegaConf as om
 from scanpy import AnnData
 from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import pearsonr
+from sklearn.neighbors import kneighbors_graph
 
 from mosaicfm.tokenizer import GeneVocab
+
+
+def load_model(model_dir: str, device: torch.device, return_genes: bool = False):
+    from mosaicfm.model.model import ComposerSCGPTModel
+
+    model_config_path = os.path.join(model_dir, "model_config.yml")
+    vocab_path = os.path.join(model_dir, "vocab.json")
+    collator_config_path = os.path.join(model_dir, "collator_config.yml")
+    ckpt = os.path.join(model_dir, "best-model.pt")
+
+    model_config = om.load(model_config_path)
+    if model_config["attn_config"]["attn_impl"] == "triton":
+        model_config["attn_config"]["attn_impl"] = "flash"
+        model_config["attn_config"]["use_attn_mask"] = False
+
+    model_config["do_mlm"] = False  # Disable MLM for embeddings generation
+    model_config["return_genes"]
+    collator_config = om.load(collator_config_path)
+    vocab = GeneVocab.from_file(vocab_path)
+
+    model = ComposerSCGPTModel(
+        model_config=model_config,
+        collator_config=collator_config,
+    )
+    model.load_state_dict(torch.load(ckpt)["state"]["model"])
+    model.to(device)
+    model.eval()
+    log.info(f"Model loaded from {ckpt}")
+
+    return model, vocab, model_config, collator_config
 
 
 def loader_from_adata(
@@ -173,3 +211,24 @@ def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
         "pearson": np.mean(pearson),
         "pearson_delta": np.mean(pearson_delta),
     }
+
+
+def compute_lisi_scores(emb, labels, k):
+    """Compute LISI (Local Inverse Simpson's Index) scores for embeddings.
+    
+    Args:
+        emb: Embedding matrix of shape (n_cells, n_features)
+        labels: Cell type labels for each cell
+        k: Number of neighbors to consider
+        
+    Returns:
+        LISI score normalized by theoretical maximum
+    """
+    nng = kneighbors_graph(emb, n_neighbors=k).tocoo()
+    labels = pd.Categorical(labels).codes
+    self_id = labels[nng.row]
+    ne_id = labels[nng.col]
+
+    _, c = np.unique(labels, return_counts=True)
+    theoretic_score = ((c / c.sum()) ** 2).sum()
+    return (self_id == ne_id).mean() / theoretic_score

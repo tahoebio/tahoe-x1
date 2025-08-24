@@ -1,8 +1,5 @@
 paths:
-  model_config: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/model_config.yml"
-  collator_config: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/collator_config.yml"
-  vocab: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/vocab.json"
-  checkpoint: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/best-model.pt"
+  model_dir: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB"
   adata_input: "/tahoe/data/datasets/benchmark/kim2020_lung/kim_train.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/ccle.h5ad" # "/tahoe/data/datasets/benchmark/tahoe/Tahoe50k_train.h5ad"
   cell_output: "./kim_cell_embeddings.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/cell_embeddings.h5ad"
   gene_output: "./kim_gene_embeddings.npz"
@@ -16,3 +13,4 @@ predict:
   seq_len_dataset: 2048 #8192
   num_workers: 8
   return_genes: True  # Whether to extract gene embeddings
+  save: True
