@@ -24,7 +24,13 @@ base-folder             Root directory.
   raw                   Raw DepMap and CCLE data.
 ```
 
-All of these folders need to at least exist for the scripts to work. The following S3 URI contains this base folder, populated with embeddings and results from the following models.
+All of these folders need to at least exist for the scripts to work. The following S3 URI contains this base folder.
+
+```
+s3://tahoe-hackathon-data/MFM/benchmarks/depmap/
+```
+
+This S3 bucket is populated with embeddings and results from the following models.
 
 - PCA (baseline)
 - Geneformer (Theodoris Lab, trained on Genecorpus-103M, ~95M parameters)
@@ -42,9 +48,7 @@ All of these folders need to at least exist for the scripts to work. The followi
 - MosaicFM (~3B parameters)
 - MosaicFM (~3B parameters, training continued with alternate gene encoder)
 
-```
-s3://tahoe-hackathon-data/MFM/benchmarks/depmap/
-```
+For more details on how we retrieved embeddings from non-MosaicFM models, please see `other-models.md` in this repository.
 
 **If you sync the entire directory (415GB), you can skip to step 4 and start evaluating new models.**
 
