@@ -140,6 +140,26 @@ Use `rf-cl-specific-task-[1,2,3]of3.sh` for task #3. The three scripts are inten
 bash rf-cl-specific-task-[1,2,3]of3.sh [base folder path] [embedding name, usually model name with underscores] [number of cores to use, 16-32 is usually good]
 ```
 
+#### Note on non-MosaicFM models
+
+Due to differing vocabularies and context size limits, the various non-MosaicFM models we provide results for (see Step 0) have different numbers of genes with available embeddings. Below is a table summarizing this information.
+
+| model | number of available genes |
+|---|---|
+| MosaicFM | 14,283 |
+| Geneformer | 11,448 |
+| scGPT | 14,285 |
+| TranscriptFormer | 1,892 |
+| STATE | 9,516 |
+
+You can use the `--filter-genes` argument in `rf.py` to restrict the embeddings being evaluated to a set of genes taken from another model. Use this in conjunction with the `--add-label` argument to keep track of which results are generated from which gene sets. Here is an example for running the first fold of task #2 on embeddings from MosaicFM-70M restricted to STATE genes.
+
+```
+python rf.py --base-path <path to base folder> --model-type classifier --emb mosaicfm_70m-mean-lt5gt70-bin --filter-genes state-mean-lt5gt70-bin --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs 8 --fold 0 --add-label="-state-genes"
+```
+
+You would then use `mosaicfm_70m-mean-lt5gt70-bin-state-genes` to refer to these results downstream.
+
 ---
 
 ### Step 6: evaluate and compare models
