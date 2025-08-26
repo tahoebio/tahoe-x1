@@ -164,4 +164,4 @@ You would then use `mosaicfm_70m-mean-lt5gt70-bin-state-genes` to refer to these
 
 ### Step 6: evaluate and compare models
 
-Once the random forests have been trained, you can go through the `evaluate-models.ipynb` notebook to compute and plot results for each of the three tasks. See the notebook for more details.
+Once the random forests have been trained, you can use `python evaluate-models.py <YAML config>` to compute and save results for each of the three tasks. See `evaluate-models-example.yaml` for configuration details.
