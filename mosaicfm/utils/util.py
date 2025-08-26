@@ -23,7 +23,7 @@ from sklearn.neighbors import kneighbors_graph
 from mosaicfm.tokenizer import GeneVocab
 
 
-def load_model(model_dir: str, device: torch.device, return_genes: bool = False):
+def load_model(model_dir: str, device: torch.device, return_genes: bool = False, use_chem_inf: bool = False):
     from mosaicfm.model.model import ComposerSCGPTModel
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
@@ -36,10 +36,18 @@ def load_model(model_dir: str, device: torch.device, return_genes: bool = False)
         model_config["attn_config"]["attn_impl"] = "flash"
         model_config["attn_config"]["use_attn_mask"] = False
 
+
     model_config["do_mlm"] = False  # Disable MLM for embeddings generation
     model_config["return_genes"] = return_genes
+
+
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
+
+    if not use_chem_inf and model_config.get("use_chem_token", False):
+        collator_config["use_chem_token"] = False
+        del model_config["chemical_encoder"]
+        log.info("Disabled chemical information input for the model.")
 
     model = ComposerSCGPTModel(
         model_config=model_config,

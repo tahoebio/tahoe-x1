@@ -44,7 +44,7 @@ def predict_embeddings(cfg: DictConfig) -> None:
     save = cfg.predict.get("save", True)
 
     log.info("Loading vocabulary and collator configuration and model checkpoints")
-    model, vocab, _, coll_cfg = load_model(cfg.paths.model_dir, device=device, return_genes=return_genes)
+    model, vocab, _, coll_cfg = load_model(cfg.paths.model_dir, device=device, return_genes=return_genes, use_chem_inf=cfg.predict.get("use_chem_inf", False))
     print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 
     log.info("Loading AnnData file…")
