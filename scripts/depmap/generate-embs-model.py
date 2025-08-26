@@ -142,8 +142,9 @@ def run_mosaicfm(base_path, model_path, model_name):
 
     # get mean embeddings for each gene
     mean_embs = np.zeros((len(genes), mean_embs_all.shape[1]))
+    gene_to_idx = {gene: idx for idx, gene in enumerate(gene_names)}
     for i, g in enumerate(tqdm(genes)):
-        mean_embs[i] = mean_embs_all[np.where(gene_names == g)[0][0]]
+        mean_embs[i] = mean_embs_all[gene_to_idx[g]]
 
     # create AnnData
     mean_embs_ad = ad.AnnData(
