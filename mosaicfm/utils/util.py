@@ -37,7 +37,7 @@ def load_model(model_dir: str, device: torch.device, return_genes: bool = False)
         model_config["attn_config"]["use_attn_mask"] = False
 
     model_config["do_mlm"] = False  # Disable MLM for embeddings generation
-    model_config["return_genes"]
+    model_config["return_genes"] = return_genes
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
 
