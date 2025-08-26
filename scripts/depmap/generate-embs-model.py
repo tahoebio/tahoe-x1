@@ -28,6 +28,7 @@ logging.basicConfig(
 )
 logging.getLogger(__name__).setLevel("INFO")
 
+
 # generate embeddings for a MosaicFM model
 def run_mosaicfm(base_path, model_path, model_name):
 
@@ -82,7 +83,7 @@ def run_mosaicfm(base_path, model_path, model_name):
         collator_cfg=collator_config,
         batch_size=16,
         max_length=17000,
-        return_gene_embeddings=True
+        return_gene_embeddings=True,
     )
 
     # save cell line embeddings
@@ -100,7 +101,7 @@ def run_mosaicfm(base_path, model_path, model_name):
     # record genes with NaN embeddings
     nan_genes = np.where(np.any(np.isnan(gene_embeddings), axis=-1))[0]
     log.info(
-        f"found {len(nan_genes)} genes with NaN embeddings"
+        f"found {len(nan_genes)} genes with NaN embeddings",
     )
 
     # save NPZ of gene embeddings
@@ -124,9 +125,16 @@ def run_mosaicfm(base_path, model_path, model_name):
     mean_embs_all = embs_npz["gene_embeddings"]
     gene_names = embs_npz["gene_names"]
     gene_info_df = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))
-    scgpt_gene_mapping = dict(zip(gene_info_df["feature_id"], gene_info_df["feature_name"]))
+    scgpt_gene_mapping = dict(
+        zip(gene_info_df["feature_id"], gene_info_df["feature_name"]),
+    )
     valid_gene_ids = scgpt_gene_mapping.keys()
-    gene_names = np.array([scgpt_gene_mapping[gene_id] if gene_id in valid_gene_ids else gene_id for gene_id in gene_names])
+    gene_names = np.array(
+        [
+            scgpt_gene_mapping[gene_id] if gene_id in valid_gene_ids else gene_id
+            for gene_id in gene_names
+        ],
+    )
     invalid_indices = [i for i, g in enumerate(genes) if g not in gene_names]
     genes = [g for i, g in enumerate(genes) if i not in invalid_indices]
     scores = [s for i, s in enumerate(scores) if i not in invalid_indices]
@@ -281,7 +289,9 @@ def run_mosaicfm(base_path, model_path, model_name):
                         continue
 
                     # fill embedding and label
-                    labels.append(f"{cell_line} | {scgpt_gene_mapping[genes[input_id]]}")
+                    labels.append(
+                        f"{cell_line} | {scgpt_gene_mapping[genes[input_id]]}",
+                    )
                     embeddings.append(cell_line_embs[j])
 
                 # increment cell line
@@ -308,6 +318,7 @@ def run_mosaicfm(base_path, model_path, model_name):
         embeddings,
         "_".join(model_name.split("-")),
     )
+
 
 if __name__ == "__main__":
 

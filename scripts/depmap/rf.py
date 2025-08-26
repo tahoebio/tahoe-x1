@@ -34,7 +34,14 @@ embs = sc.read_h5ad(os.path.join(args.base_path, f"gene-embs/{args.emb}.h5ad"))
 # filter genes if specified
 if args.filter_genes is not None:
     print(f"restricting to genes from {args.filter_genes}...")
-    filter_genes = sc.read_h5ad(os.path.join(args.base_path, f"gene-embs/{args.filter_genes}.h5ad")).obs["gene"].unique().tolist()
+    filter_genes = (
+        sc.read_h5ad(
+            os.path.join(args.base_path, f"gene-embs/{args.filter_genes}.h5ad"),
+        )
+        .obs["gene"]
+        .unique()
+        .tolist()
+    )
     embs = embs[embs.obs["gene"].isin(filter_genes)]
 
 # get splits

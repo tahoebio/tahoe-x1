@@ -1,15 +1,19 @@
-# imports
-import sys
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+"""Evaluate various models on DepMap tasks as specified in a config file."""
+
 import math
+import sys
+from pathlib import Path
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import scanpy as sc
-import matplotlib.pyplot as plt
 import seaborn as sns
 from omegaconf import OmegaConf
-from pathlib import Path
+from sklearn.metrics import average_precision_score, r2_score, roc_auc_score
 from sklearn.neighbors import kneighbors_graph
-from sklearn.metrics import r2_score, roc_auc_score, average_precision_score
+
 
 # compute LISI scores
 def compute_lisi_scores(emb, labels, k=20):
@@ -21,6 +25,7 @@ def compute_lisi_scores(emb, labels, k=20):
     theoretic_score = ((c / c.sum()) ** 2).sum()
     return (self_id == ne_id).mean() / theoretic_score
 
+
 # save current figure at given path and close
 def save_current_fig(path: Path, dpi=200, tight=True):
     if tight:
@@ -28,12 +33,14 @@ def save_current_fig(path: Path, dpi=200, tight=True):
     plt.savefig(path, dpi=dpi, bbox_inches="tight")
     plt.close()
 
+
 # get the model name from a prefix (for contextual essentiality)
 def model_from_prefix(prefix):
     if prefix.startswith("null"):
         return "null"
     else:
         return prefix.split("-")[1].replace("_", "-")
+
 
 # cell line separation analysis
 def cell_line_separation(cfg):
@@ -108,24 +115,34 @@ def cell_line_separation(cfg):
             # load and plot
             adata = sc.read_h5ad(adata_path.as_posix())
             ax = axs[i // ncols, i % ncols]
-            sc.pl.umap(adata, color="OncotreeLineage", ax=ax, show=False, legend_loc=None, title=f"{m}: {lisi_by_model.get(m, float('nan')):.3f}")
-        
+            sc.pl.umap(
+                adata,
+                color="OncotreeLineage",
+                ax=ax,
+                show=False,
+                legend_loc=None,
+                title=f"{m}: {lisi_by_model.get(m, float('nan')):.3f}",
+            )
+
         # hide any empty axes
         for j in range(n, nrows * ncols):
             axs[j // ncols, j % ncols].axis("off")
 
         # save figure
         save_current_fig(outdir / "umaps.png")
-        print(f"[cell_line] saved UMAP grid")
-    
+        print("[cell_line] saved UMAP grid")
+
     # plot and save barplot if requested
-    if do_bar and len(lisi_by_model):
-        df = pd.DataFrame({"model": list(lisi_by_model.keys()), "lisi": list(lisi_by_model.values())}).sort_values(by="lisi")
+    if do_bar and lisi_by_model:
+        df = pd.DataFrame(
+            {"model": list(lisi_by_model.keys()), "lisi": list(lisi_by_model.values())},
+        ).sort_values(by="lisi")
         plt.figure(figsize=(7, max(2, 0.4 * len(df))))
         ax = sns.barplot(data=df, x="lisi", y="model")
         ax.bar_label(ax.containers[0], fontsize=9, padding=-45, color="white")
         save_current_fig(outdir / "lisi_barplot.png")
-        print(f"[cell_line] saved LISI barplot")
+        print("[cell_line] saved LISI barplot")
+
 
 # marginal essentiality analysis
 def run_marginal_essentiality(cfg):
@@ -155,18 +172,30 @@ def run_marginal_essentiality(cfg):
 
         # load results from each fold
         for fold in range(5):
-            true_path = base_path / "gene-embs" / "results" / f"{prefix}-fold-{fold}-val-true.npy"
-            proba_path = base_path / "gene-embs" / "results" / f"{prefix}-fold-{fold}-val-proba.npy"
+            true_path = (
+                base_path
+                / "gene-embs"
+                / "results"
+                / f"{prefix}-fold-{fold}-val-true.npy"
+            )
+            proba_path = (
+                base_path
+                / "gene-embs"
+                / "results"
+                / f"{prefix}-fold-{fold}-val-proba.npy"
+            )
             y_true = np.load(true_path.as_posix())
             y_proba = np.load(proba_path.as_posix())
             auroc = roc_auc_score(y_true, y_proba[:, 1])
             auprc = average_precision_score(y_true, y_proba[:, 1])
-            records.append({
-                "model": model,
-                "fold": fold,
-                "auroc": auroc,
-                "auprc": auprc
-            })
+            records.append(
+                {
+                    "model": model,
+                    "fold": fold,
+                    "auroc": auroc,
+                    "auprc": auprc,
+                },
+            )
 
     # create and save DataFrame
     df = pd.DataFrame.from_records(records)
@@ -190,6 +219,7 @@ def run_marginal_essentiality(cfg):
         save_current_fig(outdir / "auprc_boxplot.png")
         print("[marginal] saved auPRC boxplot")
 
+
 # contextual essentiality analysis
 def run_contextual_essentiality(cfg):
 
@@ -207,46 +237,56 @@ def run_contextual_essentiality(cfg):
     print("[contextual] loading results")
     records = []
     boundaries = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+    classification_threshold = 0.5
     for model in models:
 
         # build file prefix based on model name
-        if model == "null":
-            prefix = "null"
-        else:
-            prefix = f"rf-{model.replace('-', '_')}"
+        prefix = "null" if model == "null" else f"rf-{model.replace('-', '_')}"
 
         # iterate over strata
-        for l, r in zip(boundaries, boundaries[1:]):
+        for left, right in zip(boundaries, boundaries[1:]):
 
             # add strata to file prefix
-            prefix_strata = f"{prefix}-{l}to{r}"
+            prefix_strata = f"{prefix}-{left}to{right}"
 
             # iterate over folds
             for fold in range(5):
-                true_path = base_path / "gene-embs" / "results" / f"{prefix_strata}-fold-{fold}-val-true.npy"
+                true_path = (
+                    base_path
+                    / "gene-embs"
+                    / "results"
+                    / f"{prefix_strata}-fold-{fold}-val-true.npy"
+                )
                 y_true = np.load(true_path.as_posix())
-                y_true_bin = y_true > 0.5
-                pred_path = base_path / "gene-embs" / "results" / f"{prefix_strata}-fold-{fold}-val-pred.npy"
+                y_true_bin = y_true > classification_threshold
+                pred_path = (
+                    base_path
+                    / "gene-embs"
+                    / "results"
+                    / f"{prefix_strata}-fold-{fold}-val-pred.npy"
+                )
                 y_pred = np.load(pred_path.as_posix())
                 r2 = r2_score(y_true, y_pred)
                 auroc = roc_auc_score(y_true_bin, y_pred)
                 auprc = average_precision_score(y_true_bin, y_pred)
-                records.append({
-                    "model": model,
-                    "prefix": prefix_strata,
-                    "fold": fold,
-                    "r2": r2,
-                    "auroc": auroc,
-                    "auprc": auprc
-                })
-    
+                records.append(
+                    {
+                        "model": model,
+                        "prefix": prefix_strata,
+                        "fold": fold,
+                        "r2": r2,
+                        "auroc": auroc,
+                        "auprc": auprc,
+                    },
+                )
+
     # create and save DataFrames
     df = pd.DataFrame.from_records(records)
     df.to_csv(outdir / "metrics_all.csv", index=False)
     avg_folds = df.groupby("prefix", as_index=False).agg(
         mean_r2=("r2", lambda x: x.mean()),
         mean_auroc=("auroc", lambda x: x.mean()),
-        mean_auprc=("auprc", lambda x: x.mean())
+        mean_auprc=("auprc", lambda x: x.mean()),
     )
     avg_folds["model"] = avg_folds["prefix"].apply(model_from_prefix)
     avg_folds.to_csv(outdir / "metrics_avg.csv", index=False)
@@ -269,6 +309,7 @@ def run_contextual_essentiality(cfg):
         ax.yaxis.grid(True)
         save_current_fig(outdir / "auprc_boxplot.png")
         print("[contextual] saved auPRC boxplot")
+
 
 # main script
 if __name__ == "__main__":
