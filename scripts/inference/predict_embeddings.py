@@ -39,7 +39,7 @@ def main(cfg: DictConfig) -> None:
     gene_id_key = cfg.data.gene_id_key
     return_genes = cfg.predict.get("return_genes", True)
     batch_size = cfg.predict.get("batch_size", 64)
-    max_length = cfg.predict.get("seq_len", 2048)
+    max_length = cfg.predict.get("seq_len_dataset", 2048)
     num_workers = cfg.predict.get("num_workers", 8)
 
     log.info("Loading vocabulary and collator configuration and model checkpoints")
