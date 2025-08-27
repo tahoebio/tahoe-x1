@@ -67,6 +67,8 @@ class SCGPTModel(nn.Module):
         self.init_config = model_config.get("init_config", None)
         self.gene_encoder_config = model_config.get("gene_encoder", None)
         self.keep_first_n_tokens = collator_config.get("keep_first_n_tokens", 1)
+        self.return_gene_embeddings = model_config.get("return_gene_embeddings", False)
+
         if self.init_config is None:
             self.init_config = init_config_defaults
         if self.gene_encoder_config is None:
@@ -250,9 +252,13 @@ class SCGPTModel(nn.Module):
         gen_masks: Tensor,
         key_padding_mask: Tensor,
         drug_ids: Optional[Tensor] = None,
-        inference_mode: bool = False,
+        skip_decoders: Optional[bool] = None,
     ) -> Mapping[str, Tensor]:
 
+        if skip_decoders is None:
+            skip_decoders = (
+                not self.training
+            )  # get the mode of the model: either train or val
         transformer_output = self.transformer_generate(
             genes,
             values,
@@ -262,7 +268,7 @@ class SCGPTModel(nn.Module):
         )
 
         output = {}
-        if not inference_mode:
+        if not skip_decoders:
             decoder_output = self.expression_decoder(transformer_output)
             full_preds = decoder_output["pred"]  # (batch, seq_len)
             output["expr_preds"] = full_preds
@@ -270,9 +276,10 @@ class SCGPTModel(nn.Module):
         # extend the output with cell embeddings and gene embeddings
         cell_emb = self._get_cell_emb_from_layer(transformer_output)
         output["cell_emb"] = cell_emb
-        output["gene_ids"] = genes
-        output["gene_emb"] = transformer_output
-        if not inference_mode:
+        if self.return_gene_embeddings:
+            output["gene_ids"] = genes
+            output["gene_emb"] = transformer_output
+        if not skip_decoders:
             mvc_output = self.mvc_decoder(
                 cell_emb,
                 self.cur_gene_token_embs,
@@ -316,7 +323,11 @@ class ComposerSCGPTModel(ComposerModel):
             "Spearman": MaskedSpearmanMetric(name="Spearman"),
         }
 
-    def forward(self, batch):  # batch is the output of the dataloader
+    def forward(
+        self,
+        batch,
+        skip_decoders: Optional[bool] = None,
+    ):  # batch is the output of the dataloader
         # specify how batches are passed through the model
         genes = batch["gene"]
         exprs = batch["expr"]
@@ -333,6 +344,7 @@ class ComposerSCGPTModel(ComposerModel):
             gen_masks,
             key_padding_mask,
             drug_ids=drug_ids,
+            skip_decoders=skip_decoders,
         )
 
         return output_dict
@@ -343,7 +355,9 @@ class ComposerSCGPTModel(ComposerModel):
 
         self.model.zero_grad(set_to_none=True)
 
-        return outputs if outputs is not None else self.forward(batch)
+        return (
+            outputs if outputs is not None else self.forward(batch, skip_decoders=False)
+        )
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss
