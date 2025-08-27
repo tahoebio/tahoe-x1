@@ -20,7 +20,7 @@
 # MosaicFM
 
 This is the internal codebase for the **MosaicFM** series of single-cell RNA-seq foundation models 
-developed by Vevo Therapeutics. Our repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) 
+developed by Tahoe Therapeutics. Our repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) 
 and imports several utility functions from it. Please follow the developer guidelines if you are 
 contributing to this repository. For main results and documentation, please refer to the results section. 
 If you are looking to train or finetune a model on single-cell data, please refer to the training section.
@@ -80,12 +80,12 @@ pip install -e . --no-deps # Inside the mosaicfm directory
 
 The following datasets are used for training and evaluation:
 
-| Dataset Path                             | Description                                                                                                     |
-|------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-| `s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2024-04-29_MDS/`     | MDS dataset comprising ~45M cells from Apr 2024 release by CellxGene and Vevo dataset 35 (resistance-is-futile) |
-| `s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS_v2/` | MDS dataset comprising ~34M cells from Dec 2023 release by CellxGene.                                           |
- |`s3://vevo-ml-datasets/umair/scgpt-depmap/`                        | Root folder containing Depmap dataset and model predictions                                                     |
-|`s3://vevo-drives/drive_3/ANALYSIS/analysis_107/`                  | Root folder MSigDB data and model predictions                                                                   |
+| Dataset Path                             | Description                                                                                                      |
+|------------------------------------------|------------------------------------------------------------------------------------------------------------------|
+| `s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2024-04-29_MDS/`     | MDS dataset comprising ~45M cells from Apr 2024 release by CellxGene and Tahoe dataset 35 (resistance-is-futile) |
+| `s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS_v2/` | MDS dataset comprising ~34M cells from Dec 2023 release by CellxGene.                                            |
+ |`s3://vevo-ml-datasets/umair/scgpt-depmap/`                        | Root folder containing Depmap dataset and model predictions                                                      |
+|`s3://vevo-drives/drive_3/ANALYSIS/analysis_107/`                  | Root folder MSigDB data and model predictions                                                                    |
 
 ## Pre-trained Models
 

@@ -53,7 +53,7 @@ extra_deps["all"] = {
 setup(
     name=_PACKAGE_NAME,
     version=repo_version,
-    author="Vevo Therapeutics",
+    author="Tahoe Therapeutics",
     description="mosaicfm",
     package_data={
         "mosaicfm": ["py.typed"],
