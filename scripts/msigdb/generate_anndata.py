@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 import os
 import sys
@@ -6,10 +5,8 @@ import sys
 import anndata
 import pandas as pd
 import scanpy as sc
-from omegaconf import OmegaConf as om
 from benchmark_utils import read_embeddings, read_sigs
-
-
+from omegaconf import OmegaConf as om
 
 
 def read_all_embs(embs_path):
@@ -47,7 +44,11 @@ def main(cfg):
     adata = create_anndata(embs, sigs)
 
     if cfg.get("filter", False):
-        sc.pp.filter_genes(adata, min_cells=cfg.get("min_sig_size", 25), max_cells=cfg.get("max_sig_size", None))
+        sc.pp.filter_genes(
+            adata,
+            min_cells=cfg.get("min_sig_size", 25),
+            max_cells=cfg.get("max_sig_size", None),
+        )
         sc.pp.filter_cells(adata, min_genes=cfg.get("min_hits_per_gene", 10))
 
     out_path = os.path.join(cfg["embeddings_path"], "embs_adata")
@@ -63,7 +64,7 @@ def main(cfg):
 
 if __name__ == "__main__":
     cfg = om.load(sys.argv[1])
-    
+
     num_mand_args = 2
     cli_args = []
     for arg in sys.argv[num_mand_args:]:
@@ -71,9 +72,9 @@ if __name__ == "__main__":
             cli_args.append(arg[2:])
         else:
             cli_args.append(arg)
-    
+
     cli_cfg = om.from_cli(cli_args)
     cfg = om.merge(cfg, cli_cfg)
-    
+
     om.resolve(cfg)
     main(cfg)

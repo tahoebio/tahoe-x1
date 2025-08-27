@@ -19,7 +19,6 @@ class GeneSigDataset(torch.utils.data.Dataset):
         return len(self.embs)
 
     def __getitem__(self, idx):
-        # (gene_embeddings, labels, gene_names)
         return (
             torch.tensor(self.embs.values[idx], dtype=torch.float32),
             torch.tensor(self.hit_matrix.values[idx], dtype=torch.float32),
@@ -63,7 +62,6 @@ class SigPredictor:
             enable_checkpointing=False,
             enable_progress_bar=enable_progress_bar,
             log_every_n_steps=10,
-            # strategy="ddp_notebook",
         )
         trainer.fit(
             self.model,

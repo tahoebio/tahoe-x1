@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 
 import logging
@@ -19,8 +18,6 @@ from torch.utils.data import Subset
 
 logging.getLogger("pytorch_lightning").setLevel(logging.ERROR)
 warnings.filterwarnings("ignore", ".*does not have many workers.*")
-
-
 
 
 def init_device(device_id=None):
@@ -133,7 +130,7 @@ def get_optimal_config(
     config_scores = []
 
     for model, config, loss in results:
-        config_values = list(config.values()) + [loss]
+        config_values = [*config.values(), loss]
         config_scores.append(config_values)
         if loss < best_loss:
             best_loss = loss
@@ -141,7 +138,7 @@ def get_optimal_config(
 
     return best_model, pd.DataFrame(
         config_scores,
-        columns=list(configs[0].keys()) + ["loss"],
+        columns=[*configs[0].keys(), "loss"],
     )
 
 
@@ -197,8 +194,6 @@ def run_all(adata, output_path, cfg, seed=0):
         )
 
 
-
-
 def run_from_config(cfg):
     if "h5ad" in cfg["adata_path"]:
         adata = anndata.read_h5ad(cfg["adata_path"])
@@ -206,7 +201,7 @@ def run_from_config(cfg):
         adata = anndata.read_zarr(cfg["adata_path"])
     else:
         raise ValueError("Unsupported adata format")
-    
+
     bench_cfg = cfg.get("benchmark", {})
     seeds = bench_cfg.get("seeds", [0])
     base_output = bench_cfg.get("output_dir", "benchmark_results")
@@ -220,7 +215,7 @@ def run_from_config(cfg):
 
 def main():
     cfg = om.load(sys.argv[1])
-    
+
     num_mand_args = 2
     cli_args = []
     for arg in sys.argv[num_mand_args:]:
@@ -228,10 +223,10 @@ def main():
             cli_args.append(arg[2:])
         else:
             cli_args.append(arg)
-    
+
     cli_cfg = om.from_cli(cli_args)
     cfg = om.merge(cfg, cli_cfg)
-    
+
     om.resolve(cfg)
     run_from_config(cfg)
 

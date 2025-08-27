@@ -1,28 +1,23 @@
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+import json
 import logging
 import os
 import sys
 from typing import Sequence
-import json 
-
 
 import numpy as np
 import scanpy as sc
 import torch
 from omegaconf import OmegaConf as om
 
-from mosaicfm.model import ComposerSCGPTModel
 from mosaicfm.tasks import get_batch_embeddings
-from mosaicfm.tokenizer import GeneVocab
 from mosaicfm.utils.util import load_model
-
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
     format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
 )
 logging.getLogger(__name__).setLevel("INFO")
-
-
 
 
 def _create_context_free_embeddings(cfg, model, all_gene_ids, device):
@@ -36,21 +31,29 @@ def _create_context_free_embeddings(cfg, model, all_gene_ids, device):
     with torch.no_grad(), torch.cuda.amp.autocast(enabled=True, dtype=torch.bfloat16):
         for i in range(0, num_genes, chunk_size):
             chunk_gene_ids = all_gene_ids[:, i : i + chunk_size]
-            chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(device)
+            chunk_gene_ids_tensor = torch.tensor(chunk_gene_ids, dtype=torch.long).to(
+                device,
+            )
             token_embs = model.model.gene_encoder(chunk_gene_ids_tensor)
-            ge[i : i + chunk_size] = token_embs.to("cpu").to(torch.float32).numpy()[0, :, :]
-            flag_embs = model.model.flag_encoder(torch.tensor(1, device=token_embs.device)).expand(
-                chunk_gene_ids_tensor.shape[0], chunk_gene_ids_tensor.shape[1], -1
+            ge[i : i + chunk_size] = (
+                token_embs.to("cpu").to(torch.float32).numpy()[0, :, :]
+            )
+            flag_embs = model.model.flag_encoder(
+                torch.tensor(1, device=token_embs.device),
+            ).expand(
+                chunk_gene_ids_tensor.shape[0],
+                chunk_gene_ids_tensor.shape[1],
+                -1,
             )
             total_embs = token_embs + flag_embs
             chunk_embeddings = model.model.transformer_encoder(total_embs)
-            te[i : i + chunk_size] = chunk_embeddings.to("cpu").to(torch.float32).numpy()
+            te[i : i + chunk_size] = (
+                chunk_embeddings.to("cpu").to(torch.float32).numpy()
+            )
 
     torch.cuda.empty_cache()
 
-    return te, ge #, list(gene2idx.keys()), list(gene2idx.values())
-
-
+    return te, ge  # , list(gene2idx.keys()), list(gene2idx.values())
 
 
 def generate_embeddings(config, modes: Sequence[str]):
@@ -64,14 +67,13 @@ def generate_embeddings(config, modes: Sequence[str]):
 
         composer_model, vocab, model_cfg, coll_cfg = load_model(model_dir, device)
 
-
         output_path = config["embeddings_path"]
         os.makedirs(output_path, exist_ok=True)
 
         gene2idx = vocab.get_stoi()
         all_gene_ids = np.array([list(gene2idx.values())])
 
-        with open(config["ensembl_to_gene_path"], 'r') as f:
+        with open(config["ensembl_to_gene_path"], "r") as f:
             ensemble_to_name = json.load(f)
 
         gene_ensembles = list(gene2idx.keys())
@@ -80,7 +82,12 @@ def generate_embeddings(config, modes: Sequence[str]):
 
         if "TE" in modes or "GE" in modes:
 
-            te, ge = _create_context_free_embeddings(config, composer_model, all_gene_ids, device)
+            te, ge = _create_context_free_embeddings(
+                config,
+                composer_model,
+                all_gene_ids,
+                device,
+            )
             if "TE" in modes:
                 np.savez_compressed(
                     os.path.join(output_path, f"{model_name}_TE.npz"),
@@ -107,10 +114,16 @@ def generate_embeddings(config, modes: Sequence[str]):
             n_hvg = config.get("n_hvg")
             adata = sc.read_h5ad(dataset_path)
             if n_hvg is not None:
-                sc.pp.highly_variable_genes(adata, n_top_genes=n_hvg, flavor="seurat_v3")
+                sc.pp.highly_variable_genes(
+                    adata,
+                    n_top_genes=n_hvg,
+                    flavor="seurat_v3",
+                )
                 adata = adata[:, adata.var["highly_variable"]]
             sc.pp.filter_cells(adata, min_genes=3)
-            adata.var["id_in_vocab"] = [vocab[g] if g in vocab else -1 for g in adata.var[gene_col]]
+            adata.var["id_in_vocab"] = [
+                vocab[g] if g in vocab else -1 for g in adata.var[gene_col]
+            ]
             adata = adata[:, adata.var["id_in_vocab"] >= 0]
             gene_ids = np.array(adata.var["id_in_vocab"], dtype=int)
             _, ea = get_batch_embeddings(
@@ -123,10 +136,15 @@ def generate_embeddings(config, modes: Sequence[str]):
                 batch_size=config.get("batch_size", 32),
                 max_length=config.get("max_length", 8192),
                 return_gene_embeddings=True,
-            ) #return ea in the order of vocabulary
+            )  # return ea in the order of vocabulary
             nan_genes = np.where(np.any(np.isnan(ea), axis=-1))[0]
             if "TE" not in locals():
-                te, _ = _create_context_free_embeddings(config, composer_model, all_gene_ids, device)
+                te, _ = _create_context_free_embeddings(
+                    config,
+                    composer_model,
+                    all_gene_ids,
+                    device,
+                )
 
             ea[nan_genes] = te[nan_genes]
             print("EA embeddings shape:", ea.shape, ea)
@@ -142,7 +160,7 @@ def generate_embeddings(config, modes: Sequence[str]):
 
 def main():
     cfg = om.load(sys.argv[1])
-    
+
     num_mand_args = 2
     cli_args = []
     for arg in sys.argv[num_mand_args:]:
@@ -150,12 +168,12 @@ def main():
             cli_args.append(arg[2:])
         else:
             cli_args.append(arg)
-    
+
     cli_cfg = om.from_cli(cli_args)
     cfg = om.merge(cfg, cli_cfg)
-    
+
     om.resolve(cfg)
-    
+
     modes = cfg.get("mods", ["GE", "TE"])
     print(f"config file {cfg}")
     generate_embeddings(cfg, modes)
