@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Generate cell and gene embeddings using ``composer.Trainer.predict``.
 
 This script loads a trained :class:`~mosaicfm.model.ComposerSCGPTModel` and

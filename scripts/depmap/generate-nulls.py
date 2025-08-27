@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Create null model predictions for both the marginal and cell line specific
 essentiality tasks."""
 

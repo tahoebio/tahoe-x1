@@ -1,3 +1,4 @@
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 python rf.py --base-path ${1} --model-type regressor --emb ${2}-10to20 --split-file split-cls.csv --split-col cell-line --n-jobs ${3} --fold 0
 python rf.py --base-path ${1} --model-type regressor --emb ${2}-10to20 --split-file split-cls.csv --split-col cell-line --n-jobs ${3} --fold 1

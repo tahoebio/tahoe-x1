@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Given a model, this script will create and save the cell line embeddings,
 mean gene embeddings, and contextual gene embeddings needed to run the DepMap
 benchmarks."""

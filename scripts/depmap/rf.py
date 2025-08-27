@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Given embeddings from a model (processed into AnnData format for a DepMap
 task), this script will train the specified random forest model and save results
 for further analysis."""
