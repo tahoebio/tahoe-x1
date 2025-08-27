@@ -24,6 +24,7 @@ def get_batch_embeddings(
     gene_ids: Optional[np.ndarray] = None,
     batch_size: int = 8,
     num_workers: int = 8,
+    prefetch_factor: int = 48,
     max_length: Optional[int] = None,
     return_gene_embeddings: bool = False,
 ):
@@ -49,7 +50,7 @@ def get_batch_embeddings(
               gene embeddings as NumPy arrays.
     """
     device = next(model.parameters()).device
-    model.return_genes = return_gene_embeddings
+    model.return_gene_embeddings = return_gene_embeddings
 
     print(f"Using device {device} for inference.")
     collator_cfg["do_mlm"] = False
@@ -61,6 +62,7 @@ def get_batch_embeddings(
         max_length=max_length,
         gene_ids=gene_ids,
         num_workers=num_workers,
+        prefetch_factor=prefetch_factor,
     )
 
     cell_embs: List[torch.Tensor] = []
@@ -107,7 +109,7 @@ def get_batch_embeddings(
                     if "drug_ids" in data_dict
                     else None
                 ),
-                inference_mode=True,
+                skip_decoders=True,
             )
 
             cell_embs.append(output["cell_emb"].to("cpu").to(dtype=torch.float32))

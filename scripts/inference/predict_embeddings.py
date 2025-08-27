@@ -13,6 +13,7 @@ Example usage:
 """
 
 import logging
+import os
 import sys
 from typing import List
 
@@ -32,18 +33,25 @@ logging.basicConfig(
 )
 
 
-def main(cfg: DictConfig) -> None:
+def predict_embeddings(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     cell_type_key = cfg.data.cell_type_key
     gene_id_key = cfg.data.gene_id_key
-    return_genes = cfg.predict.get("return_genes", True)
+    return_gene_embeddings = cfg.predict.get("return_gene_embeddings", False)
     batch_size = cfg.predict.get("batch_size", 64)
     max_length = cfg.predict.get("seq_len_dataset", 2048)
     num_workers = cfg.predict.get("num_workers", 8)
+    prefetch_factor = cfg.predict.get("prefetch_factor", 48)
+    adata_output_path = cfg.paths.get("adata_output", None)
+    model_dir = cfg.paths.model_dir
 
     log.info("Loading vocabulary and collator configuration and model checkpoints")
-    model, vocab, _, coll_cfg = load_model(cfg.paths.model_dir, device=device)
+    model, vocab, _, coll_cfg = load_model(
+        model_dir,
+        device=device,
+        return_gene_embeddings=return_gene_embeddings,
+    )
     print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 
     log.info("Loading AnnData file…")
@@ -72,6 +80,7 @@ def main(cfg: DictConfig) -> None:
         max_length=max_length,
         gene_ids=gene_ids,
         num_workers=num_workers,
+        prefetch_factor=prefetch_factor,
     )
 
     trainer = Trainer(
@@ -84,14 +93,14 @@ def main(cfg: DictConfig) -> None:
     log.info("Aggregating embeddings…")
     cell_embs: List[torch.Tensor] = []
 
-    if return_genes:
+    if return_gene_embeddings:
         gene_embs: List[torch.Tensor] = []
         gene_ids_list: List[torch.Tensor] = []
 
     for out in predictions:
         cell_embs.append(out["cell_emb"].cpu())
 
-        if return_genes:
+        if return_gene_embeddings:
             gene_embs.append(out["gene_emb"].cpu())
             gene_ids_list.append(out["gene_ids"].cpu())
 
@@ -103,11 +112,11 @@ def main(cfg: DictConfig) -> None:
         keepdims=True,
     )
 
-    if return_genes:
+    if return_gene_embeddings:
         gene_embs = torch.cat(gene_embs, dim=0)
-        gene_ids = torch.cat(gene_ids_list, dim=0)
+        gene_ids_list = torch.cat(gene_ids_list, dim=0)
 
-        flat_ids = gene_ids.flatten()
+        flat_ids = gene_ids_list.flatten()
         flat_embs = gene_embs.flatten(0, 1)
 
         valid = flat_ids != coll_cfg["pad_token_id"]
@@ -140,13 +149,18 @@ def main(cfg: DictConfig) -> None:
         gene_array = means[all_gene_ids, :]
 
     log.info("Saving outputs…")
+    model_name = cfg.paths.get("model_name", os.path.basename(model_dir))
+    log.info(f"Storing cell embeddings in adata.obsm['{model_name}']")
+    adata.obsm[model_name] = cell_array
 
-    np.save(cfg.paths.cell_output, cell_array)
+    if return_gene_embeddings:
+        adata.varm[model_name] = gene_array[gene_ids, :]
 
-    if return_genes:
-        np.savez(cfg.paths.gene_output, gene_array=gene_array, gene_ids=gene_ids)
+    if adata_output_path is not None:
+        adata.write_h5ad(adata_output_path)
+        log.info(f"Finished writing embeddings {adata_output_path}")
 
-    log.info("Finished writing embeddings")
+    return adata
 
 
 if __name__ == "__main__":
@@ -172,4 +186,4 @@ if __name__ == "__main__":
     cfg = om.merge(cfg, cli_cfg)
 
     om.resolve(cfg)
-    main(cfg)
+    predict_embeddings(cfg)
