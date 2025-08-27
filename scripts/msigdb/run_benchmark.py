@@ -210,7 +210,7 @@ def run_from_config(cfg):
     for seed in seeds:
         out_dir = os.path.join(base_output, f"seed_{seed}")
         os.makedirs(out_dir, exist_ok=True)
-        run_all(adata, out_dir, bench_cfg)
+        run_all(adata, out_dir, bench_cfg, seed)
 
 
 def main():
