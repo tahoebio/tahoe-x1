@@ -13,9 +13,9 @@ Example usage:
 """
 
 import logging
+import os
 import sys
 from typing import List
-import os
 
 import numpy as np
 import scanpy as sc
@@ -46,11 +46,13 @@ def predict_embeddings(cfg: DictConfig) -> None:
     adata_output_path = cfg.paths.get("adata_output", None)
     model_dir = cfg.paths.model_dir
 
-
     log.info("Loading vocabulary and collator configuration and model checkpoints")
-    model, vocab, _, coll_cfg = load_model(model_dir, device=device, return_gene_embeddings=return_gene_embeddings)
+    model, vocab, _, coll_cfg = load_model(
+        model_dir,
+        device=device,
+        return_gene_embeddings=return_gene_embeddings,
+    )
     print(f"Model is loaded with {model.model.n_layers} transformer layers.")
-
 
     log.info("Loading AnnData file…")
     adata = sc.read_h5ad(cfg.paths.adata_input)
@@ -152,13 +154,14 @@ def predict_embeddings(cfg: DictConfig) -> None:
     adata.obsm[model_name] = cell_array
 
     if return_gene_embeddings:
-        adata.varm[model_name] = gene_array[gene_ids, :] 
+        adata.varm[model_name] = gene_array[gene_ids, :]
 
     if adata_output_path is not None:
         adata.write_h5ad(adata_output_path)
         log.info(f"Finished writing embeddings {adata_output_path}")
 
-    return adata #, cell_array, gene_array if return_gene_embeddings else None
+    return adata
+
 
 if __name__ == "__main__":
 

@@ -62,7 +62,7 @@ def get_batch_embeddings(
         max_length=max_length,
         gene_ids=gene_ids,
         num_workers=num_workers,
-        prefetch_factor=prefetch_factor 
+        prefetch_factor=prefetch_factor,
     )
 
     cell_embs: List[torch.Tensor] = []

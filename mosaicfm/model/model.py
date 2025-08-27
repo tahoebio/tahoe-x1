@@ -252,11 +252,13 @@ class SCGPTModel(nn.Module):
         gen_masks: Tensor,
         key_padding_mask: Tensor,
         drug_ids: Optional[Tensor] = None,
-        skip_decoders:  Optional[bool] = None,
+        skip_decoders: Optional[bool] = None,
     ) -> Mapping[str, Tensor]:
 
         if skip_decoders is None:
-            skip_decoders = not self.training #get the mode of the model: either train or val
+            skip_decoders = (
+                not self.training
+            )  # get the mode of the model: either train or val
         transformer_output = self.transformer_generate(
             genes,
             values,
@@ -354,11 +356,8 @@ class ComposerSCGPTModel(ComposerModel):
         self.model.zero_grad(set_to_none=True)
 
         return (
-            outputs
-            if outputs is not None
-            else self.forward(batch, skip_decoders=False)
+            outputs if outputs is not None else self.forward(batch, skip_decoders=False)
         )
-
 
     def loss(self, outputs, batch):
         # pass batches and `forward` outputs to the loss

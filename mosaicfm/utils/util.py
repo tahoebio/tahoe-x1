@@ -2,8 +2,10 @@
 import logging
 from pathlib import Path
 from urllib.parse import urlparse
+
 log = logging.getLogger(__name__)
 import os
+
 import boto3
 import numpy as np
 import pandas as pd
@@ -18,7 +20,13 @@ from sklearn.neighbors import kneighbors_graph
 
 from mosaicfm.tokenizer import GeneVocab
 
-def load_model(model_dir: str, device: torch.device, return_gene_embeddings: bool = False, use_chem_inf: Optional[bool] = False):
+
+def load_model(
+    model_dir: str,
+    device: torch.device,
+    return_gene_embeddings: bool = False,
+    use_chem_inf: Optional[bool] = False,
+):
     from mosaicfm.model.model import ComposerSCGPTModel
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
@@ -37,17 +45,18 @@ def load_model(model_dir: str, device: torch.device, return_gene_embeddings: boo
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
 
-    #handle chemical information
+    # handle chemical information
     strict = True
-    if use_chem_inf is not None:
-        #if model was trained with chemical information, and we don't want to use it for inference
-        if not use_chem_inf and collator_config.get("use_chem_token", False):
-            # we need to modify the model and collator config accordingly
-            collator_config["use_chem_token"] = False
-            del model_config["chemical_encoder"]
-            del collator_config["drug_to_id_path"]
-            strict = False
 
+    # if model was trained with chemical information, and we don't want to use it for inference
+    if use_chem_inf is not None and (
+        not use_chem_inf and collator_config.get("use_chem_token", False)
+    ):
+        # we need to modify the model and collator config accordingly
+        collator_config["use_chem_token"] = False
+        del model_config["chemical_encoder"]
+        del collator_config["drug_to_id_path"]
+        strict = False
 
     model = ComposerSCGPTModel(
         model_config=model_config,
@@ -59,6 +68,7 @@ def load_model(model_dir: str, device: torch.device, return_gene_embeddings: boo
     log.info(f"Model loaded from {ckpt}")
 
     return model, vocab, model_config, collator_config
+
 
 def loader_from_adata(
     adata: AnnData,
@@ -126,14 +136,15 @@ def loader_from_adata(
 
     return data_loader
 
+
 def compute_lisi_scores(emb, labels, k):
     """Compute LISI (Local Inverse Simpson's Index) scores for embeddings.
-    
+
     Args:
         emb: Embedding matrix of shape (n_cells, n_features)
         labels: Cell type labels for each cell
         k: Number of neighbors to consider
-        
+
     Returns:
         LISI score normalized by theoretical maximum
     """
@@ -145,6 +156,7 @@ def compute_lisi_scores(emb, labels, k):
     _, c = np.unique(labels, return_counts=True)
     theoretic_score = ((c / c.sum()) ** 2).sum()
     return (self_id == ne_id).mean() / theoretic_score
+
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):
     """Add a file handler to the logger."""
