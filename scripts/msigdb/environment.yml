@@ -1,0 +1,29 @@
+name: msigdb
+channels:
+  - pytorch
+  - defaults
+  - nvidia
+  - conda-forge
+dependencies:
+  - pytorch-cuda=12.1
+  - anndata>=0.9
+  - lightning
+  - pandas
+  - plotly
+  - seaborn
+  - ipykernel
+  - scikit-learn
+  - scanpy
+  - omegaconf
+  - cuda-cudart=12.1.105=hd3aeb46_0
+  - cuda-cudart_linux-64=12.1.105=h59595ed_0
+  - cuda-cupti=12.1.105=h59595ed_0
+  - cuda-libraries=12.1.0=0
+  - cuda-nvrtc=12.1.105=hd3aeb46_0
+  - cuda-nvtx=12.1.105=h59595ed_0
+  - cuda-opencl=12.1.105=h59595ed_0
+  - cuda-runtime=12.1.0=0
+  - cuda-version=12.1=h1d6eff3_3
+  - torchvision
+  - torchaudio
+  - pytorch

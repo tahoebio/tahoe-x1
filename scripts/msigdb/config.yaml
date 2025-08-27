@@ -1,0 +1,27 @@
+models_dir_path: "/tahoe/data/ckpts/MFM-v2/test_rel/"
+dataset_path: "/tahoe/data/msigdb/cellxgene_data/rep_1.h5ad.gz"
+adata_path: "/tahoe/gits/mosaicfm-release/gene_embs/embs_adata.h5ad.gz"
+ensembl_to_gene_path: "/tahoe/gits/shreshth_sandbox/msigdb_notebooks/vevo_v2_ensembl_to_gene_name.json"
+gene_col: feature_name
+n_hvg: null
+embeddings_path: "./gene_embs"
+signatures_path: "/tahoe/data/msigdb/hallmarks"
+filter: False
+min_sig_size: 25
+max_sig_size: None
+min_hits_per_gene: 10
+chunk_size: 30000
+batch_size: 32
+max_length: 8192
+benchmark:
+  seeds: [0, 1, 2]
+  mods: [GE, TE] #All options [GE, TE, EA]
+  gene_set_paths: []
+  output_dir: ./results
+  verbose: True
+  gridsearch_configs:
+    hidden_size: [64, 512, 1024, 2048]
+    n_hidden_layers: [1, 2]
+    dropout: [0.0, 0.1, 0.5]
+vis:
+  pred_dir: ./results
