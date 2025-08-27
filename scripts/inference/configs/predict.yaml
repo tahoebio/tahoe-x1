@@ -1,13 +1,11 @@
 paths:
-  model_config: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/model_config.yml"
-  collator_config: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/collator_config.yml"
-  vocab: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/vocab.json"
-  checkpoint: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB/best-model.pt"
-  adata_input: "/tahoe/data/datasets/benchmark/kim2020_lung/kim_train.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/ccle.h5ad" # "/tahoe/data/datasets/benchmark/tahoe/Tahoe50k_train.h5ad"
-  cell_output: "./kim_cell_embeddings.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/cell_embeddings.h5ad"
-  gene_output: "./kim_gene_embeddings.npz"
+  model_dir: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB"
+  adata_input: "/tahoe/data/datasets/benchmark/kim2020_lung/kim_test.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/ccle.h5ad" # "/tahoe/data/datasets/benchmark/tahoe/Tahoe50k_train.h5ad"
+  adata_output: "./pred_adata.h5ad"
   drug_to_id_path: "drug_to_id_pad.json"
   drug_fps_path: "drug_fps_pad.npy"
+  model_name: "TahoeX"
+  # gene_output: "./gene_output.npz"
 data:
   cell_type_key: "cell_type" #"OncotreeLineage"
   gene_id_key: "ensembl_id" #"feature_id"
@@ -15,4 +13,6 @@ predict:
   batch_size: 64
   seq_len_dataset: 2048 #8192
   num_workers: 8
-  return_genes: True  # Whether to extract gene embeddings
+  prefetch_factor: 48 #2
+  return_gene_embeddings: True  # Whether to extract gene embeddings
+  use_chem_inf: False  # Whether to use chemical information for prediction if the model is trained with chemical information
