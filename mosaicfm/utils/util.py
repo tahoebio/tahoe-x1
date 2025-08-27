@@ -4,8 +4,6 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
-
-
 import os
 
 import boto3
@@ -23,7 +21,12 @@ from sklearn.neighbors import kneighbors_graph
 from mosaicfm.tokenizer import GeneVocab
 
 
-def load_model(model_dir: str, device: torch.device, return_genes: bool = False, use_chem_inf: bool = False):
+def load_model(
+    model_dir: str,
+    device: torch.device,
+    return_gene_embeddings: bool = False,
+    use_chem_inf: Optional[bool] = False,
+):
     from mosaicfm.model.model import ComposerSCGPTModel
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
@@ -36,24 +39,30 @@ def load_model(model_dir: str, device: torch.device, return_genes: bool = False,
         model_config["attn_config"]["attn_impl"] = "flash"
         model_config["attn_config"]["use_attn_mask"] = False
 
-
     model_config["do_mlm"] = False  # Disable MLM for embeddings generation
-    model_config["return_genes"] = return_genes
-
+    model_config["return_gene_embeddings"] = return_gene_embeddings
 
     collator_config = om.load(collator_config_path)
     vocab = GeneVocab.from_file(vocab_path)
 
-    if not use_chem_inf and model_config.get("use_chem_token", False):
+    # handle chemical information
+    strict = True
+
+    # if model was trained with chemical information, and we don't want to use it for inference
+    if use_chem_inf is not None and (
+        not use_chem_inf and collator_config.get("use_chem_token", False)
+    ):
+        # we need to modify the model and collator config accordingly
         collator_config["use_chem_token"] = False
         del model_config["chemical_encoder"]
-        log.info("Disabled chemical information input for the model.")
+        del collator_config["drug_to_id_path"]
+        strict = False
 
     model = ComposerSCGPTModel(
         model_config=model_config,
         collator_config=collator_config,
     )
-    model.load_state_dict(torch.load(ckpt)["state"]["model"])
+    model.load_state_dict(torch.load(ckpt)["state"]["model"], strict=strict)
     model.to(device)
     model.eval()
     log.info(f"Model loaded from {ckpt}")
@@ -69,6 +78,7 @@ def loader_from_adata(
     max_length: Optional[int] = None,
     gene_ids: Optional[np.ndarray] = None,
     num_workers: int = 8,
+    prefetch_factor: int = 48,
 ):
     count_matrix = adata.X
     if isinstance(count_matrix, np.ndarray):
@@ -121,10 +131,31 @@ def loader_from_adata(
         drop_last=False,
         num_workers=num_workers,
         pin_memory=True,
-        prefetch_factor=48,
+        prefetch_factor=prefetch_factor,
     )
 
     return data_loader
+
+
+def compute_lisi_scores(emb, labels, k):
+    """Compute LISI (Local Inverse Simpson's Index) scores for embeddings.
+
+    Args:
+        emb: Embedding matrix of shape (n_cells, n_features)
+        labels: Cell type labels for each cell
+        k: Number of neighbors to consider
+
+    Returns:
+        LISI score normalized by theoretical maximum
+    """
+    nng = kneighbors_graph(emb, n_neighbors=k).tocoo()
+    labels = pd.Categorical(labels).codes
+    self_id = labels[nng.row]
+    ne_id = labels[nng.col]
+
+    _, c = np.unique(labels, return_counts=True)
+    theoretic_score = ((c / c.sum()) ** 2).sum()
+    return (self_id == ne_id).mean() / theoretic_score
 
 
 def add_file_handler(logger: logging.Logger, log_file_path: Path):
