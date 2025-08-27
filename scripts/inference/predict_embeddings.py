@@ -163,7 +163,6 @@ def predict_embeddings(cfg: DictConfig) -> None:
     return adata
 
 
-
 if __name__ == "__main__":
 
     num_mand_args = 2

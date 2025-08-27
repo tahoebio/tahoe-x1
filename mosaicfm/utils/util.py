@@ -250,24 +250,3 @@ def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
         "pearson": np.mean(pearson),
         "pearson_delta": np.mean(pearson_delta),
     }
-
-
-def compute_lisi_scores(emb, labels, k):
-    """Compute LISI (Local Inverse Simpson's Index) scores for embeddings.
-    
-    Args:
-        emb: Embedding matrix of shape (n_cells, n_features)
-        labels: Cell type labels for each cell
-        k: Number of neighbors to consider
-        
-    Returns:
-        LISI score normalized by theoretical maximum
-    """
-    nng = kneighbors_graph(emb, n_neighbors=k).tocoo()
-    labels = pd.Categorical(labels).codes
-    self_id = labels[nng.row]
-    ne_id = labels[nng.col]
-
-    _, c = np.unique(labels, return_counts=True)
-    theoretic_score = ((c / c.sum()) ** 2).sum()
-    return (self_id == ne_id).mean() / theoretic_score
