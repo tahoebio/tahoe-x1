@@ -147,7 +147,7 @@ def generate_embeddings(config, modes: Sequence[str]):
                 )
 
             ea[nan_genes] = te[nan_genes]
-            print("EA embeddings shape:", ea.shape, ea)
+            print("EA embeddings shape:", ea.shape)
             np.savez_compressed(
                 os.path.join(output_path, f"{model_name}_EA.npz"),
                 gene_embeddings=ea,
