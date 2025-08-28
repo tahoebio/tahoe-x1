@@ -18,8 +18,8 @@ from mosaicfm.model.blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TXBlock,
+    TXEncoder,
     gene_encoder_defaults,
     init_config_defaults,
 )
@@ -27,7 +27,7 @@ from mosaicfm.model.blocks import (
 log = logging.getLogger(__name__)
 
 
-class SCGPTModel(nn.Module):
+class TXModel(nn.Module):
     def __init__(
         self,
         model_config: DictConfig,
@@ -124,7 +124,7 @@ class SCGPTModel(nn.Module):
                 freeze=chem_encoder_config.get("freeze", False),
             )
 
-        encoder_layers = SCGPTBlock(
+        encoder_layers = TXBlock(
             d_model=self.d_model,
             n_heads=self.n_heads,
             expansion_ratio=self.expansion_ratio,
@@ -135,7 +135,7 @@ class SCGPTModel(nn.Module):
             norm_scheme=self.norm_scheme,
             use_glu=model_config.get("use_glu", False),
         )
-        self.transformer_encoder = SCGPTEncoder(
+        self.transformer_encoder = TXEncoder(
             encoder_layers,
             self.n_layers,
             use_norm=self.norm_scheme == "pre",
@@ -289,19 +289,19 @@ class SCGPTModel(nn.Module):
         return output
 
     def fsdp_wrap_fn(self, module):
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TXBlock)
 
     def activation_checkpointing_fn(self, module):
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TXBlock)
 
 
-class ComposerSCGPTModel(ComposerModel):
+class ComposerTXModel(ComposerModel):
     def __init__(self, model_config, collator_config, device=None):
         super().__init__()
         self.criterion = masked_mse_loss
         self.pad_token_id = collator_config.pad_token_id
 
-        self.model = SCGPTModel(
+        self.model = TXModel(
             model_config=model_config,
             collator_config=collator_config,
             device=device,

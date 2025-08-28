@@ -5,22 +5,22 @@ from .blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TXBlock,
+    TXEncoder,
 )
 from .model import (
-    ComposerSCGPTModel,
-    SCGPTModel,
+    ComposerTXModel,
+    TXModel,
 )
 
 __all__ = [
     "CategoryValueEncoder",
-    "ComposerSCGPTModel",
+    "ComposerTXModel",
     "ContinuousValueEncoder",
     "ExprDecoder",
     "GeneEncoder",
     "MVCDecoder",
-    "SCGPTBlock",
-    "SCGPTEncoder",
-    "SCGPTModel",
+    "TXBlock",
+    "TXEncoder",
+    "TXModel",
 ]

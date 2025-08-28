@@ -14,7 +14,7 @@ from omegaconf import OmegaConf as om
 from tqdm.auto import tqdm
 
 from mosaicfm.data import DataCollator
-from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.model import ComposerTXModel
 from mosaicfm.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ def main(cfg: DictConfig) -> None:
     model_cfg["attn_config"]["attn_impl"] = cfg.model.attn_impl
     model_cfg["attn_config"]["use_attn_mask"] = cfg.model.use_attn_mask
 
-    model = ComposerSCGPTModel(model_config=model_cfg, collator_config=coll_cfg)
+    model = ComposerTXModel(model_config=model_cfg, collator_config=coll_cfg)
     state = torch.load(cfg.paths.model_file)["state"]["model"]
     model.load_state_dict(state, strict=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

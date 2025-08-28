@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 """Generate cell and gene embeddings using ``composer.Trainer.predict``.
 
-This script loads a trained :class:`~mosaicfm.model.ComposerSCGPTModel` and
+This script loads a trained :class:`~mosaicfm.model.ComposerTXModel` and
 produces embeddings for an input AnnData file. Configuration is provided via a
 YAML file.
 
