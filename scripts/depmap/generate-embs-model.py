@@ -250,7 +250,11 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
     # make empty objects to fill
     labels = []
     embeddings = []
-    with torch.no_grad(), torch.amp.autocast(device_type="cuda", enabled=True, dtype=torch.bfloat16):
+    with torch.no_grad(), torch.amp.autocast(
+        device_type="cuda",
+        enabled=True,
+        dtype=torch.bfloat16,
+    ):
 
         # keep track of cell line
         count = 0
