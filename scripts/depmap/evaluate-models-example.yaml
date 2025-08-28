@@ -1,0 +1,60 @@
+base_path: "/tahoe/umair/data/depmap-public"
+output_dir: "/tahoe/umair/example-output"
+
+cell_line_separation:
+  barplot: true
+  umaps: true
+  models:
+    - "pca"
+    - "mosaicfm-70m"
+    - "mosaicfm-1b"
+    - "mosaicfm-3b"
+    - "mosaicfm-3b-alt"
+    - "geneformer"
+    - "nvidia-gf-100m"
+    - "nvidia-gf-10m"
+    - "scgpt"
+    - "state"
+    - "transcriptformer-exemplar"
+    - "transcriptformer-metazoa"
+    - "transcriptformer-sapiens"
+    - "uce-33l"
+    - "uce-4l"
+
+marginal_essentiality:
+  auroc: true
+  auprc: true
+  models:
+    - "null"
+    - "pcloading"
+    - "mosaicfm-70m"
+    - "mosaicfm-1b"
+    - "mosaicfm-3b"
+    - "mosaicfm-3b-alt"
+    - "geneformer"
+    - "nvidia-gf-10m"
+    - "nvidia-gf-100m"
+    - "scgpt"
+    - "state"
+    - "transcriptformer-exemplar"
+    - "transcriptformer-metazoa"
+    - "transcriptformer-sapiens"
+
+contextual_essentiality:
+  auroc: true
+  auprc: false
+  models:
+    - "null"
+    - "gene_idx+pca"
+    - "mosaicfm-70m"
+    - "mosaicfm-1b"
+    - "mosaicfm-3b"
+    - "mosaicfm-3b-alt"
+    - "geneformer"
+    - "nvidia-gf-10m"
+    - "nvidia-gf-100m"
+    - "scgpt"
+    - "state"
+    - "transcriptformer-exemplar"
+    - "transcriptformer-metazoa"
+    - "transcriptformer-sapiens"
