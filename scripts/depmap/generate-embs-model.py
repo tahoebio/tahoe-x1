@@ -30,7 +30,7 @@ logging.getLogger(__name__).setLevel("INFO")
 
 
 # generate embeddings for a MosaicFM model
-def run_mosaicfm(base_path, model_path, model_name):
+def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17000):
 
     # create paths
     model_config_path = os.path.join(model_path, "model_config.yml")
@@ -81,8 +81,8 @@ def run_mosaicfm(base_path, model_path, model_name):
         gene_ids=gene_ids,
         model_cfg=model_config,
         collator_cfg=collator_config,
-        batch_size=16,
-        max_length=17000,
+        batch_size=batch_size,
+        max_length=max_length,
         return_gene_embeddings=True,
     )
 
@@ -337,8 +337,31 @@ if __name__ == "__main__":
         required=True,
         help="Model name (filenames are based on this).",
     )
-    parser.add_argument("--model-path", type=str, help="Path to model folder.")
+    parser.add_argument(
+        "--model-path",
+        type=str,
+        required=True,
+        help="Path to model folder.",
+    )
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=16,
+        help="Batch size for mosaicfm.tasks.get_batch_embeddings.",
+    )
+    parser.add_argument(
+        "--max-length",
+        type=int,
+        default=17000,
+        help="Maximum sequence length for mosaicfm.tasks.get_batch_embeddings.",
+    )
     args = parser.parse_args()
 
     # run function
-    run_mosaicfm(args.base_path, args.model_path, args.model_name)
+    run_mosaicfm(
+        args.base_path,
+        args.model_path,
+        args.model_name,
+        args.batch_size,
+        args.max_length,
+    )
