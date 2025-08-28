@@ -122,6 +122,8 @@ To run the script, you'll need a directory containing `best-model.pt`, `collator
 python generate-embs-model.py --base-path [path] --model-name [name] --model-path [path]
 ```
 
+You can also configure the forward batch size and maximum sequence length using the `--batch-size` and `--max-length` arguments. The defaults are 16 and 17000, respectively, which is what we used for the reported results.
+
 ---
 
 ### Step 5: train random forests for task #2 and task #3
