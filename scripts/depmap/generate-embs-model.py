@@ -124,14 +124,14 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
     )
     mean_embs_all = embs_npz["gene_embeddings"]
     gene_names = embs_npz["gene_names"]
-    gene_info_df = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))
-    scgpt_gene_mapping = dict(
+    gene_info_df = pd.read_csv(os.path.join(base_path, "raw/gene-mapping.csv"))
+    gene_mapping = dict(
         zip(gene_info_df["feature_id"], gene_info_df["feature_name"]),
     )
-    valid_gene_ids = scgpt_gene_mapping.keys()
+    valid_gene_ids = gene_mapping.keys()
     gene_names = np.array(
         [
-            scgpt_gene_mapping[gene_id] if gene_id in valid_gene_ids else gene_id
+            gene_mapping[gene_id] if gene_id in valid_gene_ids else gene_id
             for gene_id in gene_names
         ],
     )
@@ -165,17 +165,17 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
 
     # reprocess AnnData of CCLE counts for contextual gene embeddings
     adata = sc.read_h5ad(os.path.join(base_path, "counts.h5ad"))
-    gene_info_df = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))
-    scgpt_gene_mapping = dict(
+    gene_info_df = pd.read_csv(os.path.join(base_path, "raw/gene-mapping.csv"))
+    gene_mapping = dict(
         zip(gene_info_df["feature_id"], gene_info_df["feature_name"]),
     )
-    scgpt_vocab_ids = set(gene_info_df["feature_id"])
-    adata.var["in_scgpt_vocab"] = adata.var.index.map(lambda x: x in scgpt_vocab_ids)
-    adata = adata[:, adata.var["in_scgpt_vocab"]]
-    adata.var["gene_name_scgpt"] = adata.var.index.map(
-        lambda gene_id: scgpt_gene_mapping[gene_id],
+    vocab_ids = set(gene_info_df["feature_id"])
+    adata.var["in_vocab"] = adata.var.index.map(lambda x: x in vocab_ids)
+    adata = adata[:, adata.var["in_vocab"]]
+    adata.var["gene_name"] = adata.var.index.map(
+        lambda gene_id: gene_mapping[gene_id],
     )
-    adata.var = adata.var.drop(columns=["in_scgpt_vocab"])
+    adata.var = adata.var.drop(columns=["in_vocab"])
     adata.layers["counts"] = adata.X.copy()
     log.info("processed CCLE AnnData for contextual gene embeddings")
 
@@ -291,7 +291,7 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
 
                     # fill embedding and label
                     labels.append(
-                        f"{cell_line} | {scgpt_gene_mapping[genes[input_id]]}",
+                        f"{cell_line} | {gene_mapping[genes[input_id]]}",
                     )
                     embeddings.append(cell_line_embs[j])
 

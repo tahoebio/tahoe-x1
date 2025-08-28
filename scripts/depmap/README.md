@@ -71,7 +71,7 @@ raw/ccle-counts.gct
 raw/depmap-gene-dependencies.csv
 raw/depmap-gene-effects.csv
 raw/depmap-metadata.csv
-raw/scgpt-genes.csv
+raw/gene-mapping.csv
 ```
 
 This script will create the following files.

@@ -9,7 +9,7 @@ Requires:
     [base_path]/raw/depmap-gene-dependencies.csv
     [base_path]/raw/depmap-gene-effects.csv
     [base_path]/raw/depmap-metadata.csv
-    [base_path]/raw/scgpt-genes.csv
+    [base_path]/raw/gene-mapping.csv
 
 Creates:
 
@@ -83,12 +83,12 @@ def main(base_path):
     log.info("subset to usable cell lines")
 
     # subset to usable genes in common
-    scgpt_genes = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))[
+    vocab_genes = pd.read_csv(os.path.join(base_path, "raw/gene-mapping.csv"))[
         "feature_name"
     ].tolist()
     depmap_genes = [i.split(" ")[0] for i in depmap_gene_effects.columns.tolist()[1:]]
     ccle_genes = all_genes["gene_name"].tolist()
-    common_genes = list(set(scgpt_genes) & set(depmap_genes) & set(ccle_genes))
+    common_genes = list(set(vocab_genes) & set(depmap_genes) & set(ccle_genes))
     valid_genes = all_genes[all_genes["gene_name"].isin(common_genes)][
         "gene_id"
     ].tolist()
