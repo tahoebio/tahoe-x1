@@ -48,7 +48,7 @@ This S3 bucket is populated with embeddings and results from the following model
 - TX1-3B (~3B parameters)
 - TX1-3B-alt (~3B parameters, training continued with alternate gene encoder)
 
-For more details on how we retrieved embeddings from non-TX models, please see `other-models.md` in this repository.
+For more details on the raw data and how we retrieved embeddings from non-TX models, please see `data.md` in this repository.
 
 **If you sync the entire directory (415GB), you can skip to step 4 and start evaluating new models.**
 

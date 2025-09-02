@@ -1,10 +1,37 @@
-### Geneformer
+### raw data
+
+To perform these tasks, we combined RNAseq data from the Cancer Cell Line Encyclopedia (CCLE) with essentiality data from the Dependency Map (DepMap) project. All raw data was downloaded from the [DepMap portal](https://depmap.org/portal/data_page/).
+
+- RNAseq (file set: CCLE 2019)
+    - CCLE_RNAseq_genes_counts_20180929.gct.gz (counts)
+    - Cell_lines_annotations_20181226.txt (metadata)
+- essentiality (file set: DepMap Public, version: DepMap Public 23Q4)
+    - CRISPRGeneDependency.csv (essentiality scores)
+    - Model_v2.csv (metadata)
+
+We consider only the cell lines and genes that intersect between the two datasets. Cell lines are matched on DepMap IDs, which have the form ACH-XXXXXX. Genes are matched by name.
+
+---
+
+### Geneformer (Theodoris Lab)
 
 We prepared the dataset by passing `counts.h5ad` through the [`TranscriptomeTokenizer`](https://geneformer.readthedocs.io/en/latest/geneformer.tokenizer.html) class from the Geneformer package.
 
 To extract cell line embeddings and mean gene embeddings, we passed the prepared dataset through the [`EmbExtractor`](https://geneformer.readthedocs.io/en/latest/geneformer.emb_extractor.html) class from the Geneformer package with `emb_mode` respectively set to "cls" and "gene".
 
 To extract contextual gene embeddings, we manually iterated over minibatches from the prepared dataset after loading using [`load_and_filter`](https://huggingface.co/ctheodoris/Geneformer/blob/main/geneformer/perturber_utils.py#L26). We prepared each minibatch using [`pad_tensor_list`](https://huggingface.co/ctheodoris/Geneformer/blob/main/geneformer/perturber_utils.py#L700) and [`gen_attention_mask`](https://huggingface.co/ctheodoris/Geneformer/blob/main/geneformer/perturber_utils.py#L736) and then passed it through the Geneformer model, which we loaded with [`load_model`](https://huggingface.co/ctheodoris/Geneformer/blob/main/geneformer/perturber_utils.py#L112). For each minibatch, we iterated over the last layer of `hidden_states` from the model output, indexed with [`quant_layers`](https://huggingface.co/ctheodoris/Geneformer/blob/main/geneformer/perturber_utils.py#L221), and saved each vector as the contextual gene embedding for the corresponding input gene (if the `input_id` was not a special token).
+
+---
+
+### Geneformer (NVIDIA BioNeMo)
+
+We prepared the dataset by using the [`bionemo-scdl`](https://pypi.org/project/bionemo-scdl/) package to convert `counts.h5ad` to `SingleCellMemMapDataset` format.
+
+We then ran inference as follows.
+
+```
+python /workspace/bionemo/bionemo/model/infer.py --config-dir /workspace/bionemo/examples/singlecell/geneformer/conf/ --config-name infer ++model.downstream_task.restore_from_path=/tahoe/geneformer/geneformer-100M.nemo ++model.data.batch_size=32 ++model.data.dataset_path=/tahoe/depmap/nvidia_geneformer_memmap ++exp_manager.exp_dir=/tahoe/data/nvidia_geneformer_preds/ ++model.data.output_fname=/tahoe/depmap/nvidia_geneformer_preds/geneformer_100M_depmap.pkl
+```
 
 ---
 
