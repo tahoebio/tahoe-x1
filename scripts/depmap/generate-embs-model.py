@@ -29,7 +29,7 @@ logging.basicConfig(
 logging.getLogger(__name__).setLevel("INFO")
 
 
-# generate embeddings for a TX model
+# generate embeddings for a Tx model
 def run_tx(base_path, model_path, model_name, batch_size=16, max_length=17000):
 
     # create paths
