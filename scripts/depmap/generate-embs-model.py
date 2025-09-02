@@ -29,8 +29,8 @@ logging.basicConfig(
 logging.getLogger(__name__).setLevel("INFO")
 
 
-# generate embeddings for a MosaicFM model
-def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17000):
+# generate embeddings for a TX model
+def run_tx(base_path, model_path, model_name, batch_size=16, max_length=17000):
 
     # create paths
     model_config_path = os.path.join(model_path, "model_config.yml")
@@ -361,7 +361,7 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # run function
-    run_mosaicfm(
+    run_tx(
         args.base_path,
         args.model_path,
         args.model_name,
