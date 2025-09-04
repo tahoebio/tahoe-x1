@@ -13,7 +13,6 @@ Example usage:
 """
 
 import logging
-import os
 import sys
 from typing import List
 
@@ -24,6 +23,7 @@ from composer import Trainer
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
+from mosaicfm.model import ComposerSCGPTModel
 from mosaicfm.utils.util import load_model, loader_from_adata
 
 log = logging.getLogger(__name__)
@@ -36,6 +36,8 @@ logging.basicConfig(
 def predict_embeddings(cfg: DictConfig) -> None:
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    # retrieve configuration parameters
+    model_name = cfg.get("model_name", None)
     cell_type_key = cfg.data.cell_type_key
     gene_id_key = cfg.data.gene_id_key
     return_gene_embeddings = cfg.predict.get("return_gene_embeddings", False)
@@ -44,14 +46,30 @@ def predict_embeddings(cfg: DictConfig) -> None:
     num_workers = cfg.predict.get("num_workers", 8)
     prefetch_factor = cfg.predict.get("prefetch_factor", 48)
     adata_output_path = cfg.paths.get("adata_output", None)
-    model_dir = cfg.paths.model_dir
 
-    log.info("Loading vocabulary and collator configuration and model checkpoints")
-    model, vocab, _, coll_cfg = load_model(
-        model_dir,
-        device=device,
-        return_gene_embeddings=return_gene_embeddings,
-    )
+    # load model from local dir or HF
+    model_dir = cfg.paths.get("model_dir", None)
+    if model_dir is not None:
+        log.info(f"Loading model from local directory {model_dir}")
+        model, vocab, _, coll_cfg = load_model(
+            model_dir,
+            device=device,
+            return_gene_embeddings=return_gene_embeddings,
+        )
+    else:
+        hf_repo_id = cfg.paths.get("hf_repo_id", None)
+        hf_model_size = cfg.paths.get("hf_model_size", None)
+        if None in (hf_repo_id, hf_model_size):
+            raise ValueError(
+                "Both hf_repo_id and hf_model_size must be specified in the config (or local model dir)",
+            )
+        log.info(
+            f"Loading model from Hugging Face repo {hf_repo_id}, size {hf_model_size}",
+        )
+        model, vocab, _, coll_cfg = ComposerSCGPTModel.from_hf(
+            hf_repo_id,
+            hf_model_size,
+        )
     print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 
     log.info("Loading AnnData file…")
@@ -149,7 +167,6 @@ def predict_embeddings(cfg: DictConfig) -> None:
         gene_array = means[all_gene_ids, :]
 
     log.info("Saving outputs…")
-    model_name = cfg.paths.get("model_name", os.path.basename(model_dir))
     log.info(f"Storing cell embeddings in adata.obsm['{model_name}']")
     adata.obsm[model_name] = cell_array
 
