@@ -26,6 +26,7 @@ from mosaicfm.model.blocks import (
     gene_encoder_defaults,
     init_config_defaults,
 )
+from mosaicfm.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 
@@ -443,11 +444,15 @@ class ComposerSCGPTModel(ComposerModel):
                 return None
 
         # download files
+        vocab_path = _download(f"{model_size}-model/vocab.json")
         model_cfg_path = _download(f"{model_size}-model/model_config.yml")
         collator_cfg_path = _download(f"{model_size}-model/collator_config.yml")
         model_path = _download(f"{model_size}-model/model.safetensors")
         if None in (collator_cfg_path, model_cfg_path, model_path):
             raise FileNotFoundError("Some model files could not be found.")
+
+        # load vocabulary
+        vocab = GeneVocab.from_file(vocab_path)
 
         # load dictionaries
         model_config = om.load(model_cfg_path)
@@ -463,4 +468,4 @@ class ComposerSCGPTModel(ComposerModel):
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         model.eval()
-        return model
+        return model, vocab, model_config, collator_config
