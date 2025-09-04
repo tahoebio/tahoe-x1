@@ -408,26 +408,36 @@ class GeneEncoder(nn.Module):
 class ChemEncoder(nn.Module):
     def __init__(
         self,
-        drug_fps_path: dict,
         d_out: int,
         padding_idx: int = 0,
         activation: str = "leaky_relu",
         use_norm: bool = True,
         freeze: bool = False,
+        drug_fps_path: Optional[dict] = None,
+        num_drugs: Optional[int] = None,
+        fp_dim: Optional[int] = None,
     ):
         super().__init__()
 
-        # download pretrained drug embeddings - morgan fingerprints
-        if dist.get_local_rank() == 0:
-            download_file_from_s3_url(
-                s3_url=drug_fps_path["remote"],
-                local_file_path=drug_fps_path["local"],
-            )
-        with dist.local_rank_zero_download_and_wait(drug_fps_path["local"]):
-            dist.barrier()
+        # download pretrained drug embeddings if specified, otherwise use arguments
+        if drug_fps_path is not None:
+            if dist.get_local_rank() == 0:
+                download_file_from_s3_url(
+                    s3_url=drug_fps_path["remote"],
+                    local_file_path=drug_fps_path["local"],
+                )
+            with dist.local_rank_zero_download_and_wait(drug_fps_path["local"]):
+                dist.barrier()
 
-        drug_fps = torch.as_tensor(np.load(drug_fps_path["local"]), dtype=torch.float32)
-        embedding_dim = drug_fps.shape[1]
+            drug_fps = torch.as_tensor(
+                np.load(drug_fps_path["local"]),
+                dtype=torch.float32,
+            )
+            embedding_dim = drug_fps.shape[1]
+        else:
+            assert num_drugs is not None and fp_dim is not None
+            embedding_dim = fp_dim
+            drug_fps = torch.zeros((num_drugs, fp_dim), dtype=torch.float32)
 
         self.embedding = nn.Embedding.from_pretrained(
             drug_fps,

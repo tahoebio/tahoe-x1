@@ -120,11 +120,13 @@ class SCGPTModel(nn.Module):
         if self.use_chem_token:
             chem_encoder_config = model_config.chemical_encoder
             self.chem_encoder = ChemEncoder(
-                drug_fps_path=chem_encoder_config.get("drug_fps_path"),
                 d_out=self.d_model,
                 padding_idx=chem_encoder_config.get("padding_idx", 0),
                 activation=chem_encoder_config.get("activation", "leaky_relu"),
                 freeze=chem_encoder_config.get("freeze", False),
+                drug_fps_path=chem_encoder_config.get("drug_fps_path"),
+                num_drugs=chem_encoder_config.get("num_drugs", None),
+                fp_dim=chem_encoder_config.get("fp_dim", None),
             )
 
         encoder_layers = SCGPTBlock(
