@@ -6,8 +6,11 @@ import torch
 import torch.nn.functional as F
 from composer.models import ComposerModel
 from composer.utils import dist
+from huggingface_hub import hf_hub_download
 from llmfoundry.layers_registry import param_init_fns
 from omegaconf import DictConfig
+from omegaconf import OmegaConf as om
+from safetensors.torch import load_file
 from torch import Tensor, nn
 
 from mosaicfm.loss import MaskedMseMetric, MaskedSpearmanMetric, masked_mse_loss
@@ -426,3 +429,36 @@ class ComposerSCGPTModel(ComposerModel):
         normalized_value = (x - min_value) / (max_value - min_value)
         # Scale to -1..1
         return 2 * normalized_value - 1
+
+    @classmethod
+    def from_hf(cls, repo_id: str, model_size: str):
+
+        # helper function to download files
+        def _download(file):
+            try:
+                return hf_hub_download(repo_id=repo_id, filename=file)
+            except Exception:
+                return None
+
+        # download files
+        model_cfg_path = _download(f"{model_size}-model/model_config.yml")
+        collator_cfg_path = _download(f"{model_size}-model/collator_config.yml")
+        model_path = _download(f"{model_size}-model/model.safetensors")
+        if None in (collator_cfg_path, model_cfg_path, model_path):
+            raise FileNotFoundError("Some model files could not be found.")
+
+        # load dictionaries
+        model_config = om.load(model_cfg_path)
+        collator_config = om.load(collator_cfg_path)
+        model_state_dict = load_file(model_path)
+
+        # initialize model
+        model = cls(
+            model_config=model_config,
+            collator_config=collator_config,
+        )
+        model.load_state_dict(model_state_dict)
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        model.to(device)
+        model.eval()
+        return model
