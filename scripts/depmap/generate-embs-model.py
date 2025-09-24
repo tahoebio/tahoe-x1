@@ -17,7 +17,7 @@ from omegaconf import OmegaConf as om
 from tqdm import tqdm
 
 from mosaicfm.data import CountDataset, DataCollator
-from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.model import ComposerTXModel
 from mosaicfm.tasks import get_batch_embeddings
 from mosaicfm.tokenizer import GeneVocab
 
@@ -45,7 +45,7 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
     gene2idx = vocab.get_stoi()
 
     # load model
-    model = ComposerSCGPTModel(
+    model = ComposerTXModel(
         model_config=model_config,
         collator_config=collator_config,
     )

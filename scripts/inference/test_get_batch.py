@@ -12,7 +12,7 @@ YAML file with two top-level sections:
     ``checkpoint`` – path to the model checkpoint.
     ``adata_input`` – input AnnData (``.h5ad``) file.
     ``cell_output`` – where to save the AnnData with cell embeddings stored in
-    ``obsm['X_scGPT']``.
+    ``obsm['X_TX']``.
     ``gene_output`` – path to ``.npy`` file for gene embeddings ordered by
     vocabulary index.
 

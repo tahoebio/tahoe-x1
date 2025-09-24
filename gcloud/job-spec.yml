@@ -14,7 +14,7 @@ spec:
         cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
       - name: vevo-mosaicfm
-        image: us-central1-docker.pkg.dev/vevo-ml/default-registry/vevo-scgpt:shreshth
+        image: us-central1-docker.pkg.dev/vevo-ml/default-registry/mosaicfm:1.1.0
         command: [ "/bin/bash", "-c", "--" ]
         args:
           - |

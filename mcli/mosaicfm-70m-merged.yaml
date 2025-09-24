@@ -13,7 +13,7 @@ integrations:
 command: |
   cd mosaicfm/scripts
   composer train.py /mnt/config/parameters.yaml
-image: vevotx/ml-scgpt:shreshth
+image: vevotx/mosaicfm:1.1.0
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
 name: mosaicfm-70m
@@ -42,7 +42,7 @@ parameters:
     remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: vevo_scgpt
+    name: mosaicfm
     d_model: 512
     n_layers: 12
     init_device: cpu
@@ -165,10 +165,73 @@ parameters:
     lr_monitor: {}
     memory_monitor: {}
     runtime_estimator: {}
+    cell-classification:
+      cfg:
+        datasets:
+          ccle:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/CCLE/ccle.h5ad"
+              local: "cell-classification/ccle.h5ad"
+            cell_type_key: "OncotreeLineage"
+            gene_id_key: "feature_id"
+            seq_len: 8192
+            batch_size: 32
+          tabula:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_train.h5ad"
+              local: "cell-classification/Tabula50k_train.h5ad"
+            test:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tabula50k/Tabula50k_test.h5ad"
+              local: "cell-classification/Tabula50k_test.h5ad"
+            cell_type_key: "cell_ontology_class"
+            gene_id_key: "ensembl_id"
+          tahoe:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_train.h5ad"
+              local: "cell-classification/Tahoe50k_train.h5ad"
+            test:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/Tahoe50k/Tahoe50k_test.h5ad"
+              local: "cell-classification/Tahoe50k_test.h5ad"
+            cell_type_key: "cell_line"
+            gene_id_key: "ensembl_id"
+          kim:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_train.h5ad"
+              local: "cell-classification/kim_train.h5ad"
+            test:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/kim2020/kim_test.h5ad"
+              local: "cell-classification/kim_test.h5ad"
+            cell_type_key: "cell_type"
+            gene_id_key: "ensembl_id"
+          zheng:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_train.h5ad"
+              local: "cell-classification/zheng_train.h5ad"
+            test:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/zheng/zheng_test.h5ad"
+              local: "cell-classification/zheng_test.h5ad"
+            cell_type_key: "cell_type"
+            gene_id_key: "ensembl_id"
+          segerstolpe:
+            train:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_train.h5ad"
+              local: "cell-classification/segerstolpe_train.h5ad"
+            test:
+              remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cell_classification_benchmarks/segerstolpe/segerstolpe_test.h5ad"
+              local: "cell-classification/Segerstolpe_test.h5ad"
+            cell_type_key: "cell_type"
+            gene_id_key: "ensembl_id"
+        classifier_config:
+          max_iter: 5000
+          solver: "lbfgs"
+          multi_class: "multinomial"
+          random_state: 42
+        batch_size: 100
+        seq_len: 2048
   loggers:
     wandb:
-      project: vevo-scgpt
+      project: vevo-MFM-v2
       log_artifacts: False
-  save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+  save_folder: "s3://vevo-ml-datasets/mosaicfm_v2/models/{run_name}"
   save_interval: "2000ba"
   autoresume: True
