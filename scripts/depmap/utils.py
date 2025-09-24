@@ -90,20 +90,20 @@ def process_contextual_gene_embs(base_path, log, labels, embeddings, prefix):
     null_frac_limit = 0.1
     mean_disc = mean_disc[mean_disc["null-frac"] < null_frac_limit]
     boundaries = np.arange(0, 101, 10)
-    for cell_line_label, r in zip(boundaries, boundaries[1:]):
+    for left, right in zip(boundaries, boundaries[1:]):
 
         # get genes to keep
         subset = mean_disc[
-            (mean_disc["mean-disc-dep"] >= (cell_line_label / 100))
-            & (mean_disc["mean-disc-dep"] <= (r / 100))
+            (mean_disc["mean-disc-dep"] >= (left / 100))
+            & (mean_disc["mean-disc-dep"] <= (right / 100))
         ]
         genes_to_keep = subset["gene"].tolist()
 
         # subset AnnData and save
         subad = gene_adata[gene_adata.obs["gene"].isin(genes_to_keep)]
         subad.write_h5ad(
-            os.path.join(base_path, f"gene-embs/{prefix}-{cell_line_label}to{r}.h5ad"),
+            os.path.join(base_path, f"gene-embs/{prefix}-{left}to{right}.h5ad"),
         )
         log.info(
-            f"saved {prefix} contextual gene embeddings for {cell_line_label}% to {r}% strata",
+            f"saved {prefix} contextual gene embeddings for {left}% to {right}% strata",
         )

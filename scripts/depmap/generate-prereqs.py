@@ -1,15 +1,15 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 """Starting from a minimal DepMap benchmark directory (containing only raw
 data), this script will create the files necessary to run the benchmark tasks
-for scGPT and Geneformer models.
+for MosaicFM models.
 
 Requires:
 
     [base_path]/raw/ccle-counts.gct
+    [base_path]/raw/depmap-gene-dependencies.csv
     [base_path]/raw/depmap-gene-effects.csv
     [base_path]/raw/depmap-metadata.csv
-    [base_path]/raw/scgpt-genes.csv
-    [base_path]/raw/depmap-gene-dependencies.csv
+    [base_path]/raw/gene-mapping.csv
 
 Creates:
 
@@ -17,10 +17,6 @@ Creates:
     [base_path]/misc/genes-by-mean-disc.csv
     [base_path]/misc/split-cls.csv
     [base_path]/misc/split-genes-lt5gt70.csv
-    [base_path]/geneformer/ccle-nonzero-medians.pkl
-    [base_path]/geneformer/adata.h5ad
-    [base_path]/geneformer/tokenized.dataset
-    [base_path]/geneformer/tokenized-new-medians.dataset
 """
 
 import argparse
@@ -32,7 +28,6 @@ import anndata as ad
 import numpy as np
 import pandas as pd
 import scanpy as sc
-from geneformer import TranscriptomeTokenizer
 from scipy.sparse import csr_matrix
 from sklearn.model_selection import KFold
 
@@ -88,12 +83,12 @@ def main(base_path):
     log.info("subset to usable cell lines")
 
     # subset to usable genes in common
-    scgpt_genes = pd.read_csv(os.path.join(base_path, "raw/scgpt-genes.csv"))[
+    vocab_genes = pd.read_csv(os.path.join(base_path, "raw/gene-mapping.csv"))[
         "feature_name"
     ].tolist()
     depmap_genes = [i.split(" ")[0] for i in depmap_gene_effects.columns.tolist()[1:]]
     ccle_genes = all_genes["gene_name"].tolist()
-    common_genes = list(set(scgpt_genes) & set(depmap_genes) & set(ccle_genes))
+    common_genes = list(set(vocab_genes) & set(depmap_genes) & set(ccle_genes))
     valid_genes = all_genes[all_genes["gene_name"].isin(common_genes)][
         "gene_id"
     ].tolist()
@@ -161,7 +156,7 @@ def main(base_path):
     columns = {"cell-line": cell_lines}
     n = len(cell_lines)
     kf = KFold(n_splits=5)
-    for i, (train_idx, val_idx) in enumerate(kf.split(cell_lines)):
+    for i, (_, val_idx) in enumerate(kf.split(cell_lines)):
         split = np.array(["train"] * n)
         split[val_idx] = "val"
         columns[f"fold-{i}"] = split
@@ -189,7 +184,7 @@ def main(base_path):
     columns = {"gene": genes}
     n = len(genes)
     kf = KFold(n_splits=5)
-    for i, (train_idx, val_idx) in enumerate(kf.split(genes)):
+    for i, (_, val_idx) in enumerate(kf.split(genes)):
         split = np.array(["train"] * n)
         split[val_idx] = "val"
         columns[f"fold-{i}"] = split
@@ -212,43 +207,6 @@ def main(base_path):
     with open(outpath, "wb") as f:
         pickle.dump(medians_dict, f)
     log.info(f"saved nonzero medians to {outpath}")
-
-    # process AnnData for use with Geneformer's tokenizer
-    counts = sc.read_h5ad(os.path.join(base_path, "counts.h5ad"))
-    sc.pp.calculate_qc_metrics(counts, inplace=True)
-    counts.obs["n_counts"] = counts.obs["total_counts"]
-    counts.obs["ccle_name"] = counts.obs.index
-    counts.var["ensembl_id"] = counts.var.index
-    outpath = os.path.join(base_path, "geneformer/adata.h5ad")
-    counts.write_h5ad(outpath)
-    log.info(f"processed and saved AnnData for Geneformer at {outpath}")
-
-    # tokenize for Geneformer using Genecorpus medians
-    log.info("tokenizing for Geneformer with default medians")
-    tk = TranscriptomeTokenizer(
-        {"ModelID": "ModelID", "ccle_name": "CCLEName"},
-        nproc=4,
-    )
-    tk.tokenize_data(
-        os.path.join(base_path, "geneformer/"),
-        os.path.join(base_path, "geneformer/"),
-        "tokenized",
-        file_format="h5ad",
-    )
-
-    # tokenize for Geneformer using new medians
-    log.info("tokenizing for Geneformer with new medians")
-    tk = TranscriptomeTokenizer(
-        {"ModelID": "ModelID", "ccle_name": "CCLEName"},
-        nproc=4,
-        gene_median_file=os.path.join(base_path, "geneformer/ccle-nonzero-medians.pkl"),
-    )
-    tk.tokenize_data(
-        os.path.join(base_path, "geneformer/"),
-        os.path.join(base_path, "geneformer/"),
-        "tokenized-new-medians",
-        file_format="h5ad",
-    )
 
 
 if __name__ == "__main__":
