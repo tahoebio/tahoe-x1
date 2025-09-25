@@ -434,7 +434,13 @@ class ComposerSCGPTModel(ComposerModel):
         return 2 * normalized_value - 1
 
     @classmethod
-    def from_hf(cls, repo_id: str, model_size: str):
+    def from_hf(
+        cls,
+        repo_id: str,
+        model_size: str,
+        return_gene_embeddings: bool = True,
+        use_chem_inf: Optional[bool] = False,
+    ):
 
         # helper function to download files
         def _download(file):
@@ -451,12 +457,31 @@ class ComposerSCGPTModel(ComposerModel):
         if None in (collator_cfg_path, model_cfg_path, model_path):
             raise FileNotFoundError("Some model files could not be found.")
 
-        # load vocabulary
+        # load vocabulary and collator config
         vocab = GeneVocab.from_file(vocab_path)
-
-        # load dictionaries
-        model_config = om.load(model_cfg_path)
         collator_config = om.load(collator_cfg_path)
+
+        # load and edit attention implementation if needed
+        model_config = om.load(model_cfg_path)
+        if model_config["attn_config"]["attn_impl"] == "triton":
+            model_config["attn_config"]["attn_impl"] = "flash"
+            model_config["attn_config"]["use_attn_mask"] = False
+
+        # set up model config for inference
+        model_config["do_mlm"] = False
+        model_config["return_gene_embeddings"] = return_gene_embeddings
+
+        # handle if model was trained with chemical information, and we don't want to use it for inference
+        strict = True
+        if use_chem_inf is not None and (
+            not use_chem_inf and collator_config.get("use_chem_token", False)
+        ):
+            collator_config["use_chem_token"] = False
+            del model_config["chemical_encoder"]
+            del collator_config["drug_to_id_path"]
+            strict = False
+
+        # load state dictionary from safetensors file
         model_state_dict = load_file(model_path)
 
         # initialize model
@@ -464,7 +489,7 @@ class ComposerSCGPTModel(ComposerModel):
             model_config=model_config,
             collator_config=collator_config,
         )
-        model.load_state_dict(model_state_dict)
+        model.load_state_dict(model_state_dict, strict=strict)
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         model.to(device)
         model.eval()
