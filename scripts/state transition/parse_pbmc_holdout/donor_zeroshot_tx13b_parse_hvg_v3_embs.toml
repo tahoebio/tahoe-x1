@@ -1,0 +1,19 @@
+# example_config.toml
+# Dataset paths - maps dataset names to their directories
+[datasets]
+parse = "/tahoe/drive_3/ANALYSIS/analysis_190/Data/parse_pbmc/parse_hvg/tx1_3b_adata_chunks_parse_hvg_genes_v2"
+
+# Training specifications
+# All cell types in a dataset automatically go into training (excluding zeroshot/fewshot overrides)
+[training]
+parse = "train"
+
+# Zeroshot specifications - entire cell types go to val or test
+[zeroshot]
+"parse.Donor1" = "test"
+"parse.Donor4" = "test"
+"parse.Donor9" = "test"
+"parse.Donor12" = "test"
+
+# Fewshot specifications - explicit perturbation lists
+[fewshot]
