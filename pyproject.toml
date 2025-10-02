@@ -19,12 +19,12 @@ license = { text = "Proprietary" }
 
 dependencies = [
     "awscli>=1.32",
-    "llm-foundry[gpu]>=0.17.1",
+    "llm-foundry[gpu]==0.17.1",
     "mosaicml-streaming",
     "ninja",
     "cmake",
     "packaging",
-    "torch",
+    "torch==2.5.*",
     "llvmlite",
     "numba",
     "natsort",
