@@ -9,7 +9,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mosaicfm"
 version = "0.1.2"
-description = "TahoeX: A single-cell RNA-seq foundation model"
+description = "Tahoe-x1: Perturbation trained virtual cell models from Tahoe Therapeutics"
 readme = "README.md"
 authors = [
     { name = "Vevo Therapeutics" },
@@ -18,31 +18,16 @@ requires-python = ">=3.10"
 license = { text = "Proprietary" }
 
 dependencies = [
-    # Core ML Framework
-    #"torch==2.4.*",
-    "torch==2.5.1",
-    "torchtext",
-
-    # AWS/Cloud
     "awscli>=1.32",
-
-
-    # Training Framework
-    #"llm-foundry[gpu-flash2]==0.17.1",
-    #"llm-foundry==0.17.1",
-    "llm-foundry[gpu-flash2]==0.17.1",
-    #"flash-attn==2.7.*", #try 2.8.3 too 
-    "mosaicml-streaming",  
-
-    # Build tools
+    "llm-foundry[gpu]>=0.17.1",
+    "mosaicml-streaming",
     "ninja",
-
-    # Scientific computing
+    "cmake",
+    "packaging",
+    "torch",
     "llvmlite",
     "numba",
     "natsort",
-
-    # Single-cell analysis
     "scanpy",
     "pynndescent",
     "umap-learn",
@@ -58,12 +43,9 @@ dev = [
     "packaging>=21,<23",
 ]
 
-gpu = [
-    "transformer-engine @ git+https://github.com/NVIDIA/TransformerEngine.git@stable",
-]
 
 all = [
-    "mosaicfm[dev,gpu]",
+    "mosaicfm[dev]",
 ]
 
 [tool.setuptools.packages.find]
@@ -200,10 +182,6 @@ filterwarnings = [
     'ignore:No scheduler:UserWarning',  # testing defaults
     'ignore::DeprecationWarning:tensorboard',  # ignore tensorboard
 ]
-
-[tool.uv.extra-build-dependencies]
-flash-attn = ["torch", "packaging", "ninja"]
-megablocks = ["torch", "packaging", "ninja"]
 
 [tool.pydocstyle]
 convention = "google"
