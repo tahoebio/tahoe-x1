@@ -1,0 +1,30 @@
+# example_config.toml
+# Dataset paths - maps dataset names to their directories
+[datasets]
+parse = "/tahoe/drive_3/ANALYSIS/analysis_190/Data/parse_pbmc/parse_hvg/tx1_3b_adata_chunks_parse_hvg_genes_v3"
+
+# Training specifications
+# All cell types in a dataset automatically go into training (excluding zeroshot/fewshot overrides)
+[training]
+parse = "train"
+
+# Zeroshot specifications - entire cell types go to val or test
+[zeroshot]
+
+# Fewshot specifications - explicit perturbation lists
+[fewshot]
+[fewshot."parse.Donor1"]
+val = ['G-CSF', 'IFN-beta', 'M-CSF', 'IGF-1']
+test = ['C5a', 'TWEAK', 'LIF', 'IL-17C', 'FGF-beta', 'BAFF', 'FLT3L', 'IFN-lambda2', '4-1BBL', 'IL-17E', 'IL-2', 'IL-19', 'PRL', 'IL-16', 'IL-7', 'GM-CSF', 'IL-17A', 'IL-13', 'IL-36-alpha', 'PSPN', 'EPO', 'IL-9', 'IL-31', 'IL-11', 'LT-alpha1-beta2', 'TL1A', 'IL-32-beta', 'IFN-omega', 'IL-8', 'Noggin', 'IFN-epsilon', 'IL-17F', 'Leptin', 'IL-33', 'IL-35', 'OSM', 'IL-34', 'HGF', 'IL-1Ra', 'LIGHT', 'CD27L', 'SCF', 'IL-1-alpha', 'TGF-beta1', 'CD30L', 'IL-24', 'IFN-gamma', 'IFN-alpha1', 'IFN-lambda1', 'GITRL', 'VEGF', 'ADSF', 'IL-15', 'EGF', 'IL-3', 'IL-17B', 'IL-6', 'IL-4', 'IL-10', 'CT-1', 'IFN-lambda3', 'TRAIL']
+
+[fewshot."parse.Donor4"]
+val = ['G-CSF', 'IFN-beta', 'M-CSF', 'IGF-1']
+test = ['C5a', 'TWEAK', 'LIF', 'IL-17C', 'FGF-beta', 'BAFF', 'FLT3L', 'IFN-lambda2', '4-1BBL', 'IL-17E', 'IL-2', 'IL-19', 'PRL', 'IL-16', 'IL-7', 'GM-CSF', 'IL-17A', 'IL-13', 'IL-36-alpha', 'PSPN', 'EPO', 'IL-9', 'IL-31', 'IL-11', 'LT-alpha1-beta2', 'TL1A', 'IL-32-beta', 'IFN-omega', 'IL-8', 'Noggin', 'IFN-epsilon', 'IL-17F', 'Leptin', 'IL-33', 'IL-35', 'OSM', 'IL-34', 'HGF', 'IL-1Ra', 'LIGHT', 'CD27L', 'SCF', 'IL-1-alpha', 'TGF-beta1', 'CD30L', 'IL-24', 'IFN-gamma', 'IFN-alpha1', 'IFN-lambda1', 'GITRL', 'VEGF', 'ADSF', 'IL-15', 'EGF', 'IL-3', 'IL-17B', 'IL-6', 'IL-4', 'IL-10', 'CT-1', 'IFN-lambda3', 'TRAIL']
+
+[fewshot."parse.Donor9"]
+val = ['G-CSF', 'IFN-beta', 'M-CSF', 'IGF-1']
+test = ['C5a', 'TWEAK', 'LIF', 'IL-17C', 'FGF-beta', 'BAFF', 'FLT3L', 'IFN-lambda2', '4-1BBL', 'IL-17E', 'IL-2', 'IL-19', 'PRL', 'IL-16', 'IL-7', 'GM-CSF', 'IL-17A', 'IL-13', 'IL-36-alpha', 'PSPN', 'EPO', 'IL-9', 'IL-31', 'IL-11', 'LT-alpha1-beta2', 'TL1A', 'IL-32-beta', 'IFN-omega', 'IL-8', 'Noggin', 'IFN-epsilon', 'IL-17F', 'Leptin', 'IL-33', 'IL-35', 'OSM', 'IL-34', 'HGF', 'IL-1Ra', 'LIGHT', 'CD27L', 'SCF', 'IL-1-alpha', 'TGF-beta1', 'CD30L', 'IL-24', 'IFN-gamma', 'IFN-alpha1', 'IFN-lambda1', 'GITRL', 'VEGF', 'ADSF', 'IL-15', 'EGF', 'IL-3', 'IL-17B', 'IL-6', 'IL-4', 'IL-10', 'CT-1', 'IFN-lambda3', 'TRAIL']
+
+[fewshot."parse.Donor12"]
+val = ['G-CSF', 'IFN-beta', 'M-CSF', 'IGF-1']
+test = ['C5a', 'TWEAK', 'LIF', 'IL-17C', 'FGF-beta', 'BAFF', 'FLT3L', 'IFN-lambda2', '4-1BBL', 'IL-17E', 'IL-2', 'IL-19', 'PRL', 'IL-16', 'IL-7', 'GM-CSF', 'IL-17A', 'IL-13', 'IL-36-alpha', 'PSPN', 'EPO', 'IL-9', 'IL-31', 'IL-11', 'LT-alpha1-beta2', 'TL1A', 'IL-32-beta', 'IFN-omega', 'IL-8', 'Noggin', 'IFN-epsilon', 'IL-17F', 'Leptin', 'IL-33', 'IL-35', 'OSM', 'IL-34', 'HGF', 'IL-1Ra', 'LIGHT', 'CD27L', 'SCF', 'IL-1-alpha', 'TGF-beta1', 'CD30L', 'IL-24', 'IFN-gamma', 'IFN-alpha1', 'IFN-lambda1', 'GITRL', 'VEGF', 'ADSF', 'IL-15', 'EGF', 'IL-3', 'IL-17B', 'IL-6', 'IL-4', 'IL-10', 'CT-1', 'IFN-lambda3', 'TRAIL']
