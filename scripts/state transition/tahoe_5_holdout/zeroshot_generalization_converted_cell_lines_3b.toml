@@ -1,0 +1,14 @@
+[datasets]
+tahoe = "/tahoe/drive_3/ANALYSIS/analysis_190/Data/state_input_merged_3b/by_plate"
+
+[training]
+tahoe = "train"
+
+[zeroshot]
+"tahoe.CVCL_1097" = "test"
+"tahoe.CVCL_1285" = "test"
+"tahoe.CVCL_1098" = "test"
+"tahoe.CVCL_0334" = "test"
+"tahoe.CVCL_0480" = "test"
+
+[fewshot]
