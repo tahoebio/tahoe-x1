@@ -1,7 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 """Functions that are reused across scripts."""
 
-import itertools
 import os
 
 import anndata as ad
@@ -91,7 +90,7 @@ def process_contextual_gene_embs(base_path, log, labels, embeddings, prefix):
     null_frac_limit = 0.1
     mean_disc = mean_disc[mean_disc["null-frac"] < null_frac_limit]
     boundaries = np.arange(0, 101, 10)
-    for left, right in itertools.pairwise()(boundaries, boundaries[1:]):
+    for left, right in zip(boundaries, boundaries[1:]):
 
         # get genes to keep
         subset = mean_disc[

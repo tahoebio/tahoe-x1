@@ -78,13 +78,9 @@ class CellClassification(Callback):
             self.batch_size,
         )
         dataset_seq_len = self.dataset_registry[dataset].get("seq_len", self.seq_len)
-        with (
-            model_eval_mode(
-                self.model.model,
-            ),
-            torch.no_grad(),
-            FSDP.summon_full_params(self.model.model, writeback=False),
-        ):
+        with model_eval_mode(
+            self.model.model,
+        ), torch.no_grad(), FSDP.summon_full_params(self.model.model, writeback=False):
 
             cell_embeddings_train = get_batch_embeddings(
                 adata=adata_train,

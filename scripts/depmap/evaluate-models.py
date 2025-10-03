@@ -1,7 +1,6 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 """Evaluate various models on DepMap tasks as specified in a config file."""
 
-import itertools
 import math
 import sys
 from pathlib import Path
@@ -245,7 +244,7 @@ def run_contextual_essentiality(cfg):
         prefix = "null" if model == "null" else f"rf-{model.replace('-', '_')}"
 
         # iterate over strata
-        for left, right in itertools.pairwise()(boundaries, boundaries[1:]):
+        for left, right in zip(boundaries, boundaries[1:]):
 
             # add strata to file prefix
             prefix_strata = f"{prefix}-{left}to{right}"
