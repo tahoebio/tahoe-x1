@@ -106,10 +106,13 @@ def main(cfg: DictConfig) -> None:
         "bf16": torch.bfloat16,
     }[model_cfg["precision"]]
 
-    with torch.no_grad(), torch.amp.autocast(
-        enabled=True,
-        dtype=precision,
-        device_type=device.type,
+    with (
+        torch.no_grad(),
+        torch.amp.autocast(
+            enabled=True,
+            dtype=precision,
+            device_type=device.type,
+        ),
     ):
         for batch in loader:
             bs = batch["gene"].shape[0]
