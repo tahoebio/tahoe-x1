@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 set -e  # Exit on any error
 
 # Configuration

@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 # Train State Transition model with MosaicFM embeddings on Tahoe data
 # This script implements a zeroshot scenario with drug-cell (DC) splits
 

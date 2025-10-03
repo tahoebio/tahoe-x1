@@ -1,7 +1,70 @@
-# build requirements
+# =============================================================================
+# PROJECT METADATA & DEPENDENCIES
+# =============================================================================
+
 [build-system]
-requires = ["setuptools < 68.0.0"]
+requires = ["setuptools<68.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaicfm"
+version = "0.1.2"
+description = "Tahoe-x1: Perturbation trained virtual cell models from Tahoe Therapeutics"
+readme = "README.md"
+authors = [
+    { name = "Vevo Therapeutics" },
+]
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+
+dependencies = [
+    "awscli>=1.32",
+    "llm-foundry[gpu]==0.17.1",
+    "mosaicml-streaming",
+    "ninja",
+    "cmake",
+    "packaging",
+    "torch==2.5.*",
+    "llvmlite",
+    "numba",
+    "natsort",
+    "scanpy",
+    "pynndescent",
+    "umap-learn",
+    "anndata",
+    "h5py",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pre-commit>=3.4.0,<4",
+    "toml>=0.10.2,<0.11",
+    "ipykernel",
+    "packaging>=21,<23",
+]
+
+
+all = [
+    "mosaicfm[dev]",
+]
+
+[tool.setuptools.packages.find]
+exclude = [
+    ".github*",
+    "envs*",
+    "tutorials*",
+    "tests*",
+    "scripts*",
+    "mcli*",
+    "runai*",
+]
+
+[tool.setuptools.package-data]
+mosaicfm = ["py.typed"]
+
+# =============================================================================
+# TOOL CONFIGURATIONS
+# =============================================================================
 
 [tool.isort]
 profile = "black"
@@ -9,7 +72,6 @@ skip = ["env", "wandb", "runs", "build", "node_modules"]
 
 [tool.black]
 line-length = 88
-
 
 [tool.ruff.lint]
 select = [
@@ -24,7 +86,8 @@ select = [
     "RUF",
     "ERA",
 ]
-ignore=["PLR0913", # Too many arguments in function
+ignore = [
+    "PLR0913", # Too many arguments in function
     "PLR0915", # Too many statements
     "PLR0912", # Too many branches
     "PERF401", # Enforces list comprehensions over for-loops
@@ -32,14 +95,15 @@ ignore=["PLR0913", # Too many arguments in function
     "E402", # Module level import not at top of file
     "LOG015", # Log.info on root logger
     "SIM401", # Use .get method for dictionary like
-    ]
+]
+
 [tool.ruff]
 exclude = [
     "build/**",
     "docs/**",
     "node_modules/**",
-    "*.ipynb"]
-
+    "*.ipynb"
+]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
@@ -51,9 +115,8 @@ branch = true
 relative_files = true
 concurrency = ["thread"]
 include = [
-    "llmfoundry/*"
+    "mosaicfm/*"
 ]
-
 
 # Pyright
 [tool.pyright]
@@ -121,6 +184,15 @@ filterwarnings = [
 ]
 
 [tool.pydocstyle]
-convention="google"
-add_ignore="D100,D101,D102,D103,D104,D105,D107,D400,D401,D415"
-add_select="D404"
+convention = "google"
+add_ignore = "D100,D101,D102,D103,D104,D105,D107,D400,D401,D415"
+add_select = "D404"
+
+[[tool.uv.index]]
+name = "pytorch"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch" }
+torchvision = { index = "pytorch" }
