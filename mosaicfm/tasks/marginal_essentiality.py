@@ -69,9 +69,13 @@ class MarginalEssentiality(Callback):
         # get gene embeddings
         from mosaicfm.tasks import get_batch_embeddings
 
-        with model_eval_mode(
-            self.model.model,
-        ), torch.no_grad(), FSDP.summon_full_params(self.model.model, writeback=False):
+        with (
+            model_eval_mode(
+                self.model.model,
+            ),
+            torch.no_grad(),
+            FSDP.summon_full_params(self.model.model, writeback=False),
+        ):
             _, gene_embeddings = get_batch_embeddings(
                 adata=adata,
                 model=self.model.model,
