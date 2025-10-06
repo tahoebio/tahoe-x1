@@ -21,8 +21,8 @@ from mosaicfm.model.blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TXBlock,
+    TXEncoder,
     gene_encoder_defaults,
     init_config_defaults,
 )
@@ -130,7 +130,7 @@ class TXModel(nn.Module):
                 fp_dim=chem_encoder_config.get("fp_dim", None),
             )
 
-        encoder_layers = SCGPTBlock(
+        encoder_layers = TXBlock(
             d_model=self.d_model,
             n_heads=self.n_heads,
             expansion_ratio=self.expansion_ratio,
@@ -141,7 +141,7 @@ class TXModel(nn.Module):
             norm_scheme=self.norm_scheme,
             use_glu=model_config.get("use_glu", False),
         )
-        self.transformer_encoder = SCGPTEncoder(
+        self.transformer_encoder = TXEncoder(
             encoder_layers,
             self.n_layers,
             use_norm=self.norm_scheme == "pre",
@@ -295,10 +295,10 @@ class TXModel(nn.Module):
         return output
 
     def fsdp_wrap_fn(self, module):
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TXBlock)
 
     def activation_checkpointing_fn(self, module):
-        return isinstance(module, SCGPTBlock)
+        return isinstance(module, TXBlock)
 
 
 class ComposerTX(ComposerModel):

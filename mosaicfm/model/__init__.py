@@ -5,8 +5,8 @@ from .blocks import (
     ExprDecoder,
     GeneEncoder,
     MVCDecoder,
-    SCGPTBlock,
-    SCGPTEncoder,
+    TXBlock,
+    TXEncoder,
 )
 from .model import (
     ComposerTX,
@@ -20,7 +20,7 @@ __all__ = [
     "ExprDecoder",
     "GeneEncoder",
     "MVCDecoder",
-    "SCGPTBlock",
-    "SCGPTEncoder",
+    "TXBlock",
+    "TXEncoder",
     "TXModel",
 ]
