@@ -13,7 +13,7 @@ integrations:
 command: |
   cd mosaicfm/scripts
   composer train.py /mnt/config/parameters.yaml
-image: vevotx/ml-scgpt:shreshth
+image: vevotx/mosaicfm:1.1.0
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
 name: mosaicfm-70m

@@ -48,13 +48,13 @@ At the moment, we are also restricted to use a version of llm-foundry no later v
 implementation of flash-attention was removed in [v0.7.0](https://github.com/mosaicml/llm-foundry/releases/tag/v0.7.0).
 
 We support launching runs on the MosaicML platform as well as on local machines through RunAI.
-The recommended method for using MosaicFM is to use the pre-built [vevotx/ml-scgpt](https://hub.docker.com/repository/docker/vevotx/ml-scgpt/) docker image.
+The recommended method for using MosaicFM is to use the pre-built [vevotx/mosaicfm](https://hub.docker.com/repository/docker/vevotx/mosaicfm/) docker image.
 
 Currently, we have the following images available:
 
 | Image Name                     | Base Image | Description         |
 |--------------------------------|-------------|-------------------------------------------------|
-| [`vevotx/ml-scgpt:shreshth`](https://github.com/vevotx/vevo-docker/tree/main/ml_docker_vevo_scgpt) | docker.io/mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596 | Image used for MosaicFM-1.3B (July 2024 release) |
+| [`vevotx/mosaicfm:1.1.0`](https://github.com/vevotx/vevo-docker/tree/main/ml_docker_vevo_mosaicfm) | docker.io/mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596 | Image used for MosaicFM (current release) |
 
 ## Installation
 

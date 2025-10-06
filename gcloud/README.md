@@ -60,7 +60,7 @@ docker run --network host --gpus all \
   -e WANDB_PROJECT="vevo-MFM-v2" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
-  vevotx/ml-scgpt:shreshth -c "\
+  vevotx/mosaicfm:1.1.0 -c "\
     mkdir -p /src && \
     cd /src && \
     if [ -d mosaicfm ]; then \
