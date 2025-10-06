@@ -42,7 +42,7 @@ parameters:
     remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: vevo_scgpt
+    name: mosaicfm
     d_model: 512
     n_layers: 12
     init_device: cpu
