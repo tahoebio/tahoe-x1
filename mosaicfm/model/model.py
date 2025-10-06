@@ -31,7 +31,7 @@ from mosaicfm.tokenizer import GeneVocab
 log = logging.getLogger(__name__)
 
 
-class SCGPTModel(nn.Module):
+class TXModel(nn.Module):
     def __init__(
         self,
         model_config: DictConfig,
@@ -301,13 +301,13 @@ class SCGPTModel(nn.Module):
         return isinstance(module, SCGPTBlock)
 
 
-class ComposerSCGPTModel(ComposerModel):
+class ComposerTX(ComposerModel):
     def __init__(self, model_config, collator_config, device=None):
         super().__init__()
         self.criterion = masked_mse_loss
         self.pad_token_id = collator_config.pad_token_id
 
-        self.model = SCGPTModel(
+        self.model = TXModel(
             model_config=model_config,
             collator_config=collator_config,
             device=device,

@@ -1,7 +1,7 @@
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
 """Generate cell and gene embeddings using ``composer.Trainer.predict``.
 
-This script loads a trained :class:`~mosaicfm.model.ComposerSCGPTModel` and
+This script loads a trained :class:`~mosaicfm.model.ComposerTX` and
 produces embeddings for an input AnnData file. Configuration is provided via a
 YAML file.
 
@@ -23,7 +23,7 @@ from composer import Trainer
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
-from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.model import ComposerTX
 from mosaicfm.utils.util import load_model, loader_from_adata
 
 log = logging.getLogger(__name__)
@@ -66,7 +66,7 @@ def predict_embeddings(cfg: DictConfig) -> None:
         log.info(
             f"Loading model from Hugging Face repo {hf_repo_id}, size {hf_model_size}",
         )
-        model, vocab, _, coll_cfg = ComposerSCGPTModel.from_hf(
+        model, vocab, _, coll_cfg = ComposerTX.from_hf(
             hf_repo_id,
             hf_model_size,
         )

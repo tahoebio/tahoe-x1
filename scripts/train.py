@@ -39,7 +39,7 @@ from streaming.base.util import clean_stale_shared_memory
 install()
 
 from mosaicfm.data import build_dataloader
-from mosaicfm.model import ComposerSCGPTModel
+from mosaicfm.model import ComposerTX
 from mosaicfm.tokenizer import GeneVocab
 from mosaicfm.utils import download_file_from_s3_url
 
@@ -452,7 +452,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
     with init_context:
         # Build Model
-        model = ComposerSCGPTModel(
+        model = ComposerTX(
             model_config=model_config,
             collator_config=collator_config,
         )

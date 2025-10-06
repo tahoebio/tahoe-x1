@@ -9,18 +9,18 @@ from .blocks import (
     SCGPTEncoder,
 )
 from .model import (
-    ComposerSCGPTModel,
-    SCGPTModel,
+    ComposerTX,
+    TXModel,
 )
 
 __all__ = [
     "CategoryValueEncoder",
-    "ComposerSCGPTModel",
+    "ComposerTX",
     "ContinuousValueEncoder",
     "ExprDecoder",
     "GeneEncoder",
     "MVCDecoder",
     "SCGPTBlock",
     "SCGPTEncoder",
-    "SCGPTModel",
+    "TXModel",
 ]

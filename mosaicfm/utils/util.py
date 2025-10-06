@@ -27,7 +27,7 @@ def load_model(
     return_gene_embeddings: bool = False,
     use_chem_inf: Optional[bool] = False,
 ):
-    from mosaicfm.model.model import ComposerSCGPTModel
+    from mosaicfm.model.model import ComposerTX
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
     vocab_path = os.path.join(model_dir, "vocab.json")
@@ -58,7 +58,7 @@ def load_model(
         del collator_config["drug_to_id_path"]
         strict = False
 
-    model = ComposerSCGPTModel(
+    model = ComposerTX(
         model_config=model_config,
         collator_config=collator_config,
     )
