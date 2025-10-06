@@ -45,6 +45,6 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="The base name for the dataset.",
-    )  # scgpt_old_dataset
+    )  
     args = parser.parse_args()
     process_datasets(args.path, args.dataset_name)
