@@ -169,6 +169,6 @@ parameters:
     wandb:
       project: vevo-MFM-v2
       log_artifacts: False
-  save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+  save_folder: "s3://tahoe-hackathon-data/models/{run_name}"
   save_interval: "2000ba"
   autoresume: True

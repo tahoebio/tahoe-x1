@@ -182,7 +182,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         cfg,
         "save_folder",
         must_exist=False,
-        default_value=f"s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
+        default_value=f"s3://tahoe-hackathon-data/models/{run_name}",
     )
     is_state_dict_sharded: bool = (
         (fsdp_config.get("state_dict_type", "full") == "sharded")
