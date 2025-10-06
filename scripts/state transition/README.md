@@ -1,4 +1,4 @@
-# STATE TRAMSITION post-training
+# STATE TRAnSITION post-training
 
 This folder contains training scripts and data splits for post-training with STATE TRANSITION.
 
