@@ -10,7 +10,7 @@ from mosaicfm.utils import download_file_from_s3_url
 model_name = "scgpt-70m-1024-fix-norm-apr24-data"
 wandb_id = "55n5wvdm"
 api = wandb.Api()
-run = api.run(f"vevotx/vevo-scgpt/{wandb_id}")
+run = api.run(f"vevotx/vevo-MFM-v2/{wandb_id}")
 yaml_path = run.file("config.yaml").download(replace=True)
 
 with open("config.yaml") as f:
@@ -63,7 +63,7 @@ model_config.use_generative_training = False
 
 ## Step 5: Add precision and wandb ID to config
 model_config["precision"] = yaml_cfg["precision"]["value"]
-model_config["wandb_id"] = f"vevotx/vevo-scgpt/{wandb_id}"
+model_config["wandb_id"] = f"vevotx/vevo-MFM-v2/{wandb_id}"
 
 om.save(config=model_config, f=f"{save_dir}/model_config.yml")
 om.save(config=collator_config, f=f"{save_dir}/collator_config.yml")

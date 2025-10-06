@@ -57,7 +57,7 @@ docker run --network host --gpus all \
   -e GITHUB_TOKEN=<GITHUB_TOKEN> \
   -e WANDB_API_KEY=<WANDB_API_KEY> \
   -e WANDB_ENTITY="vevotx" \
-  -e WANDB_PROJECT="vevo-scgpt" \
+  -e WANDB_PROJECT="vevo-MFM-v2" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
   vevotx/ml-scgpt:shreshth -c "\
