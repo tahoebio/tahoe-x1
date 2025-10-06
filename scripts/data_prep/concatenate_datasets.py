@@ -39,7 +39,7 @@ if __name__ == "__main__":
         type=str,
         required=True,
         help="The directory containing dataset chunks.",
-    )  # /vevo/cellxgene/scgpt_old_dataset/hf_dataset
+    )  
     parser.add_argument(
         "--dataset_name",
         type=str,

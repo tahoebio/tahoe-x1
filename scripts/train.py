@@ -348,7 +348,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )
         logging.getLogger("mosaicfm").setLevel(
             python_log_level.upper(),
-        )  # vevo-scGPT module
+        )  
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
     # Initialize context
