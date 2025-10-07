@@ -181,7 +181,7 @@ parameters:
     runtime_estimator: {}
   loggers:
     wandb:
-      project: vevo-MFM-v2
+      project: tahoex
       log_artifacts: False
   load_path: 's3://vevo-ml-datasets/mosaicfm_v2/models/mosaicfm-3b-prod/ep4-ba104156-rank0.pt'
   load_weights_only: True 

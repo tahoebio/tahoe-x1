@@ -10,7 +10,7 @@ from tahoex.utils import download_file_from_s3_url
 model_name = "tx-3b-prod"
 wandb_id = "mygjkq5c"
 api = wandb.Api()
-run = api.run(f"vevotx/vevo-MFM-v2/{wandb_id}")
+run = api.run(f"vevotx/tahoex/{wandb_id}")
 yaml_path = run.file("config.yaml").download(replace=True)
 
 with open("config.yaml") as f:
@@ -63,7 +63,7 @@ model_config.use_generative_training = False
 
 ## Step 5: Add precision and wandb ID to config
 model_config["precision"] = yaml_cfg["precision"]["value"]
-model_config["wandb_id"] = f"vevotx/vevo-MFM-v2/{wandb_id}"
+model_config["wandb_id"] = f"vevotx/tahoex/{wandb_id}"
 
 om.save(config=model_config, f=f"{save_dir}/model_config.yml")
 om.save(config=collator_config, f=f"{save_dir}/collator_config.yml")
