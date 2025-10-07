@@ -1,6 +1,6 @@
 # v2 Dataset Preparation Scripts
 
-This folder contains scripts for the first major update to the pretraining dataset for MosaicFM.
+This folder contains scripts for the first major update to the pretraining dataset for TahoeX.
 This release includes data from CellXGene (~60M cells), scBasecamp (~115M cells) as well as Vevo's Tahoe-100M dataset (~96M).
 
 | Dataset                             | Description                                                                                                               | s3 path                                                               |

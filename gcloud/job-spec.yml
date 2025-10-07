@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: vevo-mosaicfm-single-node
+  name: vevo-tahoex-single-node
   namespace: default
 spec:
   template:
@@ -13,7 +13,7 @@ spec:
       nodeSelector:
         cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
-      - name: vevo-mosaicfm
+      - name: vevo-tahoex
         image: vevotx/mosaicfm:1.1.0
         command: [ "/bin/bash", "-c", "--" ]
         args:

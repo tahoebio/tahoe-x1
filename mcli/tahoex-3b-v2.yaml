@@ -1,8 +1,9 @@
 integrations:
 - integration_type: git_repo
   git_repo: tahoebio/mosaicfm
-  git_branch: main #80-use-evo2-pretrained-gene-embeddings
-  pip_install:  -e . --no-deps
+  git_branch: main
+  # git_commit: # OR use your commit hash
+  pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
 
 # We are fetching, converting, and training on the 'val' split
@@ -10,18 +11,17 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/provisioning-request.yaml`
 # to convert and host the full 'train' dataset.
 command: |
-  export OPENBLAS_NUM_THREADS=1
   cd mosaicfm/scripts
   composer train.py /mnt/config/parameters.yaml
 image: vevotx/mosaicfm:1.1.0
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
   OPENBLAS_NUM_THREADS: 1 # Prevents an issue with k-nearest neighbors in the cell-class callback
-name: mosaicfm-3b
+name: tx-3b
 
 compute:
-  gpus: 32 #64 # Number of GPUs to use
-  cluster: r15z10p1 #r18z1p1
+  gpus: 128 # Number of GPUs to use
+  cluster: r18z1p1
 scheduling:
   max_duration: 90 # Maximum duration of the run in hours
 
@@ -34,12 +34,12 @@ parameters:
   device_train_batch_size: 160
   global_train_batch_size: 10240
   device_eval_batch_size: 160
-  device_train_microbatch_size: 8 #'auto'
+  device_train_microbatch_size: 20
   vocabulary:
     remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: mosaicfm
+    name: tahoex
     d_model: 2560
     n_layers: 32
     init_device: cpu
@@ -91,7 +91,7 @@ parameters:
     do_binning: True
     mlm_probability: 0.5
     mask_value: -1
-    max_length: 2048
+    max_length: 1024
     sampling: True
     data_style: "both"
     num_bins: 51
@@ -106,19 +106,19 @@ parameters:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/train/"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2/train/"
           local: "mds-data-folder/tahoe/train"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/train/"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
           local: "mds-data-folder/cellxgene/train"
         scbasecamp:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/train/"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2/train/"
           local: "mds-data-folder/scbasecamp/train"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: True
       shuffle_seed: ${global_seed}
-      num_canonical_nodes:  2
+      num_canonical_nodes: 2
     drop_last: False
     num_workers: 8
     pin_memory: True
@@ -128,14 +128,14 @@ parameters:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/valid/"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2/valid/"
           local: "mds-data-folder/tahoe/valid"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/valid/"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
           local: "mds-data-folder/cellxgene/valid"
         scbasecamp:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/valid/"
-          local: "mds-data-folder/scbasecamp/val"
+          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2/valid/"
+          local: "mds-data-folder/scbasecamp/valid"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: False
@@ -148,15 +148,17 @@ parameters:
     persistent_workers: True
   optimizer:
     name: decoupled_adamw
-    lr: 3.0e-5 #3.0e-4
+    lr: 3.0e-4
     betas:
       - 0.9
       - 0.95
     eps: 1.0e-08
     weight_decay: 3.0e-06
   scheduler:
-    name: 'constant_with_warmup'
-    t_warmup: '0ba'
+    name: cosine_with_warmup
+    t_warmup: "0.05dur"
+    t_max: "1dur"
+    alpha_f: 0.1
   algorithms:
     gradient_clipping:
       clipping_type: norm
@@ -165,7 +167,7 @@ parameters:
   precision: amp_bf16
   eval_interval: "10000ba"
   eval_subset_num_batches: 100
-  max_duration: '1ep' #"120064ba"
+  max_duration: "4ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -183,8 +185,7 @@ parameters:
     wandb:
       project: vevo-MFM-v2
       log_artifacts: False
-  load_path: 's3://vevo-ml-datasets/mosaicfm_v2/models/mosaicfm-3b-prod/ep4-ba104156-rank0.pt'
-  load_weights_only: True 
   save_folder: "s3://vevo-ml-datasets/mosaicfm_v2/models/{run_name}"
-  save_interval: "1000ba"
-  run_name: mosaicfm-3b-prod-cont-MFMv2
+  save_interval: "3000ba"
+  run_name: tx-3b-prod
+  autoresume: True

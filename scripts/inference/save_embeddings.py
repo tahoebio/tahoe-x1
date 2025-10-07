@@ -86,7 +86,7 @@ def main(cfg: DictConfig) -> None:
             pa.field("sample", pa.dictionary(pa.int32(), pa.string())),
             pa.field("cell_line", pa.dictionary(pa.int32(), pa.string())),
             pa.field("BARCODE_SUB_LIB_ID", pa.string()),
-            pa.field("mosaicfm-70m-merged", pa.list_(pa.float32(), 512)),
+            pa.field("tx-70m-merged", pa.list_(pa.float32(), 512)),
         ],
     )
 
@@ -145,7 +145,7 @@ def main(cfg: DictConfig) -> None:
                     "sample": samples,
                     "cell_line": cells,
                     "BARCODE_SUB_LIB_ID": barcodes,
-                    "mosaicfm-70m-merged": [list(r) for r in cls_np],
+                    "tx-70m-merged": [list(r) for r in cls_np],
                 },
                 schema=schema,
             )

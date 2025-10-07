@@ -7,7 +7,7 @@ from omegaconf import OmegaConf as om
 from tahoex.tokenizer import GeneVocab
 from tahoex.utils import download_file_from_s3_url
 
-model_name = "mosaicfm-3b-prod"
+model_name = "tx-3b-prod"
 wandb_id = "mygjkq5c"
 api = wandb.Api()
 run = api.run(f"vevotx/vevo-MFM-v2/{wandb_id}")
@@ -30,7 +30,7 @@ download_file_from_s3_url(
     local_file_path="vocab.json",
 )
 
-save_dir = f"/tahoe/mosaicfm/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
+save_dir = f"/tahoe/tahoex/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
 
 # Step 1 - Add special tokens to the vocab
 vocab = GeneVocab.from_file("vocab.json")
