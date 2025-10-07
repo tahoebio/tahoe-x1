@@ -4,8 +4,8 @@ import os
 import wandb
 from omegaconf import OmegaConf as om
 
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.tokenizer import GeneVocab
+from tahoex.utils import download_file_from_s3_url
 
 model_name = "mosaicfm-3b-prod"
 wandb_id = "mygjkq5c"

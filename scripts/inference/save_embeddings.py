@@ -13,9 +13,9 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from tqdm.auto import tqdm
 
-from mosaicfm.data import DataCollator
-from mosaicfm.model import ComposerTX
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import DataCollator
+from tahoex.model import ComposerTX
+from tahoex.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 logging.basicConfig(

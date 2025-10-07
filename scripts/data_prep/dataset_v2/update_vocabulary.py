@@ -7,7 +7,7 @@ import scanpy as sc
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.tokenizer import GeneVocab
 
 # Logging setup
 log = logging.getLogger(__name__)

@@ -15,7 +15,7 @@ from llmfoundry.models.mpt.modeling_mpt import gen_flash_attn_padding_info
 from torch import Tensor, nn
 from torch.nn.modules.transformer import _get_clones
 
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.utils import download_file_from_s3_url
 
 attn_config_defaults: Dict = {
     "attn_type": "grouped_query_attention",

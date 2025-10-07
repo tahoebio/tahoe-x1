@@ -13,8 +13,8 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from scipy.sparse import csc_matrix, csr_matrix
 
-from mosaicfm.data import CountDataset
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import CountDataset
+from tahoex.tokenizer import GeneVocab
 
 
 def find_h5ad_files(

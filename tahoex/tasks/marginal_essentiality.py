@@ -15,7 +15,7 @@ from torch.distributed.fsdp.fully_sharded_data_parallel import (
     FullyShardedDataParallel as FSDP,
 )
 
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.utils import download_file_from_s3_url
 
 
 class MarginalEssentiality(Callback):
@@ -67,7 +67,7 @@ class MarginalEssentiality(Callback):
         )
 
         # get gene embeddings
-        from mosaicfm.tasks import get_batch_embeddings
+        from tahoex.tasks import get_batch_embeddings
 
         with (
             model_eval_mode(

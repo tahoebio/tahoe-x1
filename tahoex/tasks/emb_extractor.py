@@ -8,9 +8,9 @@ from anndata import AnnData
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
-from mosaicfm.model import TXModel
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils.util import loader_from_adata
+from tahoex.model import TXModel
+from tahoex.tokenizer import GeneVocab
+from tahoex.utils.util import loader_from_adata
 
 log = logging.getLogger(__name__)
 
