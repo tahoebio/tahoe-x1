@@ -56,7 +56,7 @@ docker run --network host -it --gpus all \
   vevotx/mosaicfm:1.1.0 -c "\
   mkdir -p /src && \
   cd /src && \
-  git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/vevotx/mosaicfm.git && \
+  git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git && \
   cd mosaicfm && \
   pip install -e . --no-deps && \
   cd scripts && \

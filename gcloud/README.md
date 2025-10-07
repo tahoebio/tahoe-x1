@@ -64,16 +64,16 @@ docker run --network host --gpus all \
     mkdir -p /src && \
     cd /src && \
     if [ -d mosaicfm ]; then \
-      cd mosaicfm && \
+      cd tahoe-x1 && \
       git fetch --all && \
       git reset --hard origin/32-train-13b-model-with-full-dataset; \
     else \
-      git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/vevotx/mosaicfm.git && \
-      cd mosaicfm; \
+      git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git && \
+      cd tahoe-x1; \
     fi && \
     pip install -e . --no-deps && \
     cd scripts && \
-    composer --world_size 64 --node_rank <NODE_RANK_0-7> --master_addr <MASTER_ADDR> --master_port 29500 train.py ../gcloud/mosaicfm-1_3b-merged.yaml"
+    composer --world_size 64 --node_rank <NODE_RANK_0-7> --master_addr <MASTER_ADDR> --master_port 29500 train.py ../gcloud/tahoex-1_3b-merged.yaml"
 ```
 
 I launched the runs in node order, ie master node first, followed by 1-7. 

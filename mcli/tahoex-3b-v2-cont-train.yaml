@@ -1,6 +1,6 @@
 integrations:
 - integration_type: git_repo
-  git_repo: tahoebio/mosaicfm
+  git_repo: tahoebio/tahoe-x1
   git_branch: main #80-use-evo2-pretrained-gene-embeddings
   pip_install:  -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
@@ -11,7 +11,7 @@ integrations:
 # to convert and host the full 'train' dataset.
 command: |
   export OPENBLAS_NUM_THREADS=1
-  cd mosaicfm/scripts
+  cd tahoe-x1/scripts
   composer train.py /mnt/config/parameters.yaml
 image: vevotx/mosaicfm:1.1.0
 env_variables:

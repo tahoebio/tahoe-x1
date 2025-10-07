@@ -1,6 +1,6 @@
 integrations:
 - integration_type: git_repo
-  git_repo: tahoebio/mosaicfm
+  git_repo: tahoebio/tahoe-x1
   git_branch: main
   # git_commit: # OR use your commit hash
   pip_install: -e . --no-deps
@@ -11,7 +11,7 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/provisioning-request.yaml`
 # to convert and host the full 'train' dataset.
 command: |
-  cd mosaicfm/scripts
+  cd tahoe-x1/scripts
   composer train.py /mnt/config/parameters.yaml
 image: vevotx/mosaicfm:1.1.0
 env_variables:
