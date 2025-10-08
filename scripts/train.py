@@ -348,7 +348,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         )
         logging.getLogger("tahoex").setLevel(
             python_log_level.upper(),
-        )  
+        )
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
     # Initialize context
