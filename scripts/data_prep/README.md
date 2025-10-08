@@ -2,7 +2,7 @@
 
 > [!NOTE]
 > These instructions outline the steps followed for the 2024 release of TahoeX.
-> For the datasets processing pipeline for TahoeX-v2 please refer to the **datasets_v2** folder
+> For the datasets processing pipeline for Tahoe-x1 please refer to the **datasets_v2** folder
 
 This folder contains scripts for converting single-cell 
 data in the adata format from multiple sources into the MDS format used by our training workflow.
