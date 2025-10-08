@@ -57,7 +57,7 @@ docker run --network host -it --gpus all \
   mkdir -p /src && \
   cd /src && \
   git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git && \
-  cd mosaicfm && \
+  cd tahoe-x1 && \
   pip install -e . --no-deps && \
   cd scripts && \
   /bin/bash"

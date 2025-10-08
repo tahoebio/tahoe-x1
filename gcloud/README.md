@@ -1,4 +1,4 @@
-# Launching a MosaicFM run on Google Cloud
+# Launching a TahoeX run on Google Cloud
 
 DWS can be used either through Google Kubernetes Engine (GKE) or through MIG resize requests. Although the process with GKE would be more automated and require fewer manual steps (such as launching the launcher individually on each node) 
 I was not able to get it to work. The initial steps for setting up GKE can be found [here](https://cloud.google.com/kubernetes-engine/docs/how-to/provisioningrequest). The provisioning-request and job-spec created for this process are included in this folder. 
@@ -44,7 +44,7 @@ It follows the format `VM_NAME.ZONE.c.PROJECT_ID.internal`. You can check that i
 In my case the value was `MASTER_ADDR=h100-cluster-401h.us-central1-a.c.vevo-ml.internal`
 The Node rank is a number from 0-7 and must be changed for each node. The world size is 64 for the 8 nodes.
 The final launch command inside the docker statement should look something like:
-> composer --world_size 64 --node_rank 7 --master_addr h100-cluster-401h.us-central1-a.c.vevo-ml.internal --master_port 29500 train.py ../gcloud/mosaicfm-1_3b-merged.yaml
+> composer --world_size 64 --node_rank 7 --master_addr h100-cluster-401h.us-central1-a.c.vevo-ml.internal --master_port 29500 train.py ../gcloud/tahoex-1_3b-merged.yaml
 
 The keys for AWS, GITHUB, WANDB need to be populated as well.
 
@@ -63,7 +63,7 @@ docker run --network host --gpus all \
   vevotx/mosaicfm:1.1.0 -c "\
     mkdir -p /src && \
     cd /src && \
-    if [ -d mosaicfm ]; then \
+    if [ -d tahoe-x1 ]; then \
       cd tahoe-x1 && \
       git fetch --all && \
       git reset --hard origin/32-train-13b-model-with-full-dataset; \

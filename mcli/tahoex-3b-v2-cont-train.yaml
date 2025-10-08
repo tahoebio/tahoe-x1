@@ -36,7 +36,7 @@ parameters:
   device_eval_batch_size: 160
   device_train_microbatch_size: 8 #'auto'
   vocabulary:
-    remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+    remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
     name: tahoex
@@ -79,7 +79,7 @@ parameters:
       activation: "gelu"
     chemical_encoder:
       drug_fps_path:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_fps_pad.npy"
+        remote: "s3://tahoe-hackathon-data/MFM/drug_fps_pad.npy"
         local: "drug_fps_pad.npy"
       activation: "gelu"
       padding_idx: 0
@@ -99,20 +99,20 @@ parameters:
     use_junk_tokens: False
     use_chem_token: True
     drug_to_id_path:
-      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/drug_to_id_pad.json"
+      remote: "s3://tahoe-hackathon-data/MFM/drug_to_id_pad.json"
       local: "drug_to_id_pad.json"
     keep_first_n_tokens: 2
   train_loader:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/train/"
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2_filtered/train/"
           local: "mds-data-folder/tahoe/train"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/train/"
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS_filtered/train/"
           local: "mds-data-folder/cellxgene/train"
         scbasecamp:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/train/"
+          remote: "s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2_filtered/train/"
           local: "mds-data-folder/scbasecamp/train"
       download_timeout: 300
       allow_unsafe_types: True
@@ -128,13 +128,13 @@ parameters:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v2_filtered/valid/"
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2_filtered/valid/"
           local: "mds-data-folder/tahoe/valid"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS_filtered/valid/"
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS_filtered/valid/"
           local: "mds-data-folder/cellxgene/valid"
         scbasecamp:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/scbasecamp_2025_02_25_MDS_v2_filtered/valid/"
+          remote: "s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2_filtered/valid/"
           local: "mds-data-folder/scbasecamp/val"
       download_timeout: 300
       allow_unsafe_types: True
@@ -183,8 +183,8 @@ parameters:
     wandb:
       project: tahoex
       log_artifacts: False
-  load_path: 's3://vevo-ml-datasets/mosaicfm_v2/models/mosaicfm-3b-prod/ep4-ba104156-rank0.pt'
-  load_weights_only: True 
-  save_folder: "s3://vevo-ml-datasets/mosaicfm_v2/models/{run_name}"
+  load_path: 's3://tahoe-hackathon-data/MFM/ckpts/tx-3b-prod/ep4-ba104156-rank0.pt'
+  load_weights_only: True
+  save_folder: "s3://tahoe-hackathon-data/MFM/ckpts/{run_name}"
   save_interval: "1000ba"
   run_name: tx-3b-prod-cont

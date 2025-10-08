@@ -17,22 +17,22 @@
 </p>
 <br />
 
-# MosaicFM
+# TahoeX
 
-This is the internal codebase for the **MosaicFM** series of single-cell RNA-seq foundation models 
+This is the internal codebase for the **TahoeX** series of single-cell RNA-seq foundation models 
 developed by Vevo Therapeutics. Our repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) 
 and imports several utility functions from it. Please follow the developer guidelines if you are 
 contributing to this repository. For main results and documentation, please refer to the results section. 
 If you are looking to train or finetune a model on single-cell data, please refer to the training section.
 
 The repository is organized as follows:
-* `mosaicfm/` contains the building blocks for the MosaicFM models.
-  * `mosaicfm/model/blocks` Building block modules that may be used across models
-  * `mosaicfm/model/model` Full architectures subclassed from [ComposerModel](https://docs.mosaicml.com/projects/composer/en/latest/composer_model.html)
-  * `mosaicfm/tasks/` Helper functions to use in downstream applications, such as embedding extraction.
-  * `mosaicfm/tokenizer` Vocabulary building and tokenization functions.
-  * `mosaicfm/data` Data loaders and collators
-  * `mosaicfm/utils` Miscellaneous utility functions such to dowload files from s3 etc.
+* `tahoex/` contains the building blocks for the TahoeX models.
+  * `tahoex/model/blocks` Building block modules that may be used across models
+  * `tahoex/model/model` Full architectures subclassed from [ComposerModel](https://docs.mosaicml.com/projects/composer/en/latest/composer_model.html)
+  * `tahoex/tasks/` Helper functions to use in downstream applications, such as embedding extraction.
+  * `tahoex/tokenizer` Vocabulary building and tokenization functions.
+  * `tahoex/data` Data loaders and collators
+  * `tahoex/utils` Miscellaneous utility functions such to dowload files from s3 etc.
 * `scripts/` contains scripts to train/evaluate models and to build datasets.
   * `scripts/train.py` Script to train a model. Accepts a yaml file or command line arguments for specifying job parameters.
   * `scripts/prepare_for_inference.py` Script to save a model for inference by packaging it with the vocabulary and saving metadata.
@@ -48,29 +48,29 @@ At the moment, we are also restricted to use a version of llm-foundry no later v
 implementation of flash-attention was removed in [v0.7.0](https://github.com/mosaicml/llm-foundry/releases/tag/v0.7.0).
 
 We support launching runs on the MosaicML platform as well as on local machines through RunAI.
-The recommended method for using MosaicFM is to use the pre-built [vevotx/mosaicfm](https://hub.docker.com/repository/docker/vevotx/mosaicfm/) docker image.
+The recommended method for using TahoeX is to use the pre-built [vevotx/mosaicfm](https://hub.docker.com/repository/docker/vevotx/mosaicfm/) docker image.
 
 Currently, we have the following images available:
 
 | Image Name                     | Base Image | Description         |
 |--------------------------------|-------------|-------------------------------------------------|
-| [`vevotx/mosaicfm:1.1.0`](https://github.com/vevotx/vevo-docker/tree/main/ml_docker_vevo_mosaicfm) | docker.io/mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596 | Image used for MosaicFM (current release) |
+| [`vevotx/mosaicfm:1.1.0`](https://github.com/vevotx/vevo-docker/tree/main/ml_docker_vevo_mosaicfm) | docker.io/mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596 | Image used for TahoeX (current release) |
 
 ## Installation
 
 ### With docker
 ```shell
-git clone https://github.com/vevotx/mosaicfm.git
-cd mosaicfm
+git clone https://github.com/tahoebio/tahoe-x1.git
+cd tahoe-x1
 pip install -e .
 ```
 ### Without docker
 ```shell
-git clone https://github.com/vevotx/mosaicfm.git 
-cd mosaicfm
+git clone https://github.com/tahoebio/tahoe-x1.git
+cd tahoe-x1
 mamba env create -f envs/mosaicfm_env.yml
-mamba activate mosaicfm
-pip install -e . --no-deps # Inside the mosaicfm directory
+mamba activate tahoe-x1
+pip install -e . --no-deps # Inside the tahoex directory
 ```
 > [!NOTE]  
 > If you are on an H100 GPU you may see `'sm_90' is not a recognized processor for this target (ignoring processor)`. This is expected and safe to ignore.
@@ -91,10 +91,10 @@ The following datasets are used for training and evaluation:
 
 | Model Name                  | Run Name                           | Path to Checkpoints                                           | WandB id |
 |-----------------------------|------------------------------------|---------------------------------------------------------------|----------|
-| **MosaicFM-1.3B**           | scgpt-1_3b-2048-prod               | `s3:/vevo-scgpt/models/scgpt-1_3b-2048-prod/`                 | lv6jl8kl |
-| **MosaicFM-70M**            | scgpt-70m-1024-fix-norm-apr24-data | `s3:/vevo-scgpt/models/scgpt-70m-1024-fix-norm-apr24-data/`    | 55n5wvdm |
-| **MosaicFM-25M**            | scgpt-25m-1024-fix-norm-apr24-data | `s3:/vevo-scgpt/models/scgpt-25m-1024-fix-norm-apr24-data/`    | bt4a1luo |
-| **MosaicFM-9M**             | sscgpt-test-9m-full-data           | `s3:/vevo-scgpt/models/scgpt-test-9m-full-data/`              | di7kyyf1 |
+| **TX1-1.3B**           | scgpt-1_3b-2048-prod               | `s3:/vevo-scgpt/models/scgpt-1_3b-2048-prod/`                 | lv6jl8kl |
+| **TX1-70M**            | scgpt-70m-1024-fix-norm-apr24-data | `s3:/vevo-scgpt/models/scgpt-70m-1024-fix-norm-apr24-data/`    | 55n5wvdm |
+| **TX1-25M**            | scgpt-25m-1024-fix-norm-apr24-data | `s3:/vevo-scgpt/models/scgpt-25m-1024-fix-norm-apr24-data/`    | bt4a1luo |
+| **TX1-9M**             | sscgpt-test-9m-full-data           | `s3:/vevo-scgpt/models/scgpt-test-9m-full-data/`              | di7kyyf1 |
 
 ## Results
 Links to evaluations and benchmarks are provided below:
