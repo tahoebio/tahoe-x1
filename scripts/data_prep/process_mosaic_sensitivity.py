@@ -12,7 +12,7 @@ from datasets import Dataset
 from omegaconf import DictConfig, OmegaConf
 from tqdm.auto import tqdm
 
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.tokenizer import GeneVocab
 
 # Logging setup
 log = logging.getLogger(__name__)

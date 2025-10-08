@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: vevo-mosaicfm-single-node
+  name: vevo-tahoex-single-node
   namespace: default
 spec:
   template:
@@ -13,16 +13,16 @@ spec:
       nodeSelector:
         cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
-      - name: vevo-mosaicfm
-        image: us-central1-docker.pkg.dev/vevo-ml/default-registry/vevo-scgpt:shreshth
+      - name: vevo-tahoex
+        image: vevotx/mosaicfm:1.1.0
         command: [ "/bin/bash", "-c", "--" ]
         args:
           - |
             set -e;
             mkdir -p /src;
             cd /src;
-            git clone -b 32-train-13b-model-with-full-dataset https://oauth2:${GITHUB_TOKEN}@github.com/vevotx/mosaicfm.git;
-            cd mosaicfm/gcloud;
+            git clone -b 32-train-13b-model-with-full-dataset https://oauth2:${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git;
+            cd tahoe-x1/gcloud;
             ./launch_run.sh
         resources:
           limits:

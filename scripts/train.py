@@ -12,7 +12,7 @@ import torch
 from composer.core.callback import Callback
 from llmfoundry.registry import callbacks
 
-from mosaicfm.tasks import CellClassification, MarginalEssentiality
+from tahoex.tasks import CellClassification, MarginalEssentiality
 
 callbacks.register("cell-classification", func=CellClassification)
 callbacks.register("marginal-essentiality", func=MarginalEssentiality)
@@ -38,10 +38,10 @@ from streaming.base.util import clean_stale_shared_memory
 
 install()
 
-from mosaicfm.data import build_dataloader
-from mosaicfm.model import ComposerSCGPTModel
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.data import build_dataloader
+from tahoex.model import ComposerTX
+from tahoex.tokenizer import GeneVocab
+from tahoex.utils import download_file_from_s3_url
 
 log = logging.getLogger(__name__)
 
@@ -182,7 +182,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
         cfg,
         "save_folder",
         must_exist=False,
-        default_value=f"s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}",
+        default_value=f"s3://tahoe-hackathon-data/models/{run_name}",
     )
     is_state_dict_sharded: bool = (
         (fsdp_config.get("state_dict_type", "full") == "sharded")
@@ -346,9 +346,9 @@ def main(cfg: DictConfig) -> composer.Trainer:
             # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
             format=f"%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
         )
-        logging.getLogger("mosaicfm").setLevel(
+        logging.getLogger("tahoex").setLevel(
             python_log_level.upper(),
-        )  # vevo-scGPT module
+        )
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
 
     # Initialize context
@@ -452,7 +452,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
     )
     with init_context:
         # Build Model
-        model = ComposerSCGPTModel(
+        model = ComposerTX(
             model_config=model_config,
             collator_config=collator_config,
         )

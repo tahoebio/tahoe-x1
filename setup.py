@@ -1,5 +1,5 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
-"""Mosaicfm package setup."""
+"""TahoeX package setup."""
 
 import os
 import re
@@ -7,8 +7,8 @@ import re
 import setuptools
 from setuptools import setup
 
-_PACKAGE_NAME = "mosaicfm"
-_PACKAGE_DIR = "mosaicfm"
+_PACKAGE_NAME = "tahoex"
+_PACKAGE_DIR = "tahoex"
 _REPO_REAL_PATH = os.path.dirname(os.path.realpath(__file__))
 _PACKAGE_REAL_PATH = os.path.join(_REPO_REAL_PATH, _PACKAGE_DIR)
 
@@ -53,10 +53,10 @@ extra_deps["all"] = {
 setup(
     name=_PACKAGE_NAME,
     version=repo_version,
-    author="Vevo Therapeutics",
-    description="mosaicfm",
+    author="Tahoe Therapeutics",
+    description="tahoex",
     package_data={
-        "mosaicfm": ["py.typed"],
+        "tahoex": ["py.typed"],
     },
     packages=setuptools.find_packages(
         exclude=[

@@ -18,7 +18,7 @@ from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import pearsonr
 from sklearn.neighbors import kneighbors_graph
 
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.tokenizer import GeneVocab
 
 
 def load_model(
@@ -27,7 +27,7 @@ def load_model(
     return_gene_embeddings: bool = False,
     use_chem_inf: Optional[bool] = False,
 ):
-    from mosaicfm.model.model import ComposerSCGPTModel
+    from tahoex.model.model import ComposerTX
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
     vocab_path = os.path.join(model_dir, "vocab.json")
@@ -58,7 +58,7 @@ def load_model(
         del collator_config["drug_to_id_path"]
         strict = False
 
-    model = ComposerSCGPTModel(
+    model = ComposerTX(
         model_config=model_config,
         collator_config=collator_config,
     )
@@ -95,7 +95,7 @@ def loader_from_adata(
     if max_length is None:
         max_length = len(gene_ids)
 
-    from mosaicfm.data import CountDataset, DataCollator
+    from tahoex.data import CountDataset, DataCollator
 
     dataset = CountDataset(
         count_matrix,

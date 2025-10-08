@@ -8,16 +8,16 @@ from anndata import AnnData
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
-from mosaicfm.model import SCGPTModel
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils.util import loader_from_adata
+from tahoex.model import TXModel
+from tahoex.tokenizer import GeneVocab
+from tahoex.utils.util import loader_from_adata
 
 log = logging.getLogger(__name__)
 
 
 def get_batch_embeddings(
     adata: AnnData,
-    model: SCGPTModel,
+    model: TXModel,
     vocab: GeneVocab,
     model_cfg: DictConfig,
     collator_cfg: DictConfig,
@@ -32,7 +32,7 @@ def get_batch_embeddings(
 
     Args:
         adata (AnnData): The AnnData object.
-        model (SCGPTModel): The model.
+        model (TXModel): The model.
         vocab (GeneVocab): The gene-to-ID vocabulary
         model_cfg (DictConfig, optional): The model configuration dictionary.
         collator_cfg (DictConfig, optional): The collator configuration dictionary.

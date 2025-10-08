@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Copyright (C) Vevo Therapeutics 2025. All rights reserved.
-# Train State Transition model with MosaicFM embeddings on Tahoe data
+# Train State Transition model with TahoeX embeddings on Tahoe data
 # This script implements a fewshot scenario with drug-cell (DC) splits
 
 set -e  # Exit on any error
@@ -32,7 +32,7 @@ cd /tahoe/drive_3/ANALYSIS/analysis_190/Code/state
 # Train the State Transition model
 state tx train \
     data.kwargs.toml_config_path="$CONFIG_FILE" \
-    data.kwargs.embed_key="mosaicfm-70m-merged" \
+    data.kwargs.embed_key="tx-70m-merged" \
     data.kwargs.output_space="gene" \
     data.kwargs.num_workers=12 \
     data.kwargs.pert_col="drugname_drugconc" \
@@ -48,7 +48,7 @@ state tx train \
     model.kwargs.cell_set_len=256 \
     model.kwargs.residual_decoder=false \
     model=tahoe_llama_212693232 \
-    wandb.tags="[tahoe,fewshot,drug_cell_split,mosaicfm_70m_merged]" \
+    wandb.tags="[tahoe,fewshot,drug_cell_split,tahoex_70m_merged]" \
     wandb.project="state_tx_tahoe" \
     +wandb.name="$EXPERIMENT_NAME" \
     ++wandb.entity="vevotx" \

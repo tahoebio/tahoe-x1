@@ -1,6 +1,6 @@
 integrations:
 - integration_type: git_repo
-  git_repo: vevotx/mosaicfm
+  git_repo: tahoebio/tahoe-x1
   git_branch: main
   # git_commit:  # OR use your commit hash
   pip_install: -e . --no-deps
@@ -11,12 +11,12 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/provisioning-request.yaml`
 # to convert and host the full 'train' dataset.
 command: |
-  cd mosaicfm/scripts
+  cd tahoe-x1/scripts
   composer train.py /mnt/config/parameters.yaml
-image: vevotx/ml-scgpt:shreshth
+image: vevotx/mosaicfm:1.1.0
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
-name: mosaicfm-70m
+name: tx-70m
 
 compute:
   gpus: 16 # Number of GPUs to use
@@ -39,10 +39,10 @@ parameters:
   device_eval_batch_size: 400
   device_train_microbatch_size: "auto"
   vocabulary:
-    remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+    remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: vevo_scgpt
+    name: tahoex
     d_model: 512
     n_layers: 12
     init_device: cpu
@@ -94,8 +94,13 @@ parameters:
     use_junk_tokens: False
   train_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
-      local: "mds-data-folder/train"
+      streams:
+        tahoe:
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/train/"
+          local: "mds-data-folder/tahoe/train"
+        cellxgene:
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/train/"
+          local: "mds-data-folder/cellxgene/train"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: True
@@ -108,8 +113,13 @@ parameters:
     persistent_workers: True
   valid_loader:
     dataset:
-      remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
-      local: "mds-data-folder/val"
+      streams:
+        tahoe:
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/valid/"
+          local: "mds-data-folder/tahoe/val"
+        cellxgene:
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/valid/"
+          local: "mds-data-folder/cellxgene/val"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: False
@@ -157,8 +167,8 @@ parameters:
     runtime_estimator: {}
   loggers:
     wandb:
-      project: vevo-scgpt
+      project: tahoex
       log_artifacts: False
-  save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+  save_folder: "s3://tahoe-hackathon-data/MFM/ckpts/{run_name}"
   save_interval: "2000ba"
   autoresume: True

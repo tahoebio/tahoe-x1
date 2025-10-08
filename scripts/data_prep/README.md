@@ -1,8 +1,8 @@
 # Data preparation
 
 > [!NOTE]
-> These instructions outline the steps followed for the 2024 release of MosaicFM.
-> For the datasets processing pipeline for MosaicFM-v2 please refer to the **datasets_v2** folder
+> These instructions outline the steps followed for the 2024 release of TahoeX.
+> For the datasets processing pipeline for Tahoe-x1 please refer to the **datasets_v2** folder
 
 This folder contains scripts for converting single-cell 
 data in the adata format from multiple sources into the MDS format used by our training workflow.
@@ -12,16 +12,16 @@ data in the adata format from multiple sources into the MDS format used by our t
 
 | Dataset                             | Description                                                                                                                  | s3 path                                                               |
 |-------------------------------------|------------------------------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------|
-| Resistance is Futile v1 (MDS)       | Training data tokenized using the vocab for MosaicFM-1.3B. Contains a train and eval split segregated by drug                | s3://vevo-ml-datasets/vevo-scgpt/datasets/resistance_is_futile_35_MDS_v1/ |
-| Adamson v1 (MDS)                    | Adamson data tokenized using the MosaicFM-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/adamson_v1 |
-| Norman v1 (MDS)                     | Norman data tokenized using the MosaicFM-1.3B vocab. Containes train, validation and test splits segregated by perturbation  | s3://vevo-ml-datasets/vevo-scgpt/datasets/norman_v1  |
-| Replogle RPE1 v1 (MDS)              | Replogle RPE1 data tokenized using the MosaicFM-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/replogle_rpe1_v1 |
-| Replogle K562 v1 (MDS)              | Replogle K562 data tokenized using the MosaicFM-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/replogle_k562_v1 |
-| Resistace is Futile v1 (HF dataset) | Resistance is futile data tokenized using vocab for MosaicFM-1.3B. Not split into train/test                                 | s3://vevo-ml-datasets/vevo-scgpt/datasets/resistance_is_futile_full.dataset |
-| Adamson (HF dataset)                | Adamson dataset mapped using MosaicFM 1.3B vocab in the Huggingface datasets format. Not split into train/test               | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/adamson.dataset/ |
-| Norman  (HF dataset)                | Norman dataset mapped using MosaicFM 1.3B vocab in the Huggingface datasets format. Not split into train/test                | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/norman.dataset/ |
-| Replogle RPE1 (HF dataset)          | Replogle RPE1 dataset mapped using MosaicFM 1.3B vocab in the Huggingface datasets format. Not split into train/test         | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/replogle_rpe1.dataset/ |
-| Replogle K562 (HF dataset)          | Replogle K562 dataset mapped using MosaicFM 1.3B vocab in the Huggingface datasets format. Not split into train/test         | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/replogle_k562.dataset/ |
+| Resistance is Futile v1 (MDS)       | Training data tokenized using the vocab for TX-1.3B. Contains a train and eval split segregated by drug                | s3://vevo-ml-datasets/vevo-scgpt/datasets/resistance_is_futile_35_MDS_v1/ |
+| Adamson v1 (MDS)                    | Adamson data tokenized using the TX-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/adamson_v1 |
+| Norman v1 (MDS)                     | Norman data tokenized using the TX-1.3B vocab. Containes train, validation and test splits segregated by perturbation  | s3://vevo-ml-datasets/vevo-scgpt/datasets/norman_v1  |
+| Replogle RPE1 v1 (MDS)              | Replogle RPE1 data tokenized using the TX-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/replogle_rpe1_v1 |
+| Replogle K562 v1 (MDS)              | Replogle K562 data tokenized using the TX-1.3B vocab. Containes train, validation and test splits segregated by perturbation | s3://vevo-ml-datasets/vevo-scgpt/datasets/replogle_k562_v1 |
+| Resistace is Futile v1 (HF dataset) | Resistance is futile data tokenized using vocab for TX-1.3B. Not split into train/test                                 | s3://vevo-ml-datasets/vevo-scgpt/datasets/resistance_is_futile_full.dataset |
+| Adamson (HF dataset)                | Adamson dataset mapped using TX 1.3B vocab in the Huggingface datasets format. Not split into train/test               | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/adamson.dataset/ |
+| Norman  (HF dataset)                | Norman dataset mapped using TX 1.3B vocab in the Huggingface datasets format. Not split into train/test                | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/norman.dataset/ |
+| Replogle RPE1 (HF dataset)          | Replogle RPE1 dataset mapped using TX 1.3B vocab in the Huggingface datasets format. Not split into train/test         | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/replogle_rpe1.dataset/ |
+| Replogle K562 (HF dataset)          | Replogle K562 dataset mapped using TX 1.3B vocab in the Huggingface datasets format. Not split into train/test         | s3://vevo-ml-datasets/perturbseq/vevo-processed/aidan_filtered/replogle_k562.dataset/ |
 
 The MDS folders also contain
  - `metadata.json` : Contains the splits and median_library_size for each dataset.
@@ -76,7 +76,7 @@ have a well characterized set of target genes.
 
 The data is processed as follows:
 - Preprocessing:
-  - Select genes that are present in the MosaicFM vocabulary (matched using Ensemble gene ID, not gene symbol)
+  - Select genes that are present in the TX vocabulary (matched using Ensemble gene ID, not gene symbol)
   - Select the 5000 most variable genes using Seurat v3 (Note: Seurat v3 expects un-normalized raw counts)
   - Add the 
 - Iterate over cell-lines

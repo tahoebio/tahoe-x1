@@ -10,8 +10,8 @@ from omegaconf import DictConfig
 from scipy.sparse import csr_matrix
 from streaming import Stream, StreamingDataLoader, StreamingDataset
 
-from mosaicfm.data import DataCollator
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import DataCollator
+from tahoex.tokenizer import GeneVocab
 
 
 def build_streams(streams: dict[str, Any]) -> List[Stream]:

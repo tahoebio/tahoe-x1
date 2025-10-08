@@ -1,5 +1,5 @@
 paths:
-  model_dir: "/tahoe/data/ckpts/MFM-v2/release/mosaicfm-70m-VQ9aRB"
+  model_dir: "/tahoe/data/ckpts/tx/release/tahoex-70m-VQ9aRB"
   adata_input: "/tahoe/data/datasets/benchmark/kim2020_lung/kim_test.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/ccle.h5ad" # "/tahoe/data/datasets/benchmark/tahoe/Tahoe50k_train.h5ad"
   adata_output: "./pred_adata.h5ad"
   drug_to_id_path: "drug_to_id_pad.json"

@@ -16,10 +16,10 @@ import utils
 from omegaconf import OmegaConf as om
 from tqdm import tqdm
 
-from mosaicfm.data import CountDataset, DataCollator
-from mosaicfm.model import ComposerSCGPTModel
-from mosaicfm.tasks import get_batch_embeddings
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import CountDataset, DataCollator
+from tahoex.model import ComposerTX
+from tahoex.tasks import get_batch_embeddings
+from tahoex.tokenizer import GeneVocab
 
 # set up logging
 log = logging.getLogger(__name__)
@@ -29,8 +29,8 @@ logging.basicConfig(
 logging.getLogger(__name__).setLevel("INFO")
 
 
-# generate embeddings for a MosaicFM model
-def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17000):
+# generate embeddings for a TahoeX model
+def run_tahoex(base_path, model_path, model_name, batch_size=16, max_length=17000):
 
     # create paths
     model_config_path = os.path.join(model_path, "model_config.yml")
@@ -45,7 +45,7 @@ def run_mosaicfm(base_path, model_path, model_name, batch_size=16, max_length=17
     gene2idx = vocab.get_stoi()
 
     # load model
-    model = ComposerSCGPTModel(
+    model = ComposerTX(
         model_config=model_config,
         collator_config=collator_config,
     )
@@ -353,18 +353,18 @@ if __name__ == "__main__":
         "--batch-size",
         type=int,
         default=16,
-        help="Batch size for mosaicfm.tasks.get_batch_embeddings.",
+        help="Batch size for tahoex.tasks.get_batch_embeddings.",
     )
     parser.add_argument(
         "--max-length",
         type=int,
         default=17000,
-        help="Maximum sequence length for mosaicfm.tasks.get_batch_embeddings.",
+        help="Maximum sequence length for tahoex.tasks.get_batch_embeddings.",
     )
     args = parser.parse_args()
 
     # run function
-    run_mosaicfm(
+    run_tahoex(
         args.base_path,
         args.model_path,
         args.model_name,

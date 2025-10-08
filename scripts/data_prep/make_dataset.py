@@ -8,8 +8,8 @@ import datasets
 import numpy as np
 import scanpy as sc
 
-from mosaicfm.data import CountDataset
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import CountDataset
+from tahoex.tokenizer import GeneVocab
 
 
 def find_h5ad_files(directory: str, ignore_subdirs: Optional[List] = None) -> List[str]:

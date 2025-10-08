@@ -15,7 +15,7 @@ from llmfoundry.models.mpt.modeling_mpt import gen_flash_attn_padding_info
 from torch import Tensor, nn
 from torch.nn.modules.transformer import _get_clones
 
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.utils import download_file_from_s3_url
 
 attn_config_defaults: Dict = {
     "attn_type": "grouped_query_attention",
@@ -51,7 +51,7 @@ gene_encoder_defaults: Dict = {
 log = logging.getLogger(__name__)
 
 
-class SCGPTBlock(nn.Module):
+class TXBlock(nn.Module):
     r"""TransformerEncoderLayer is made up of self-attn and feedforward network.
     The class is modified from torch.nn.TransformerEncoderLayer to support the
     FlashAttention.
@@ -200,7 +200,7 @@ class SCGPTBlock(nn.Module):
         return self.post_ffn_dropout(x)
 
 
-class SCGPTEncoder(nn.Module):
+class TXEncoder(nn.Module):
     # takes in the set of different inputs in an mapping
     r"""TransformerEncoder is a stack of N encoder layers. Users can build the
     BERT(https://arxiv.org/abs/1810.04805) model with corresponding parameters.
@@ -222,7 +222,7 @@ class SCGPTEncoder(nn.Module):
 
     def __init__(
         self,
-        encoder_layer: SCGPTBlock,
+        encoder_layer: TXBlock,
         num_layers: int,
         use_norm: bool = False,
         norm_config: Optional[Dict] = None,

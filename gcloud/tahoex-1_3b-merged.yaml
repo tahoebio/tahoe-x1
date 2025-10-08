@@ -5,10 +5,10 @@ global_train_batch_size: 3584
 device_eval_batch_size: 56
 device_train_microbatch_size: "auto"
 vocabulary:
-  remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+  remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: vevo_scgpt
+  name: tahoex
   d_model: 2048
   n_layers: 24
   init_device: cpu
@@ -62,10 +62,10 @@ train_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/train/"
         local: "mds-data-folder/tahoe/train"
       cellxgene:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
+        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/train/"
         local: "mds-data-folder/cellxgene/train"
     download_timeout: 300
     allow_unsafe_types: True
@@ -81,10 +81,10 @@ valid_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/valid/"
         local: "mds-data-folder/tahoe/val"
       cellxgene:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
+        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/valid/"
         local: "mds-data-folder/cellxgene/val"
     download_timeout: 300
     allow_unsafe_types: True
@@ -133,9 +133,9 @@ callbacks:
   runtime_estimator: {}
 loggers:
   wandb:
-    project: vevo-scgpt
+    project: tahoex
     log_artifacts: False
-save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_folder: "s3://tahoe-hackathon-data/models/{run_name}"
 save_interval: "2000ba"
 autoresume: True
-run_name: "mosaicfm-v2-1_3b-1024-prod"
+run_name: "tx-v2-1_3b-1024-prod"

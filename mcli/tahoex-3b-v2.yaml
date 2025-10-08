@@ -1,8 +1,8 @@
 integrations:
 - integration_type: git_repo
-  git_repo: vevotx/mosaicfm
-  git_branch: marginal-essen
-  # git_commit:  # OR use your commit hash
+  git_repo: tahoebio/tahoe-x1
+  git_branch: main
+  # git_commit: # OR use your commit hash
   pip_install: -e . --no-deps
   ssh_clone: true  # Should be true if using a private repo
 
@@ -11,23 +11,19 @@ integrations:
 # For real training runs, follow the instructions in `llm-foundry/scripts/train/provisioning-request.yaml`
 # to convert and host the full 'train' dataset.
 command: |
-  cd mosaicfm/scripts
+  cd tahoe-x1/scripts
   composer train.py /mnt/config/parameters.yaml
 image: vevotx/mosaicfm:1.1.0
 env_variables:
-  MOSAICML_PLATFORM: False # Logging metadata to MosaicML platform is disabled, since it seems to timeout
-  OPENBLAS_NUM_THREADS: 1 # Prevents an issue
-name: mosaicfm-70m
+  MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
+  OPENBLAS_NUM_THREADS: 1 # Prevents an issue with k-nearest neighbors in the cell-class callback
+name: tx-3b
 
 compute:
-  gpus: 16 # Number of GPUs to use
+  gpus: 128 # Number of GPUs to use
   cluster: r18z1p1
 scheduling:
-  max_duration: 0.5 # Maximum duration of the run in hours
-
-  ## These configurations are optional
-  # cluster:
-  # gpu_type: a100_80gb # Type of GPU to use. We use a100_80gb in our experiments
+  max_duration: 90 # Maximum duration of the run in hours
 
 
 # The below is injected as a YAML file: /mnt/config/parameters.yaml
@@ -35,22 +31,22 @@ scheduling:
 parameters:
   global_seed: 777
   seed: ${global_seed}
-  device_train_batch_size: 400
-  global_train_batch_size: 4800
-  device_eval_batch_size: 300
-  device_train_microbatch_size: 300
+  device_train_batch_size: 160
+  global_train_batch_size: 10240
+  device_eval_batch_size: 160
+  device_train_microbatch_size: 20
   vocabulary:
-    remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+    remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: vevo_scgpt
-    d_model: 512
-    n_layers: 12
+    name: tahoex
+    d_model: 2560
+    n_layers: 32
     init_device: cpu
     expansion_ratio: 4
     standard_scale_outputs: False
-    transformer_activation: relu
-    n_heads: 8
+    transformer_activation: gelu
+    n_heads: 20
     norm_scheme: "pre"
     use_generative_training: True
     use_cell_conditioned_generation: False
@@ -58,9 +54,9 @@ parameters:
     cell_emb_style: cls
     attn_config:
       attn_impl: flash
-      attn_type: "grouped_query_attention"
       use_attn_mask: False
-      kv_nheads: 8
+      attn_type: "grouped_query_attention"
+      kv_nheads: 20
       attn_pdrop: 0.0
     norm_config:
       norm_type: "layernorm"
@@ -69,7 +65,7 @@ parameters:
       input_emb_style: "continuous"
       dropout: 0.1
       max_value: 512
-      activation: relu
+      activation: gelu
       use_norm: True
     gene_encoder:
       use_norm: True
@@ -80,7 +76,14 @@ parameters:
     expression_decoder:
       n_outputs: 1
       n_layers: 1
-      activation: "leaky_relu"
+      activation: "gelu"
+    chemical_encoder:
+      drug_fps_path:
+        remote: "s3://tahoe-hackathon-data/MFM/drug_fps_pad.npy"
+        local: "drug_fps_pad.npy"
+      activation: "gelu"
+      padding_idx: 0
+      freeze: False
   collator:
     do_padding: True
     pad_value: -2
@@ -94,15 +97,23 @@ parameters:
     num_bins: 51
     right_binning: False
     use_junk_tokens: False
+    use_chem_token: True
+    drug_to_id_path:
+      remote: "s3://tahoe-hackathon-data/MFM/drug_to_id_pad.json"
+      local: "drug_to_id_pad.json"
+    keep_first_n_tokens: 2
   train_loader:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/train/"
           local: "mds-data-folder/tahoe/train"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/train/"
           local: "mds-data-folder/cellxgene/train"
+        scbasecamp:
+          remote: "s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2/train/"
+          local: "mds-data-folder/scbasecamp/train"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: True
@@ -117,11 +128,14 @@ parameters:
     dataset:
       streams:
         tahoe:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
-          local: "mds-data-folder/tahoe/val"
+          remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/valid/"
+          local: "mds-data-folder/tahoe/valid"
         cellxgene:
-          remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
-          local: "mds-data-folder/cellxgene/val"
+          remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/valid/"
+          local: "mds-data-folder/cellxgene/valid"
+        scbasecamp:
+          remote: "s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2/valid/"
+          local: "mds-data-folder/scbasecamp/valid"
       download_timeout: 300
       allow_unsafe_types: True
       shuffle: False
@@ -139,7 +153,7 @@ parameters:
       - 0.9
       - 0.95
     eps: 1.0e-08
-    weight_decay: 1.0e-05
+    weight_decay: 3.0e-06
   scheduler:
     name: cosine_with_warmup
     t_warmup: "0.05dur"
@@ -151,9 +165,9 @@ parameters:
       clipping_threshold: 1.0
     low_precision_layernorm: {}
   precision: amp_bf16
-  eval_interval: "100ba"
+  eval_interval: "10000ba"
   eval_subset_num_batches: 100
-  max_duration: "100ba"
+  max_duration: "4ep"
   fsdp_config:
     sharding_strategy: FULL_SHARD
     mixed_precision: DEFAULT
@@ -161,34 +175,17 @@ parameters:
     activation_checkpointing_reentrant: false
     activation_cpu_offload: false
     limit_all_gathers: true
-    verbose: true
   callbacks:
     speed_monitor:
       window_size: 20
     lr_monitor: {}
     memory_monitor: {}
     runtime_estimator: {}
-    marginal-essentiality:
-      cfg:
-        batch_size: 32
-        seq_len: 8192
-        adata:
-          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/ccle.h5ad"
-          local: "/vevo/data/download/marginal-essentiality/ccle.h5ad"
-          gene_column: "feature_id"
-        labels:
-          remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/labels.csv"
-          local: "/vevo/data/download/marginal-essentiality/labels.csv"
-          gene_column: "gene_id"
-          label_column: "essential"
-        classifier:
-          n_jobs: 32
-          test_size: 0.2
-          random_state: 42
   loggers:
     wandb:
-      project: vevo-scgpt
+      project: tahoex
       log_artifacts: False
-  save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
-  save_interval: "2000ba"
+  save_folder: "s3://tahoe-hackathon-data/MFM/ckpts/{run_name}"
+  save_interval: "3000ba"
+  run_name: tx-3b-prod
   autoresume: True

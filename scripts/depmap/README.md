@@ -1,6 +1,6 @@
 # DepMap benchmarks
 
-This folder contains the scripts required to evaluate MosaicFM on three benchmarks centered around the DepMap dataset.
+This folder contains the scripts required to evaluate TahoeX on three benchmarks centered around the DepMap dataset.
 
 1. separate cancer cell lines by tissue of origin.
 2. predict whether genes are broadly essential or inessential.
@@ -43,12 +43,12 @@ This S3 bucket is populated with embeddings and results from the following model
 - TranscriptFormer (Exemplar)
 - TranscriptFormer (Metazoa)
 - STATE
-- MosaicFM (~70M parameters)
-- MosaicFM (~1.3B parameters)
-- MosaicFM (~3B parameters)
-- MosaicFM (~3B parameters, training continued with alternate gene encoder)
+- TahoeX (~70M parameters)
+- TahoeX (~1.3B parameters)
+- TahoeX (~3B parameters)
+- TahoeX (~3B parameters, training continued with alternate gene encoder)
 
-For more details on how we retrieved embeddings from non-MosaicFM models, please see `other-models.md` in this repository.
+For more details on how we retrieved embeddings from non-TahoeX models, please see `other-models.md` in this repository.
 
 **If you sync the entire directory (415GB), you can skip to step 4 and start evaluating new models.**
 
@@ -109,11 +109,11 @@ python generate-nulls.py --base-path [path]
 
 ### Step 4: generate embeddings for the model being evaluated
 
-When you have a new MosaicFM model to evaluate, use `generate-embs-model.py` to extract the embeddings needed for the DepMap benchmarks. Note that in all the following examples, the model name is something you can choose. File names are based this parameter, and you'll use it in steps 5 and 6. For the most seamless operation, specify the model name with nothing but hyphens. In step 5, and for task #2 and task #3 in step 6, the hyphens will be replaced with underscores.
+When you have a new TahoeX model to evaluate, use `generate-embs-model.py` to extract the embeddings needed for the DepMap benchmarks. Note that in all the following examples, the model name is something you can choose. File names are based this parameter, and you'll use it in steps 5 and 6. For the most seamless operation, specify the model name with nothing but hyphens. In step 5, and for task #2 and task #3 in step 6, the hyphens will be replaced with underscores.
 
 ```
-model name: mosaicfm-70m-verify-script
-downstream: mosaicfm_70m_verify_script
+model name: TahoeX-70m-verify-script
+downstream: TahoeX_70m_verify_script
 ```
 
 To run the script, you'll need a directory containing `best-model.pt`, `collator_config.yml`, `model_config.yml`, and `vocab.json`. Pass the location of this directory to the script using the `--model-path` argument.
@@ -142,25 +142,25 @@ Use `rf-cl-specific-task-[1,2,3]of3.sh` for task #3. The three scripts are inten
 bash rf-cl-specific-task-[1,2,3]of3.sh [base folder path] [embedding name, usually model name with underscores] [number of cores to use, 16-32 is usually good]
 ```
 
-#### Note on non-MosaicFM models
+#### Note on non-TahoeX models
 
-Due to differing vocabularies and context size limits, the various non-MosaicFM models we provide results for (see Step 0) have different numbers of genes with available embeddings. Below is a table summarizing this information.
+Due to differing vocabularies and context size limits, the various non-TahoeX models we provide results for (see Step 0) have different numbers of genes with available embeddings. Below is a table summarizing this information.
 
 | model | number of available genes |
 |---|---|
-| MosaicFM | 14,283 |
+| TahoeX | 14,283 |
 | Geneformer | 11,448 |
 | scGPT | 14,285 |
 | TranscriptFormer | 1,892 |
 | STATE | 9,516 |
 
-You can use the `--filter-genes` argument in `rf.py` to restrict the embeddings being evaluated to a set of genes taken from another model. Use this in conjunction with the `--add-label` argument to keep track of which results are generated from which gene sets. Here is an example for running the first fold of task #2 on embeddings from MosaicFM-70M restricted to STATE genes.
+You can use the `--filter-genes` argument in `rf.py` to restrict the embeddings being evaluated to a set of genes taken from another model. Use this in conjunction with the `--add-label` argument to keep track of which results are generated from which gene sets. Here is an example for running the first fold of task #2 on embeddings from TahoeX-70M restricted to STATE genes.
 
 ```
-python rf.py --base-path <path to base folder> --model-type classifier --emb mosaicfm_70m-mean-lt5gt70-bin --filter-genes state-mean-lt5gt70-bin --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs 8 --fold 0 --add-label="-state-genes"
+python rf.py --base-path <path to base folder> --model-type classifier --emb tahoex_70m-mean-lt5gt70-bin --filter-genes state-mean-lt5gt70-bin --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs 8 --fold 0 --add-label="-state-genes"
 ```
 
-You would then use `mosaicfm_70m-mean-lt5gt70-bin-state-genes` to refer to these results downstream.
+You would then use `tahoex_70m-mean-lt5gt70-bin-state-genes` to refer to these results downstream.
 
 ---
 

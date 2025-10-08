@@ -4,13 +4,13 @@ import os
 import wandb
 from omegaconf import OmegaConf as om
 
-from mosaicfm.tokenizer import GeneVocab
-from mosaicfm.utils import download_file_from_s3_url
+from tahoex.tokenizer import GeneVocab
+from tahoex.utils import download_file_from_s3_url
 
-model_name = "scgpt-70m-1024-fix-norm-apr24-data"
-wandb_id = "55n5wvdm"
+model_name = "tx-3b-prod"
+wandb_id = "mygjkq5c"
 api = wandb.Api()
-run = api.run(f"vevotx/vevo-scgpt/{wandb_id}")
+run = api.run(f"vevotx/tahoex/{wandb_id}")
 yaml_path = run.file("config.yaml").download(replace=True)
 
 with open("config.yaml") as f:
@@ -20,7 +20,7 @@ model_config = yaml_cfg.pop("model", None)["value"]
 collator_config = yaml_cfg.pop("collator", None)["value"]
 vocab_config = yaml_cfg.pop("vocabulary", None)["value"]
 if vocab_config is None:
-    vocab_remote_url = "s3://vevo-ml-datasets/vevo-scgpt/datasets/cellxgene_primary_2023-12-15_MDS/cellxgene_primary_2023-12-15_vocab.json"
+    vocab_remote_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
 else:
     vocab_remote_url = vocab_config["remote"]
 
@@ -30,7 +30,7 @@ download_file_from_s3_url(
     local_file_path="vocab.json",
 )
 
-save_dir = f"/vevo/scgpt/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
+save_dir = f"/tahoe/tahoex/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
 
 # Step 1 - Add special tokens to the vocab
 vocab = GeneVocab.from_file("vocab.json")
@@ -63,7 +63,7 @@ model_config.use_generative_training = False
 
 ## Step 5: Add precision and wandb ID to config
 model_config["precision"] = yaml_cfg["precision"]["value"]
-model_config["wandb_id"] = f"vevotx/vevo-scgpt/{wandb_id}"
+model_config["wandb_id"] = f"vevotx/tahoex/{wandb_id}"
 
 om.save(config=model_config, f=f"{save_dir}/model_config.yml")
 om.save(config=collator_config, f=f"{save_dir}/collator_config.yml")

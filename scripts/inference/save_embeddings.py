@@ -13,9 +13,9 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from tqdm.auto import tqdm
 
-from mosaicfm.data import DataCollator
-from mosaicfm.model import ComposerSCGPTModel
-from mosaicfm.tokenizer import GeneVocab
+from tahoex.data import DataCollator
+from tahoex.model import ComposerTX
+from tahoex.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 logging.basicConfig(
@@ -56,7 +56,7 @@ def main(cfg: DictConfig) -> None:
     model_cfg["attn_config"]["attn_impl"] = cfg.model.attn_impl
     model_cfg["attn_config"]["use_attn_mask"] = cfg.model.use_attn_mask
 
-    model = ComposerSCGPTModel(model_config=model_cfg, collator_config=coll_cfg)
+    model = ComposerTX(model_config=model_cfg, collator_config=coll_cfg)
     state = torch.load(cfg.paths.model_file)["state"]["model"]
     model.load_state_dict(state, strict=True)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -86,7 +86,7 @@ def main(cfg: DictConfig) -> None:
             pa.field("sample", pa.dictionary(pa.int32(), pa.string())),
             pa.field("cell_line", pa.dictionary(pa.int32(), pa.string())),
             pa.field("BARCODE_SUB_LIB_ID", pa.string()),
-            pa.field("mosaicfm-70m-merged", pa.list_(pa.float32(), 512)),
+            pa.field("tx-70m-merged", pa.list_(pa.float32(), 512)),
         ],
     )
 
@@ -145,7 +145,7 @@ def main(cfg: DictConfig) -> None:
                     "sample": samples,
                     "cell_line": cells,
                     "BARCODE_SUB_LIB_ID": barcodes,
-                    "mosaicfm-70m-merged": [list(r) for r in cls_np],
+                    "tx-70m-merged": [list(r) for r in cls_np],
                 },
                 schema=schema,
             )

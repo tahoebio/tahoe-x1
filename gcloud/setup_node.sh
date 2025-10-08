@@ -50,14 +50,14 @@ docker run --network host -it --gpus all \
   -e GITHUB_TOKEN=<GITHUB_TOKEN> \
   -e WANDB_API_KEY=<WANDB_API_KEY> \
   -e WANDB_ENTITY="vevotx" \
-  -e WANDB_PROJECT="vevo-scgpt" \
+  -e WANDB_PROJECT="tahoex" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
-  vevotx/ml-scgpt:shreshth -c "\
+  vevotx/mosaicfm:1.1.0 -c "\
   mkdir -p /src && \
   cd /src && \
-  git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/vevotx/mosaicfm.git && \
-  cd mosaicfm && \
+  git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git && \
+  cd tahoe-x1 && \
   pip install -e . --no-deps && \
   cd scripts && \
   /bin/bash"

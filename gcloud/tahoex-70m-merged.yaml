@@ -1,14 +1,14 @@
 global_seed: 777
 seed: ${global_seed}
 device_train_batch_size: 400
-global_train_batch_size: 400
+global_train_batch_size: 4800
 device_eval_batch_size: 400
 device_train_microbatch_size: "auto"
 vocabulary:
-  remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/vevo_v2_vocab.json"
+  remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: vevo_scgpt
+  name: tahoex
   d_model: 512
   n_layers: 12
   init_device: cpu
@@ -22,11 +22,10 @@ model:
   use_glu: False
   cell_emb_style: cls
   attn_config:
-    attn_impl: flash
+    attn_impl: triton
     attn_type: "grouped_query_attention"
     kv_nheads: 8
     attn_pdrop: 0.0
-    use_attn_mask: False
   norm_config:
     norm_type: "layernorm"
     eps: 1.0e-5
@@ -50,7 +49,7 @@ collator:
   do_padding: True
   pad_value: -2
   do_mlm: True
-  do_binning: True #set do_binning=False and log_transform=True and provide target_sum if you want to train with log1p inputs.
+  do_binning: True
   mlm_probability: 0.5
   mask_value: -1
   max_length: 1024
@@ -63,11 +62,11 @@ train_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/train/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/train"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/train/"
+        local: "mds-data-folder/tahoe/train"
       cellxgene:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/train/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/train"
+        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/train/"
+        local: "mds-data-folder/cellxgene/train"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: True
@@ -82,11 +81,11 @@ valid_loader:
   dataset:
     streams:
       tahoe:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/tahoe_100m_MDS_v1/valid/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/tahoe_merged_MDS/valid"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v1/valid/"
+        local: "mds-data-folder/tahoe/val"
       cellxgene:
-        remote: "s3://vevo-ml-datasets/mosaicfm_v2/datasets/cellxgene_2025_01_21_merged_MDS/valid/"
-        local: "/vevo/mosaicfm/datasets/vevo_merged_jan_2025/cellxgene_merged_MDS/valid"
+        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/valid/"
+        local: "mds-data-folder/cellxgene/val"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: False
@@ -117,8 +116,7 @@ algorithms:
   low_precision_layernorm: {}
 precision: amp_bf16
 eval_interval: "1000ba"
-eval_subset_num_batches: 100
-max_duration: "10ba"
+max_duration: "6ep"
 fsdp_config:
   sharding_strategy: FULL_SHARD
   mixed_precision: DEFAULT
@@ -133,27 +131,10 @@ callbacks:
   lr_monitor: {}
   memory_monitor: {}
   runtime_estimator: {}
-  marginal-essentiality:
-    cfg:
-      batch_size: 32
-      seq_len: 8192
-      adata:
-        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/ccle.h5ad"
-        local: "/vevo/data/download/marginal-essentiality/ccle.h5ad"
-        gene_column: "feature_id"
-      labels:
-        remote: "s3://vevo-ml-datasets/vevo-scgpt/datasets/scgpt_benchmarks/marginal-essentiality/labels.csv"
-        local: "/vevo/data/download/marginal-essentiality/labels.csv"
-        gene_column: "gene_id"
-        label_column: "essential"
-      classifier:
-        n_jobs: 32
-        test_size: 0.2
-        random_state: 42
 loggers:
   wandb:
-    project: vevo-scgpt
+    project: tahoex
     log_artifacts: False
-save_folder: "s3://vevo-ml-datasets/vevo-scgpt/models/{run_name}"
+save_folder: "s3://tahoe-hackathon-data/models/{run_name}"
 save_interval: "2000ba"
 save_num_checkpoints_to_keep: 0
