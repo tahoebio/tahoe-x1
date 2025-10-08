@@ -20,7 +20,7 @@
 # TahoeX
 
 This is the internal codebase for the **TahoeX** series of single-cell RNA-seq foundation models 
-developed by Vevo Therapeutics. Our repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) 
+developed by Tahoe Therapeutics. Our repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) 
 and imports several utility functions from it. Please follow the developer guidelines if you are 
 contributing to this repository. For main results and documentation, please refer to the results section. 
 If you are looking to train or finetune a model on single-cell data, please refer to the training section.
