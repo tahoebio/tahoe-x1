@@ -1,6 +1,5 @@
 # Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
 from .blocks import (
-    CategoryValueEncoder,
     ContinuousValueEncoder,
     ExprDecoder,
     GeneEncoder,
@@ -14,7 +13,6 @@ from .model import (
 )
 
 __all__ = [
-    "CategoryValueEncoder",
     "ComposerTX",
     "ContinuousValueEncoder",
     "ExprDecoder",

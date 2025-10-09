@@ -5,7 +5,6 @@ from typing import Mapping, Optional
 import torch
 import torch.nn.functional as F
 from composer.models import ComposerModel
-from composer.utils import dist
 from huggingface_hub import hf_hub_download
 from llmfoundry.layers_registry import param_init_fns
 from omegaconf import DictConfig
@@ -15,7 +14,6 @@ from torch import Tensor, nn
 
 from tahoex.loss import MaskedMseMetric, MaskedSpearmanMetric, masked_mse_loss
 from tahoex.model.blocks import (
-    CategoryValueEncoder,
     ChemEncoder,
     ContinuousValueEncoder,
     ExprDecoder,
@@ -94,29 +92,17 @@ class TXModel(nn.Module):
             "input_emb_style",
             "continuous",
         )
-        if self.input_emb_style not in ["category", "continuous"]:
+        if self.input_emb_style != "continuous":
             raise ValueError(
-                f"input_emb_style should be one of category or continuous"
-                f"got {self.input_emb_style}",
+                f"Only 'continuous' input_emb_style is supported, got {self.input_emb_style}",
             )
-        if self.input_emb_style == "continuous":
-            self.expression_encoder = ContinuousValueEncoder(
-                d_model=self.d_model,
-                dropout=expression_encoder_config.get("dropout", 0.1),
-                max_value=expression_encoder_config.get("max_value", 512),
-                activation=expression_encoder_config.get("activation", "relu"),
-                use_norm=expression_encoder_config.get("use_norm", False),
-            )
-        elif self.input_emb_style == "category":
-            assert self.n_input_bins > 0
-            self.expression_encoder = CategoryValueEncoder(
-                self.n_input_bins,
-                self.d_model,
-                padding_idx=self.pad_value,
-                use_norm=False,
-            )
-        else:
-            raise ValueError(f"Unknown input_emb_style: {self.input_emb_style}")
+        self.expression_encoder = ContinuousValueEncoder(
+            d_model=self.d_model,
+            dropout=expression_encoder_config.get("dropout", 0.1),
+            max_value=expression_encoder_config.get("max_value", 512),
+            activation=expression_encoder_config.get("activation", "relu"),
+            use_norm=expression_encoder_config.get("use_norm", False),
+        )
 
         if self.use_chem_token:
             chem_encoder_config = model_config.chemical_encoder
