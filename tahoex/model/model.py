@@ -5,6 +5,7 @@ from typing import Mapping, Optional
 import torch
 import torch.nn.functional as F
 from composer.models import ComposerModel
+from composer.utils import dist
 from huggingface_hub import hf_hub_download
 from llmfoundry.layers_registry import param_init_fns
 from omegaconf import DictConfig
