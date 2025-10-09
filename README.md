@@ -141,6 +141,8 @@ Filtered versions of the pre-training datasets above exclude cells with very few
 
 Public access to datasets: `s3://tahoe-hackathon-data/MFM/benchmarks/`
 
+If you require access to datasets not available in the public bucket, please open a GitHub issue or contact the team.
+
 For more information on dataset preparation, see [scripts/data_prep/README.md](scripts/data_prep/README.md).
 
 
@@ -151,9 +153,9 @@ We provide pre-trained TahoeX1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID |
 |------------|------------|----------------|-----------------|----------|
-| **TX1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | mygjkq5c |
-| **TX1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | 26iormxc |
-| **TX1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | ftb65le8 |
+| **TX1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) |
+| **TX1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) |
+| **TX1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) |
 
 Models are also available on HuggingFace: `tahoebio/TahoeX1`
 
