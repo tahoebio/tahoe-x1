@@ -99,7 +99,6 @@ pip install -e .
 ```
 
 
-> **Note**: If you are on an H100 GPU, you may see `'sm_90' is not a recognized processor for this target (ignoring processor)`. This warning is expected and safe to ignore.
 
 
 
