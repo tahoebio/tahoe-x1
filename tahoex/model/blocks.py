@@ -501,32 +501,6 @@ class ContinuousValueEncoder(nn.Module):
         return self.dropout(x)
 
 
-class CategoryValueEncoder(nn.Module):
-    def __init__(
-        self,
-        num_embeddings: int,
-        embedding_dim: int,
-        padding_idx: Optional[int] = None,
-        use_norm: bool = False,
-    ):
-        super().__init__()
-        self.embedding = nn.Embedding(
-            num_embeddings,
-            embedding_dim,
-            padding_idx=padding_idx,
-        )
-        self.use_norm = use_norm
-        if self.use_norm:
-            self.enc_norm = nn.LayerNorm(embedding_dim)
-
-    def forward(self, x: Tensor) -> Tensor:
-        x = x.long()
-        x = self.embedding(x)  # (batch, seq_len, embsize)
-        if self.use_norm:
-            x = self.enc_norm(x)
-        return x
-
-
 class ExprDecoder(nn.Module):
     """Consists of three linear functions and leaky-relu as an activation
     function."""
