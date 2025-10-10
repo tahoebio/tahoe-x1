@@ -1,26 +1,53 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
-import argparse
+# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+import logging
+import os
+import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Generator, List
 
 import datasets
+from omegaconf import DictConfig
+from omegaconf import OmegaConf as om
+
+# Logging setup
+logging.basicConfig(
+    format="%(asctime)s: [%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
+    level=logging.INFO,
+)
+log = logging.getLogger(__name__)
 
 
-def get_files(path: str) -> Iterable[str]:
-    files = [str(f.resolve()) for f in Path(path).glob("chunk*.dataset")]
+def get_files(path: str) -> List[str]:
+    """Retrieve dataset chunk file paths."""
+    files = sorted(str(f.resolve()) for f in Path(path).glob("chunk*.dataset"))
+    log.info(f"Found {len(files)} dataset chunks.")
     return files
 
 
-def get_datasets(files: Iterable[str]) -> Iterable[datasets.Dataset]:
-    return [datasets.load_from_disk(file) for file in files]
+def get_datasets(files: List[str]) -> Generator[datasets.Dataset, None, None]:
+    """Lazy load datasets using a generator to prevent memory overload."""
+    for file in files:
+        yield datasets.load_from_disk(file)
 
 
-def process_datasets(path: str, dataset_name: str):
-    merged_dataset = datasets.concatenate_datasets(get_datasets(get_files(path)))
+def main(cfg: DictConfig):
+    dataset_root = cfg.huggingface.output_root
+    dataset_name = cfg.huggingface.dataset_name
+    save_dir = cfg.huggingface.merged_dataset_root
+    test_size = cfg.huggingface.split_parameters.test_size
+    shuffle = cfg.huggingface.split_parameters.shuffle
+    seed = cfg.huggingface.split_parameters.seed
+
+    log.info(f"Merging dataset chunks from {dataset_root}...")
+    merged_dataset = datasets.concatenate_datasets(
+        list(get_datasets(get_files(dataset_root))),
+    )
+    log.info(f"Total {dataset_name} size: {len(merged_dataset)} samples")
+
     merged_dataset = merged_dataset.train_test_split(
-        test_size=0.01,
-        shuffle=True,
-        seed=44,
+        test_size=test_size,
+        shuffle=shuffle,
+        seed=seed,
     )
     train_dataset = merged_dataset["train"]
     valid_dataset = merged_dataset["test"]
@@ -28,23 +55,15 @@ def process_datasets(path: str, dataset_name: str):
     print(f"train set number of samples: {len(train_dataset)}")
     print(f"valid set number of samples: {len(valid_dataset)}")
 
-    train_dataset.save_to_disk(f"{path}/{dataset_name}_train.dataset")
-    valid_dataset.save_to_disk(f"{path}/{dataset_name}_valid.dataset")
+    valid_dataset.save_to_disk(os.path.join(save_dir, "valid.dataset"))
+    train_dataset.save_to_disk(os.path.join(save_dir, "train.dataset"))
+    log.info("Dataset merging and saving completed successfully.")
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Merge and split dataset files.")
-    parser.add_argument(
-        "--path",
-        type=str,
-        required=True,
-        help="The directory containing dataset chunks.",
-    )
-    parser.add_argument(
-        "--dataset_name",
-        type=str,
-        required=True,
-        help="The base name for the dataset.",
-    )
-    args = parser.parse_args()
-    process_datasets(args.path, args.dataset_name)
+    yaml_path = sys.argv[1]
+    log.info(f"Loading configuration from {yaml_path}...")
+    with open(yaml_path) as f:
+        cfg = om.load(f)
+    om.resolve(cfg)
+    main(cfg)
