@@ -81,7 +81,7 @@ uv venv
 source .venv/bin/activate
 
 # Install the package
-uv pip install -e .  --no-build-isolation-package flash-attn
+uv pip install -e . --no-build-isolation-package flash-attn
 ```
 
 ### Option 2: With Docker
@@ -110,7 +110,7 @@ The model is trained and tested on:
 - **CUDA**: Version 12.1 or compatible
 - **Python**: ≥3.10
 - **PyTorch**: 2.5.2
-- **llm-foundry**: v0.17.1 (restricted to ≤v0.6.0 for triton flash-attention support)
+- **llm-foundry**: v0.17.1 
 
 Platforms such as MosaicML and RunAI are used for training and deployment.
 
@@ -328,7 +328,7 @@ We encourage the use of:
 For launching training/evaluation runs, ensure you have access to:
 - AWS S3 buckets
 - Weights & Biases (wandb)
-- MosaicML CLI (`mcli`) or RunAI
+- MosaicML CLI (`mcli`) or RunAI or local gpu
 
 
 ## Acknowledgements
