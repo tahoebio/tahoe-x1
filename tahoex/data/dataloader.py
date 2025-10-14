@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 from collections.abc import MutableSequence
 from typing import Any, Dict, List, Optional, Union
 

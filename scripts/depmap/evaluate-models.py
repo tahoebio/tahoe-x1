@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Evaluate various models on DepMap tasks as specified in a config file."""
 
 import itertools

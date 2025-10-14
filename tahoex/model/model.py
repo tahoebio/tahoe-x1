@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import logging
 from typing import Mapping, Optional
 
