@@ -29,7 +29,12 @@
 These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction, 
 and simulating the effect of perturbations.
 
-![img](./assets/abstract_box_illustration.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/abstract_logo_dark_mode.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/abstract_logo_light_mode.png">
+  <img src="./assets/abstract_logo_light_mode.png" alt="Abstract Logo">
+</picture>
+
 
 📄 **Preprint**: Coming soon - [Paper](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
 
