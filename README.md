@@ -88,7 +88,7 @@ uv pip install -e . --no-build-isolation-package flash-attn
 
 ```bash
 # Pull the pre-built Docker image
-docker pull vevotx/mosaicfm:1.1.0
+docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
 # Clone the repo
 git clone https://github.com/tahoebio/tahoe-x1.git
@@ -119,7 +119,7 @@ We provide pre-built Docker images for ease of use:
 
 | Image Name | Base Image | Description |
 |------------|------------|-------------|
-| [`vevotx/mosaicfm:1.1.0`](https://hub.docker.com/repository/docker/vevotx/mosaicfm/) | `mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596` | Current release image for TahoeX1 |
+| [`ghcr.io/tahoebio/tahoe-x1:1.0.0`](https://github.com/tahoebio/tahoe-x1/pkgs/container/tahoe-x1) | `mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596` | Current release image for TahoeX1 |
 
 ## Datasets
 

@@ -53,7 +53,7 @@ docker run --network host -it --gpus all \
   -e WANDB_PROJECT="tahoex" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
-  vevotx/mosaicfm:1.1.0 -c "\
+  ghcr.io/tahoebio/tahoe-x1:1.0.0 -c "\
   mkdir -p /src && \
   cd /src && \
   git clone -b 32-train-13b-model-with-full-dataset https://oauth2:\${GITHUB_TOKEN}@github.com/tahoebio/tahoe-x1.git && \

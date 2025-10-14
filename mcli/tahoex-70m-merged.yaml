@@ -13,7 +13,7 @@ integrations:
 command: |
   cd tahoe-x1/scripts
   composer train.py /mnt/config/parameters.yaml
-image: vevotx/mosaicfm:1.1.0
+image: ghcr.io/tahoebio/tahoe-x1:1.0.0
 env_variables:
   MOSAICML_PLATFORM: False #Logging metadata to MosaicML platform is disabled, since it seems to timeout
 name: tx-70m

@@ -60,7 +60,7 @@ docker run --network host --gpus all \
   -e WANDB_PROJECT="tahoex" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
-  vevotx/mosaicfm:1.1.0 -c "\
+  ghcr.io/tahoebio/tahoe-x1:1.0.0 -c "\
     mkdir -p /src && \
     cd /src && \
     if [ -d tahoe-x1 ]; then \
