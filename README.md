@@ -334,7 +334,7 @@ For launching training/evaluation runs, ensure you have access to:
 
 We would like to thank the developers of the following open-source projects:
 
-- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneer work in single-cell foundation models
+- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneering work in single-cell foundation models
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
 - **[Hugging Face datasets](https://github.com/huggingface/datasets)**: Dataset handling and processing
