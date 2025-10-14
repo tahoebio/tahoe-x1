@@ -1,5 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
-
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import numpy as np
 import pandas as pd
 import scanpy as sc

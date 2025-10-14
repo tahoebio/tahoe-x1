@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright (C) Vevo Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 # Train State Transition model with TahoeX embeddings on Tahoe data
 # This script implements a fewshot scenario with drug-cell (DC) splits
 

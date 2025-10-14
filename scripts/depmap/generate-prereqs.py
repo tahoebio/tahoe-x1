@@ -1,4 +1,4 @@
-# Copyright (C) Vevo Therapeutics 2024-2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Starting from a minimal DepMap benchmark directory (containing only raw
 data), this script will create the files necessary to run the benchmark tasks
 for TX models.

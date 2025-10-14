@@ -14,7 +14,7 @@ spec:
         cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
       - name: vevo-tahoex
-        image: vevotx/mosaicfm:1.1.0
+        image: ghcr.io/tahoebio/tahoe-x1:1.0.0
         command: [ "/bin/bash", "-c", "--" ]
         args:
           - |

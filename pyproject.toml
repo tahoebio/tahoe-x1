@@ -12,7 +12,7 @@ version = "0.1.2"
 description = "Tahoe-x1: Perturbation trained virtual cell models from Tahoe Therapeutics"
 readme = "README.md"
 authors = [
-    { name = "Vevo Therapeutics" },
+    { name = "Tahoe Therapeutics" },
 ]
 requires-python = ">=3.10"
 license = { text = "Proprietary" }

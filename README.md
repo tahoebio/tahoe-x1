@@ -17,11 +17,11 @@
 </p>
 <br />
 
-# TahoeX1: Foundation Models for Single-Cell Genomics
+# Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model
 
-**TahoeX1** is a series of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics. These models are trained on millions of single-cell profiles and can be used for various downstream tasks including cell type classification, gene essentiality prediction, pathway analysis, and cellular state transitions.
+**Tahoe-x1** is a series of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics. These models are trained on millions of single-cell profiles and can be used for various downstream tasks including cell type classification, gene essentiality prediction, pathway analysis, and cellular state transitions.
 
-📄 **Preprint**: Coming soon - [Internal Technical Report](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
+📄 **Preprint**: Coming soon - [Paper](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
 
 ## Table of Contents
 - [Repository Structure](#repository-structure)
@@ -42,7 +42,7 @@ This repository follows a similar structure to [llm-foundry](https://github.com/
 
 ```
 tahoe-x1/
-├── tahoex/                    # Core TahoeX library
+├── tahoex/                    # Core Tahoe-x1 library
 │   ├── model/
 │   │   ├── blocks/           # Building block modules used across models
 │   │   └── model/            # Full architecture subclassed from ComposerModel
@@ -88,7 +88,7 @@ uv pip install -e . --no-build-isolation-package flash-attn
 
 ```bash
 # Pull the pre-built Docker image
-docker pull vevotx/mosaicfm:1.1.0
+docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
 # Clone the repo
 git clone https://github.com/tahoebio/tahoe-x1.git
@@ -119,11 +119,11 @@ We provide pre-built Docker images for ease of use:
 
 | Image Name | Base Image | Description |
 |------------|------------|-------------|
-| [`vevotx/mosaicfm:1.1.0`](https://hub.docker.com/repository/docker/vevotx/mosaicfm/) | `mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596` | Current release image for TahoeX1 |
+| [`ghcr.io/tahoebio/tahoe-x1:1.0.0`](https://github.com/tahoebio/tahoe-x1/pkgs/container/tahoe-x1) | `mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596` | Current release image for Tahoe-x1 |
 
 ## Datasets
 
-TahoeX1 models are trained on large-scale single-cell RNA-seq datasets. The following datasets are used for training and evaluation:
+Tahoe-x1 models are trained on large-scale single-cell RNA-seq datasets. The following datasets are used for training and evaluation:
 
 | Dataset | Description | Usage | Location |
 |---------|-------------|-------|----------|
@@ -133,8 +133,8 @@ TahoeX1 models are trained on large-scale single-cell RNA-seq datasets. The foll
 | **filtered CellxGene 2025-01** | ~43M filtered cells  from Jan 2025 CellxGene release | Tx1-3b stage 2 Pre-training  | `s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS_filtered/` |
 | **filtered scBaseCamp 2025-02** | ~76M filtered cells from Feb 2025 scBaseCamp release | Tx1-3b stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2_filtered/` |
 | **filtered Tahoe 100M** | ~34M filtered cells from Tahoe-100M | Tx1-3b stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2_filtered/` |
-| **DepMap** | Cancer cell line dependency data | DepMap Benchmark | `s3://vevo-ml-datasets/umair/scgpt-depmap/` |
-| **MSigDB** | Pathway signature data | MsigDB Benchmark | `s3://vevo-drives/drive_3/ANALYSIS/analysis_107/` |
+| **DepMap** | Cancer cell line dependency data | DepMap Benchmark | `s3://tahoe-hackathon-data/MFM/benchmarks/depmap/` |
+| **MSigDB** | Pathway signature data | MsigDB Benchmark | `s3://tahoe-hackathon-data/MFM/benchmarks/msigdb/` |
 
 Filtered versions of the pre-training datasets above exclude cells with very few expressed genes and are used for stage 2 pre-training of Tx1-3b.
 
@@ -148,7 +148,7 @@ For more information on dataset preparation, see [scripts/data_prep/README.md](s
 
 ## Pre-trained Models
 
-We provide pre-trained TahoeX1 models of various sizes:
+We provide pre-trained Tahoe-x1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID |
 |------------|------------|----------------|-----------------|----------|
@@ -332,9 +332,9 @@ For launching training/evaluation runs, ensure you have access to:
 
 ## Acknowledgements
 
-We would like to thank the developers of the following open-source projects that made TahoeX1 possible:
+We would like to thank the developers of the following open-source projects:
 
-- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneer work in single-cell foundation models
+- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneering work in single-cell foundation models
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
 - **[Hugging Face datasets](https://github.com/huggingface/datasets)**: Dataset handling and processing
