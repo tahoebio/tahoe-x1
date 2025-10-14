@@ -332,7 +332,7 @@ For launching training/evaluation runs, ensure you have access to:
 
 ## Acknowledgements
 
-We would like to thank the developers of the following open-source projects that made Tahoe-x1 possible:
+We would like to thank the developers of the following open-source projects:
 
 - **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneer work in single-cell foundation models
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
