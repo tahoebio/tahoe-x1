@@ -2,11 +2,17 @@
 <p align="center">
   <a href="https://github.com/tahoebio/tahoe-x1">
     <picture>
+      <!-- Dark mode -->
+      <source media="(prefers-color-scheme: dark)" srcset="./assets/tahoe-white-logo.png">
+      <!-- Light mode -->
+      <source media="(prefers-color-scheme: light)" srcset="./assets/tahoe-navy-logo.png">
+      <!-- Fallback -->
       <img alt="tahoe-therapeutics" src="./assets/tahoe-navy-logo.png" width="95%">
     </picture>
   </a>
 </p>
 <!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_END -->
+
 
 <p align="center">
 <a href="https://github.com/astral-sh/ruff"><img alt="Linter: Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json"></a>
@@ -19,7 +25,16 @@
 
 # Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model
 
-**Tahoe-x1** is a series of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics. These models are trained on millions of single-cell profiles and can be used for various downstream tasks including cell type classification, gene essentiality prediction, pathway analysis, and cellular state transitions.
+**Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
+These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction, 
+and simulating the effect of perturbations.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="./assets/abstract_logo_dark_mode.png">
+  <source media="(prefers-color-scheme: light)" srcset="./assets/abstract_logo_light_mode.png">
+  <img src="./assets/abstract_logo_light_mode.png" alt="Abstract Logo">
+</picture>
+
 
 📄 **Preprint**: Coming soon - [Paper](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
 
@@ -331,22 +346,11 @@ For launching training/evaluation runs, ensure you have access to:
 
 
 ## Acknowledgements
-
 We would like to thank the developers of the following open-source projects:
-
-- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: Pioneering work in single-cell foundation models
+- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For insipring the Tahoe-x1 architecture
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
-- **[Hugging Face datasets](https://github.com/huggingface/datasets)**: Dataset handling and processing
-- **[Scanpy](https://scanpy.readthedocs.io/)**: Single-cell analysis in Python
-- **CellxGene**: For curating and providing access to large-scale single-cell datasets
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
+- **[CellxGene](https://cellxgene.cziscience.com/)** and **[scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)** : For providing access to their single cell atlas and benchmarking tools.
 ---
 
-**Developed by Tahoe Therapeutics**
-
-For questions, issues, or collaboration inquiries, please open an issue on GitHub or contact the development team.
+For questions, issues, or collaboration inquiries, please open an issue on [GitHub](https://github.com/tahoebio/tahoe-x1) or write to us at [admin@tahoebio.ai](mailto:admin@tahoebio.ai).
