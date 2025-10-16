@@ -347,7 +347,7 @@ For launching training/evaluation runs, ensure you have access to:
 
 ## Acknowledgements
 We would like to thank the developers of the following open-source projects:
-- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For insipring the Tahoe-x1 architecture
+- **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For inspiring the Tahoe-x1 architecture
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
 - **[CellxGene](https://cellxgene.cziscience.com/)** and **[scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)** : For providing access to their single cell atlas and benchmarking tools.
