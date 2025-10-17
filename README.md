@@ -117,7 +117,7 @@ docker run -it \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 \
   /bin/bash
 
-# Install the package
+# Install the tahoe-x1 package (the requirements are already present in the container)
 pip install -e . --no-deps
 ```
 
