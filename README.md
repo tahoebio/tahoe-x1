@@ -103,7 +103,7 @@ uv pip install -e . --no-build-isolation-package flash-attn
 
 ```bash
 
-# Clone on host
+# Clone the repo
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
