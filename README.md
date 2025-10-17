@@ -74,8 +74,11 @@ tahoe-x1/
 │   ├── state transition/     # State transition prediction scripts
 │   ├── data_prep/            # Dataset preparation scripts
 │   └── inference/            # Inference utilities
-├── mcli/                      # MosaicML platform configuration files
-└── runai/                     # RunAI configuration files
+└── configs/                      
+    ├──runai/                 # RunAI configuration files
+    ├──mcli/                  # MosaicML platform configuration files
+    ├──gcloud/                # Google Cloud configuration files
+    └──test_run.yaml          # Sample config file
 ```
 
 ## Installation
@@ -111,7 +114,8 @@ cd tahoe-x1
 docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
 # Start a shell with the current directory mounted at /workspace
-docker run -it \
+docker run -it --rm \
+  --gpus all \
   -v "$(pwd)":/workspace \
   -w /workspace \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 \
@@ -134,7 +138,7 @@ The model is trained and tested on:
 - **PyTorch**: 2.5.2
 - **llm-foundry**: v0.17.1 
 
-Platforms such as MosaicML and RunAI are used for training and deployment.
+Platforms such as MosaicML and RunAI are used for training.
 
 ### Docker Images
 
@@ -173,11 +177,11 @@ For more information on dataset preparation, see [scripts/data_prep/README.md](s
 
 We provide pre-trained Tahoe-x1 models of various sizes:
 
-| Model Name | Parameters | Context Length | Checkpoint Path | WandB ID |
-|------------|------------|----------------|-----------------|----------|
-| **TX1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) |
-| **TX1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) |
-| **TX1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) |
+| Model Name | Parameters | Context Length | Checkpoint Path | WandB ID | Config File |
+|------------|------------|----------------|-----------------|----------|-------------|
+| **TX1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
+| **TX1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
+| **TX1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
 Models are also available on HuggingFace: `tahoebio/TahoeX1`
 
@@ -185,21 +189,25 @@ Models are also available on HuggingFace: `tahoebio/TahoeX1`
 
 ### Training from Scratch
 
-Use the main training script with a YAML configuration file:
+A sample test configuration is available at `configs/test_run.yaml` for quick experimentation.
+
+Use the main training script with a YAML configuration file: 
 
 ```bash
-python scripts/train.py -f configs/your_config.yaml
+composer scripts/train.py -f configs/test_run.yaml
 ```
 
 Or with command-line arguments:
 
 ```bash
-python scripts/train.py \
+composer scripts/train.py \
   --model_name tahoex \
   --data_path /path/to/data \
   --max_seq_len 2048 \
   --batch_size 32
 ```
+
+Note that the current codebase only supports `attn_impl: flash` and `use_attn_mask: False`. The Triton backend and custom attention masks (used for training TX1-1B and TX1-70M) are no longer supported. If you have questions about using custom attention masks with the Triton backend, please contact us.
 
 ### Fine-tuning
 
@@ -216,19 +224,8 @@ python scripts/train.py \
   --load_path s3://path/to/checkpoint
 ```
 
-### Launching on MosaicML Platform
-
-```bash
-mcli run -f mcli/train_config.yaml
-```
-
-See [mcli/README.md](mcli/README.md) for detailed instructions on configuring and launching runs on MosaicML.
-
-### Launching on RunAI
-
-```bash
-runai submit -f runai/train_config.yaml
-```
+### Launching runs on different platforms
+For launching runs on specific platforms such as MosaicML, Google Cloud, or RunAI, refer to the corresponding configuration folders under `configs/` and their respective README files.
 
 ### Preparing Models for Inference
 
