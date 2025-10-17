@@ -111,6 +111,7 @@ cd tahoe-x1
 docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
 # Start a shell with the current directory mounted at /workspace
+# Note: Requires NVIDIA Docker runtime and compatible GPUs
 docker run -it --rm \
   --gpus all \
   -v "$(pwd)":/workspace \
