@@ -102,15 +102,23 @@ uv pip install -e . --no-build-isolation-package flash-attn
 ### Option 2: With Docker
 
 ```bash
-# Pull the pre-built Docker image
-docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
 # Clone the repo
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
-# Install the package
-pip install -e .
+# Pull the pre-built Docker image
+docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
+
+# Start a shell with the current directory mounted at /workspace
+docker run -it \
+  -v "$(pwd)":/workspace \
+  -w /workspace \
+  ghcr.io/tahoebio/tahoe-x1:1.0.0 \
+  /bin/bash
+
+# Install the tahoe-x1 package (the requirements are already present in the container)
+pip install -e . --no-deps
 ```
 
 
