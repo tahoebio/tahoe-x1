@@ -102,28 +102,23 @@ uv pip install -e . --no-build-isolation-package flash-attn
 ### Option 2: With Docker
 
 ```bash
-# Pull the pre-built Docker image
-docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
-# Get shell entrypoint into docker container
-docker run -it ghcr.io/tahoebio/tahoe-x1:1.0.0 /bin/bash
-
-OR
-
-# Launch a container with your local project mounted
-docker run -it \
-  -v $(pwd):/workspace \            # Mount current directory - Replace $(pwd) with the full path to your project
-  -w /workspace \                   # Set working directory
-  ghcr.io/tahoebio/tahoe-x1:1.0.0 \ # Image name
-  /bin/bash                         # Start an interactive shell
-
-# Clone the repo
+# Clone on host
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
+# Pull the pre-built Docker image
+docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
+
+# Start a shell with the current directory mounted at /workspace
+docker run -it \
+  -v "$(pwd)":/workspace \
+  -w /workspace \
+  ghcr.io/tahoebio/tahoe-x1:1.0.0 \
+  /bin/bash
+
 # Install the package
 pip install -e . --no-deps
-
 ```
 
 
