@@ -82,8 +82,8 @@ def main(cfg: DictConfig) -> composer.Trainer:
             "Support for the triton backend has been removed in llm-foundry v0.8, please use torch or flash instead",
         )
     elif (attn_backend == "flash") and model_config["attn_config"].get(
-        "use_attn_mask",
-        True,
+            "use_attn_mask",
+            True,
     ):
         raise ValueError(
             "Attention mask/bias is not supported with the flash-backend, to enable use_attn_mask switch to the torch-backend",
@@ -297,10 +297,10 @@ def main(cfg: DictConfig) -> composer.Trainer:
     # Enable autoresume from model checkpoints if possible
     autoresume_default: bool = False
     if (
-        logged_cfg.get("run_name", None) is not None
-        and save_folder is not None
-        and not save_overwrite
-        and not save_weights_only
+            logged_cfg.get("run_name", None) is not None
+            and save_folder is not None
+            and not save_overwrite
+            and not save_weights_only
     ):
         autoresume_default = True
 
@@ -534,6 +534,11 @@ def main(cfg: DictConfig) -> composer.Trainer:
     trainer.fit()
     log.info("Training finished.")
     return trainer
+
+
+
+
+# =============================================================================
 
 
 if __name__ == "__main__":

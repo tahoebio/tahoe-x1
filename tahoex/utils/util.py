@@ -1,12 +1,9 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import logging
 from pathlib import Path
-from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 import os
-
-import boto3
 import numpy as np
 import pandas as pd
 import torch
@@ -22,10 +19,10 @@ from tahoex.tokenizer import GeneVocab
 
 
 def load_model(
-    model_dir: str,
-    device: torch.device,
-    return_gene_embeddings: bool = False,
-    use_chem_inf: Optional[bool] = False,
+        model_dir: str,
+        device: torch.device,
+        return_gene_embeddings: bool = False,
+        use_chem_inf: Optional[bool] = False,
 ):
     from tahoex.model.model import ComposerTX
 
@@ -50,7 +47,7 @@ def load_model(
 
     # if model was trained with chemical information, and we don't want to use it for inference
     if use_chem_inf is not None and (
-        not use_chem_inf and collator_config.get("use_chem_token", False)
+            not use_chem_inf and collator_config.get("use_chem_token", False)
     ):
         # we need to modify the model and collator config accordingly
         collator_config["use_chem_token"] = False
@@ -71,14 +68,14 @@ def load_model(
 
 
 def loader_from_adata(
-    adata: AnnData,
-    collator_cfg: DictConfig,
-    vocab: GeneVocab,
-    batch_size: int = 50,
-    max_length: Optional[int] = None,
-    gene_ids: Optional[np.ndarray] = None,
-    num_workers: int = 8,
-    prefetch_factor: int = 48,
+        adata: AnnData,
+        collator_cfg: DictConfig,
+        vocab: GeneVocab,
+        batch_size: int = 50,
+        max_length: Optional[int] = None,
+        gene_ids: Optional[np.ndarray] = None,
+        num_workers: int = 8,
+        prefetch_factor: int = 48,
 ):
     count_matrix = adata.X
     if isinstance(count_matrix, np.ndarray):
@@ -172,47 +169,23 @@ def add_file_handler(logger: logging.Logger, log_file_path: Path):
     logger.addHandler(h)
 
 
+from tahoex.utils.s3_utils import download_file_from_s3
+
+
 def download_file_from_s3_url(s3_url, local_file_path):
     """Downloads a file from an S3 URL to the specified local path.
+
+    Supports public S3 buckets without credentials (like --no-sign-request).
 
     :param s3_url: S3 URL in the form s3://bucket-name/path/to/file
     :param local_file_path: Local path where the file will be saved.
     :return: The local path to the downloaded file, or None if download fails.
     """
-    # Validate the S3 URL format
-    assert s3_url.startswith("s3://"), "URL must start with 's3://'"
-
-    # Parse the S3 URL
-    parsed_url = urlparse(s3_url)
-    assert parsed_url.scheme == "s3", "URL scheme must be 's3'"
-
-    bucket_name = parsed_url.netloc
-    s3_file_key = parsed_url.path.lstrip("/")
-
-    # Ensure bucket name and file key are not empty
-    assert bucket_name, "Bucket name cannot be empty"
-    assert s3_file_key, "S3 file key cannot be empty"
-
-    # Ensure the directory for local_file_path exists (if any)
-    local_path = Path(local_file_path)
-    if local_path.parent != Path("."):
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Create an S3 client
-    s3 = boto3.client("s3")
-
-    try:
-        # Download the file
-        s3.download_file(bucket_name, s3_file_key, str(local_path))
-        print(f"File downloaded successfully to {local_path}")
-        return str(local_path)
-    except Exception as e:
-        print(f"Error downloading the file from {s3_url}: {e}")
-        return None
+    # Delegate to the new S3 utilities module
+    return download_file_from_s3(s3_url, local_file_path)
 
 
 def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
-
     conditions_unique = np.unique(conditions)
     condition2idx = {c: np.where(conditions == c)[0] for c in conditions_unique}
 
@@ -226,18 +199,18 @@ def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
 
     pearson = []
     for cond, t, p in zip(
-        conditions_unique,
-        targets_mean_perturbed_by_condition,
-        preds_mean_perturbed_by_condition,
+            conditions_unique,
+            targets_mean_perturbed_by_condition,
+            preds_mean_perturbed_by_condition,
     ):
         print(cond, pearsonr(t, p))
         pearson.append(pearsonr(t, p)[0])
 
     pearson_delta = []
     for cond, t, p in zip(
-        conditions_unique,
-        targets_mean_perturbed_by_condition,
-        preds_mean_perturbed_by_condition,
+            conditions_unique,
+            targets_mean_perturbed_by_condition,
+            preds_mean_perturbed_by_condition,
     ):
         tm, pm = t, p
         tm -= mean_ctrl
