@@ -137,16 +137,25 @@ uv pip install -e . --no-build-isolation-package flash-attn
 
 
 
-## Training Infrastructure
+## System Requirements & Training Capabilities
 
-The model is trained and tested on:
-- **GPU**: NVIDIA H100 GPUs
-- **CUDA**: Version 12.1 or compatible
-- **Python**: ≥3.10
-- **PyTorch**: 2.5.2
-- **llm-foundry**: v0.17.1 
+Tahoe-x1 is built natively on [Composer](https://github.com/mosaicml/composer) and [llm-foundry](https://github.com/mosaicml/llm-foundry), inheriting their full suite of large-scale training capabilities:
 
-Platforms such as MosaicML and RunAI are used for training.
+### Hardware Requirements
+- **GPU**: NVIDIA Ampere (A100) or newer for FlashAttention support
+- **CUDA**: Version 12.1+
+- **Python**: 3.10+
+
+### Advanced Training Features
+The codebase leverages Composer's state-of-the-art training stack, configurable via YAML:
+- **Automatic micro-batching** for optimal memory utilization
+- **Mixed precision training** with BF16/FP16, plus FP8 support on Hopper (H100) and newer GPUs
+- **Multi-GPU and multi-node** distributed training with FSDP (Fully Sharded Data Parallel)
+- **Gradient accumulation and checkpointing** for training larger models on limited hardware
+- **Advanced optimizers and schedulers** from the LLM training ecosystem
+- **Streaming datasets** for efficient data loading at scale
+
+This infrastructure supports training models from 70M to 3B parameters and can scale to larger architectures.
 
 ### Docker Images
 
@@ -294,29 +303,15 @@ Set `return_gene_embeddings: True` in the configuration to extract gene-level re
 
 
 ### Benchmarks
-Tx1 achieves state-of-the-art performance across four key disease-relevant benchmarks.For comprehensive results, analysis, and model comparisons, please refer to our preprint:
-📄 [Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model](http://www.tahoebio.ai/news/tahoe-x1)
 
-#### 1. Cancer Dependency Prediction (DepMap)
-- **Broadly Essential Genes**: Predict pan-essential genes required across all contexts
-- **Context-Specific Essentiality**: Identify genes essential in specific cancer contexts
+Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. See our [preprint](http://www.tahoebio.ai/news/tahoe-x1) for detailed results.
 
-📊 See [scripts/depmap/](scripts/depmap/README.md) for evaluation protocols and results.
-
-#### 2. Hallmark Pathway Recovery (MSigDB)
-Predict gene membership in 50 MSigDB hallmark gene sets, including cancer hallmarks and fundamental biological processes.
-
-📊 See [scripts/msigdb/](scripts/msigdb/README.md) for benchmarking pipeline.
-
-#### 3. Cell-Type Classification (Tabula Sapiens 2.0)
-Classify cell types across five tissues using frozen embeddings.
-
-📊 Evaluated using the [cz-benchmarks](https://github.com/chanzuckerberg/cz-benchmarks) package.
-
-#### 4. Perturbation Response Prediction
-Predict transcriptional responses to perturbations in held-out cellular contexts using the State Transition framework.
-
-📊 See [scripts/state transition/](scripts/state%20transition/README.md) for implementation.
+| Benchmark | Task | Code Location |
+|-----------|------|---------------|
+| **DepMap Essentiality** | Predict broad and context-specific gene dependencies | [`scripts/depmap/`](scripts/depmap/) |
+| **MSigDB Hallmarks** | Recover 50 hallmark pathway memberships from gene embeddings | [`scripts/msigdb/`](scripts/msigdb/) |
+| **Cell-Type Classification** | Classify cell types across 5 tissues (Tabula Sapiens 2.0) | [`cz-benchmarks`](https://github.com/chanzuckerberg/cz-benchmarks) |
+| **Perturbation Prediction** | Predict transcriptional responses in held-out contexts | [`scripts/state transition/`](scripts/state%20transition/) |
 
 ### Technical Report
 
