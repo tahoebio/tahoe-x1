@@ -25,7 +25,7 @@
 
 # Tahoe-x1: A compute-efficient single-cell foundation model designed for Gigascale datasets
 
-[📄 Preprint](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) | [🧑‍🏫 Tutorials](tutorials/clustering_tutorial.ipynb) | [🚀 Getting Started](#installation)
+[📄 Preprint](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) |[🚀 Getting Started](#installation) | [🧑‍🏫 Tutorials](tutorials/) 
 
 **Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
 These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction,
@@ -93,10 +93,11 @@ We **strongly recommend** working with Tahoe-x1 inside a Docker container to ens
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
-# Pull the pre-built Docker image
-docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
+# Pull the latest Docker image with all the dependencies pre-installed
+docker pull ghcr.io/tahoebio/tahoe-x1:latest
 
 # Start an interactive container with GPU support
+# Note that nvidia-container-toolkit is required for this step
 docker run -it --rm \
   --gpus all \
   -v "$(pwd)":/workspace \
@@ -104,7 +105,7 @@ docker run -it --rm \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 \
   /bin/bash
 
-# Inside the container, install Tahoe-x1 (dependencies are pre-installed)
+# Inside the container, install the Tahoe-x1 package (dependencies are pre-installed)
 pip install -e . --no-deps
 ```
 
@@ -190,7 +191,7 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 | **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
 | **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
-🤗 **HuggingFace Models**: [tahoebio/Tahoe-x1](https://huggingface.co/tahoebio/Tahoe-x1)
+Model weights are also available as safetensor files on our  [🤗 Huggingface model card](https://huggingface.co/tahoebio/Tahoe-x1).
 
 ## Training and Fine-tuning
 
@@ -308,9 +309,9 @@ Predict gene membership in MSigDB pathway signatures using gene embeddings.
 
 📊 See manuscript and [scripts/msigdb/](scripts/msigdb/README.md) for results and benchmarking pipeline.
 
-#### State Transition
+#### Perturbation Prediction
 
-📊 See manuscript and [scripts/state transition/](scripts/state%20transition/README.md) for results and post-training protocols.
+📊 See manuscript and [scripts/state transition/](scripts/state%20transition/README.md) for results and our post-training protocol for perturbation prediction using the state-transition model.
 
 ### Technical Report
 For comprehensive results, analysis, and model comparisons, please refer to our paper:
@@ -320,41 +321,6 @@ For comprehensive results, analysis, and model comparisons, please refer to our 
 ### Additional Resources
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
-
-
-
-
-## Developer Guidelines
-
-### Code Style
-We use **Black** for code formatting and **Ruff** for linting to maintain consistency across contributions.
-
-### Pre-commit Hooks
-Set up pre-commit hooks before contributing:
-
-```bash
-pip install pre-commit
-pre-commit install
-pre-commit run --all-files  # Run before committing
-```
-
-### Contribution Workflow
-1. **Do not push directly to `main`** - create a new branch for your changes
-2. Open a pull request for review
-3. Ensure all pre-commit checks pass
-4. Use type annotations and Google-style docstrings for new code
-
-### Type Checking and Documentation
-We encourage the use of:
-- Type annotations for functions and classes
-- Google-style docstrings
-- Future additions will include `pyright` and `pydocstyle` checks
-
-### Infrastructure Access
-For launching training/evaluation runs, ensure you have access to:
-- AWS S3 buckets
-- Weights & Biases (wandb)
-- MosaicML CLI (`mcli`) or RunAI or local gpu
 
 
 ## Acknowledgements
