@@ -25,8 +25,10 @@
 
 # Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model
 
+[📄 Paper](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace Models](https://huggingface.co/tahoebio/Tahoe-x1) | [📊 Benchmarks](#benchmarks)
+
 **Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
-These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction, 
+These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction,
 and simulating the effect of perturbations.
 
 <picture>
@@ -34,9 +36,6 @@ and simulating the effect of perturbations.
   <source media="(prefers-color-scheme: light)" srcset="./assets/abstract_logo_light_mode.png">
   <img src="./assets/abstract_logo_light_mode.png" alt="Abstract Logo">
 </picture>
-
-
-📄 **Preprint**: Coming soon - [Paper](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
 
 ## Table of Contents
 - [Repository Structure](#repository-structure)
@@ -83,37 +82,19 @@ tahoe-x1/
 
 ## Installation
 
-### Option 1: With uv (Recommended)
+We **strongly recommend** working with Tahoe-x1 inside a Docker container to ensure reproducibility and compatibility.
+
+### Docker Installation (Recommended)
 
 ```bash
-
-# Clone the repo
-git clone https://github.com/tahoebio/tahoe-x1.git
-cd tahoe-x1
-
-# Install uv if it doesn't exist
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create env
-uv venv
-source .venv/bin/activate
-
-# Install the package
-uv pip install -e . --no-build-isolation-package flash-attn
-```
-
-### Option 2: With Docker
-
-```bash
-
-# Clone the repo
+# Clone the repository
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
 # Pull the pre-built Docker image
 docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
 
-# Start a shell with the current directory mounted at /workspace
+# Start an interactive container with GPU support
 docker run -it --rm \
   --gpus all \
   -v "$(pwd)":/workspace \
@@ -121,9 +102,33 @@ docker run -it --rm \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 \
   /bin/bash
 
-# Install the tahoe-x1 package (the requirements are already present in the container)
+# Inside the container, install Tahoe-x1 (dependencies are pre-installed)
 pip install -e . --no-deps
 ```
+
+The Docker image includes all necessary dependencies including PyTorch, CUDA drivers, and flash-attention for optimal performance.
+
+### Local Installation (Alternative)
+
+If you prefer to install locally, we recommend using `uv` for dependency management:
+
+```bash
+# Clone the repository
+git clone https://github.com/tahoebio/tahoe-x1.git
+cd tahoe-x1
+
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create and activate virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install the package with dependencies
+uv pip install -e . --no-build-isolation-package flash-attn
+```
+
+**Note**: Local installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
 
 
 
@@ -183,7 +188,7 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 | **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
 | **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
-Models are also available on HuggingFace: `tahoebio/TahoeX1`
+🤗 **HuggingFace Models**: [tahoebio/Tahoe-x1](https://huggingface.co/tahoebio/Tahoe-x1)
 
 ## Training and Fine-tuning
 
@@ -252,7 +257,7 @@ from scripts.inference.predict_embeddings import predict_embeddings
 cfg = {
     "model_name": "Tx1-70m",
     "paths": {
-        "hf_repo_id": "tahoebio/TahoeX1",
+        "hf_repo_id": "tahoebio/Tahoe-x1",
         "hf_model_size": "70m",
         "adata_input": "/path/to/your_data.h5ad",
     },
@@ -300,14 +305,13 @@ Predict gene membership in MSigDB pathway signatures using gene embeddings.
 
 📊 See manuscript and [scripts/msigdb/](scripts/msigdb/README.md) for results and benchmarking pipeline.
 
-#### State Transition 
+#### State Transition
 
-📊 See manuscript and [scripts/state transition/](scripts/state transition/README.md) for results and post-training protocols.
+📊 See manuscript and [scripts/state transition/](scripts/state%20transition/README.md) for results and post-training protocols.
 
 ### Technical Report
-For comprehensive results, analysis, and model comparisons, please refer to our technical report:
-- [Internal Link](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
-- Public preprint: Coming soon
+For comprehensive results, analysis, and model comparisons, please refer to our paper:
+📄 [Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model](http://www.tahoebio.ai/news/tahoe-x1)
 
 
 ### Additional Resources
