@@ -23,9 +23,9 @@
 </p>
 <br />
 
-# Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model
+# Tahoe-x1: A compute-efficient single-cell foundation model designed for Gigascale datasets
 
-[📄 Paper](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace Models](https://huggingface.co/tahoebio/Tahoe-x1) | [📊 Benchmarks](#benchmarks)
+[📄 Preprint](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) | [🧑‍🏫 Tutorials](tutorials/clustering_tutorial.ipynb) | [🚀 Getting Started](#installation)
 
 **Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
 These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction,
@@ -64,15 +64,17 @@ tahoe-x1/
 │   ├── tokenizer/            # Vocabulary building and tokenization functions
 │   ├── data/                 # Data loaders and collators
 │   └── utils/                # Utility functions 
-├── scripts/                   
-│   ├── train.py              # Training script 
+├── scripts/
+│   ├── train.py              # Training script
 │   ├── prepare_for_inference.py  # Prepares model for inference
-│   ├── clustering_tutorial.ipynb  # Cell clustering tutorial
 │   ├── depmap/               # DepMap benchmark scripts
 │   ├── msigdb/               # MSigDB pathway benchmark scripts
 │   ├── state transition/     # State transition prediction scripts
 │   ├── data_prep/            # Dataset preparation scripts
 │   └── inference/            # Inference utilities
+├── tutorials/                 # Jupyter notebook tutorials
+│   ├── clustering_tutorial.ipynb  # Cell clustering and UMAP visualization
+│   └── training_tutorial.ipynb    # Training walkthrough
 └── configs/                      
     ├──runai/                 # RunAI configuration files
     ├──mcli/                  # MosaicML platform configuration files
@@ -286,7 +288,8 @@ Set `return_gene_embeddings: True` in the configuration to extract gene-level re
 ## Tutorials and Benchmarks
 
 ### Tutorials
-- **[scripts/clustering_tutorial.ipynb](scripts/clustering_tutorial.ipynb)**: Cell clustering and UMAP visualization tutorial
+- **[Clustering Tutorial](tutorials/clustering_tutorial.ipynb)**: Cell clustering and UMAP visualization
+- **[Training Tutorial](tutorials/training_tutorial.ipynb)**: Step-by-step guide to training Tahoe-x1 models
 
 
 ### Benchmarks
