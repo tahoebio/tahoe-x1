@@ -1,4 +1,4 @@
-# Launching a TahoeX run on Google Cloud
+# Launching a Tahoe-x1 run on Google Cloud
 
 DWS can be used either through Google Kubernetes Engine (GKE) or through MIG resize requests. Although the process with GKE would be more automated and require fewer manual steps (such as launching the launcher individually on each node) 
 I was not able to get it to work. The initial steps for setting up GKE can be found [here](https://cloud.google.com/kubernetes-engine/docs/how-to/provisioningrequest). The provisioning-request and job-spec created for this process are included in this folder. 

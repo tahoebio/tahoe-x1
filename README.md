@@ -154,16 +154,16 @@ Tahoe-x1 models are trained on large-scale single-cell RNA-seq datasets. The fol
 
 | Dataset | Description | Usage | Location |
 |---------|-------------|-------|----------|
-| **CellxGene 2025-01** | ~61M  cells  from Jan 2025 CellxGene release | Tx1-3b stage 1 Pre-training  | `s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/` |
-| **scBaseCamp 2025-02** | ~112M  cells from Feb 2025 scBaseCamp release | Tx1-3b stage 1 Pre-training | `s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2/` |
-| **Tahoe 100M** | ~96M  cells from Tahoe-100M | Tx1-3b stage 1 Pre-training | `s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/` |
-| **filtered CellxGene 2025-01** | ~43M filtered cells  from Jan 2025 CellxGene release | Tx1-3b stage 2 Pre-training  | `s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS_filtered/` |
-| **filtered scBaseCamp 2025-02** | ~76M filtered cells from Feb 2025 scBaseCamp release | Tx1-3b stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2_filtered/` |
-| **filtered Tahoe 100M** | ~34M filtered cells from Tahoe-100M | Tx1-3b stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2_filtered/` |
+| **CellxGene 2025-01** | ~61M  cells  from Jan 2025 CellxGene release | Tx1-3B stage 1 Pre-training  | `s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/` |
+| **scBaseCamp 2025-02** | ~112M  cells from Feb 2025 scBaseCamp release | Tx1-3B stage 1 Pre-training | `s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2/` |
+| **Tahoe 100M** | ~96M  cells from Tahoe-100M | Tx1-3B stage 1 Pre-training | `s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/` |
+| **filtered CellxGene 2025-01** | ~43M filtered cells  from Jan 2025 CellxGene release | Tx1-3B stage 2 Pre-training  | `s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS_filtered/` |
+| **filtered scBaseCamp 2025-02** | ~76M filtered cells from Feb 2025 scBaseCamp release | Tx1-3B stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/scbasecamp_2025_02_25_MDS_v2_filtered/` |
+| **filtered Tahoe 100M** | ~34M filtered cells from Tahoe-100M | Tx1-3B stage 2 Pre-training | `s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2_filtered/` |
 | **DepMap** | Cancer cell line dependency data | DepMap Benchmark | `s3://tahoe-hackathon-data/MFM/benchmarks/depmap/` |
 | **MSigDB** | Pathway signature data | MsigDB Benchmark | `s3://tahoe-hackathon-data/MFM/benchmarks/msigdb/` |
 
-Filtered versions of the pre-training datasets above exclude cells with very few expressed genes and are used for stage 2 pre-training of Tx1-3b.
+Filtered versions of the pre-training datasets above exclude cells with very few expressed genes and are used for stage 2 pre-training of Tx1-3B.
 
 Public access to datasets: `s3://tahoe-hackathon-data/MFM/benchmarks/`
 
@@ -179,9 +179,9 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID | Config File |
 |------------|------------|----------------|-----------------|----------|-------------|
-| **TX1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
-| **TX1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
-| **TX1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
+| **Tx1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
+| **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
+| **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
 Models are also available on HuggingFace: `tahoebio/TahoeX1`
 
@@ -207,7 +207,7 @@ composer scripts/train.py \
   --batch_size 32
 ```
 
-Note that the current codebase only supports `attn_impl: flash` and `use_attn_mask: False`. The Triton backend and custom attention masks (used for training TX1-1B and TX1-70M) are no longer supported. If you have questions about using custom attention masks with the Triton backend, please contact us.
+Note that the current codebase only supports `attn_impl: flash` and `use_attn_mask: False`. The Triton backend and custom attention masks (used for training Tx1-1B and Tx1-70M) are no longer supported. If you have questions about using custom attention masks with the Triton backend, please contact us.
 
 ### Fine-tuning
 
