@@ -84,7 +84,7 @@ tahoe-x1/
 
 ## Installation
 
-We **strongly recommend** working with Tahoe-x1 inside a Docker container to ensure reproducibility and compatibility.
+Docker installation provides better reproducibility and avoids dependency conflicts.
 
 ### Docker Installation (Recommended)
 
@@ -111,9 +111,9 @@ pip install -e . --no-deps
 
 The Docker image includes all necessary dependencies including PyTorch, CUDA drivers, and flash-attention for optimal performance.
 
-### Local Installation (Alternative)
+### Native Installation (Alternative)
 
-If you prefer to install locally, we recommend using `uv` for dependency management:
+For direct installation without Docker, we recommend using `uv` for dependency management:
 
 ```bash
 # Clone the repository
@@ -131,7 +131,7 @@ source .venv/bin/activate
 uv pip install -e . --no-build-isolation-package flash-attn
 ```
 
-**Note**: Local installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
+**Note**: Native installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
 
 
 
