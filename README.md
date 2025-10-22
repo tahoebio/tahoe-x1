@@ -23,13 +23,13 @@
 </p>
 <br />
 
-# Tahoe-x1: A compute-efficient single-cell foundation model designed for Gigascale datasets
+# Tahoe-x1: Scaling Perturbation-Trained Single-Cell Foundation Models to 3 Billion Parameters
 
-[📄 Preprint](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) |[🚀 Getting Started](#installation) | [🧑‍🏫 Tutorials](tutorials/) 
+[📄 Paper](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) | [🚀 Getting Started](#installation) | [🧑‍🏫 Tutorials](tutorials/)
 
-**Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
-These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction,
-and simulating the effect of perturbations.
+**Tahoe-x1 (Tx1)** is a family of perturbation-trained single-cell foundation models with up to 3 billion parameters, developed by Tahoe Therapeutics.
+Tx1 is pretrained on large-scale single-cell transcriptomic datasets including the _Tahoe-100M_ perturbation compendium, and fine-tuned for cancer-relevant tasks.
+Through architectural optimizations and efficient training strategies, Tx1 achieves 3–30× higher compute efficiency than prior implementations while delivering state-of-the-art performance across disease-relevant benchmarks.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/abstract_logo_dark_mode.png">
@@ -158,7 +158,7 @@ We provide pre-built Docker images for ease of use:
 
 ## Datasets
 
-Tahoe-x1 models are trained on large-scale single-cell RNA-seq datasets. The following datasets are used for training and evaluation:
+Tx1 was pretrained on 266 million single-cell profiles from three major sources. The following datasets were used for training and evaluation:
 
 | Dataset | Description | Usage | Location |
 |---------|-------------|-------|----------|
@@ -187,7 +187,7 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID | Config File |
 |------------|------------|----------------|-----------------|----------|-------------|
-| **Tx1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
+| **Tx1-3B** | 3B | 2048  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
 | **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
 | **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
@@ -294,28 +294,32 @@ Set `return_gene_embeddings: True` in the configuration to extract gene-level re
 
 
 ### Benchmarks
-Tahoe-x1 models have been extensively evaluated on multiple benchmarks:
+Tx1 achieves state-of-the-art performance across four key disease-relevant benchmarks.For comprehensive results, analysis, and model comparisons, please refer to our preprint:
+📄 [Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model](http://www.tahoebio.ai/news/tahoe-x1)
 
-#### DepMap Benchmarks
-Three tasks centered around cancer cell line data:
-1. **Tissue of Origin Classification**: Separate cancer cell lines by tissue type
-2. **Gene Essentiality Prediction**: Predict broadly essential vs. inessential genes
-3. **Cell Line-Specific Essentiality**: Predict gene essentiality for specific cell lines
+#### 1. Cancer Dependency Prediction (DepMap)
+- **Broadly Essential Genes**: Predict pan-essential genes required across all contexts
+- **Context-Specific Essentiality**: Identify genes essential in specific cancer contexts
 
-📊 See manuscript and [scripts/depmap/](scripts/depmap/README.md) for detailed results and evaluation protocols.
+📊 See [scripts/depmap/](scripts/depmap/README.md) for evaluation protocols and results.
 
-#### MSigDB Pathway Prediction
-Predict gene membership in MSigDB pathway signatures using gene embeddings.
+#### 2. Hallmark Pathway Recovery (MSigDB)
+Predict gene membership in 50 MSigDB hallmark gene sets, including cancer hallmarks and fundamental biological processes.
 
-📊 See manuscript and [scripts/msigdb/](scripts/msigdb/README.md) for results and benchmarking pipeline.
+📊 See [scripts/msigdb/](scripts/msigdb/README.md) for benchmarking pipeline.
 
-#### Perturbation Prediction
+#### 3. Cell-Type Classification (Tabula Sapiens 2.0)
+Classify cell types across five tissues using frozen embeddings.
 
-📊 See manuscript and [scripts/state transition/](scripts/state%20transition/README.md) for results and our post-training protocol for perturbation prediction using the state-transition model.
+📊 Evaluated using the [cz-benchmarks](https://github.com/chanzuckerberg/cz-benchmarks) package.
+
+#### 4. Perturbation Response Prediction
+Predict transcriptional responses to perturbations in held-out cellular contexts using the State Transition framework.
+
+📊 See [scripts/state transition/](scripts/state%20transition/README.md) for implementation.
 
 ### Technical Report
-For comprehensive results, analysis, and model comparisons, please refer to our paper:
-📄 [Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model](http://www.tahoebio.ai/news/tahoe-x1)
+
 
 
 ### Additional Resources
@@ -324,11 +328,13 @@ For comprehensive results, analysis, and model comparisons, please refer to our 
 
 
 ## Acknowledgements
-We would like to thank the developers of the following open-source projects:
+We thank the developers of the following open-source projects:
 - **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For inspiring the Tahoe-x1 architecture
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
-- **[CellxGene](https://cellxgene.cziscience.com/)** and **[scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)** : For providing access to their single cell atlas and benchmarking tools.
+- **[CZ CELLxGENE](https://cellxgene.cziscience.com/)**: Chan Zuckerberg Initiative's single-cell atlas
+- **[Arc scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)**: Arc Institute's virtual cell atlas
+- **[Arc Institute STATE](https://github.com/arcinstitute/state)**: State Transition model for perturbation prediction
 ---
 
 For questions, issues, or collaboration inquiries, please open an issue on [GitHub](https://github.com/tahoebio/tahoe-x1) or write to us at [admin@tahoebio.ai](mailto:admin@tahoebio.ai).
