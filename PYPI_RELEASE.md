@@ -15,10 +15,9 @@ This guide explains how to publish the `tahoex` package to PyPI.
 
 ### 1. Update Version
 
-Update the version in `pyproject.toml`:
-```toml
-[project]
-version = "1.0.0"  # Update to your desired version
+Update the version in `tahoex/_version.py`:
+```python
+__version__ = '1.0.0'  # Update to your desired version
 ```
 
 Follow [Semantic Versioning](https://semver.org/):
