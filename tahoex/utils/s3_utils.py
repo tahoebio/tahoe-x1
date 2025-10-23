@@ -47,7 +47,10 @@ def patch_streaming_for_public_s3():
         S3Downloader._original_download_file_impl = S3Downloader._download_file_impl
 
         def patched_download_file_impl(
-            self, remote: str, local: str, timeout: float
+            self,
+            remote: str,
+            local: str,
+            timeout: float,
         ) -> None:
             """Download a file from S3, with automatic fallback to unsigned for
             public buckets."""
@@ -58,12 +61,12 @@ def patch_streaming_for_public_s3():
                     self._create_s3_client(timeout=timeout)
                 except (NoCredentialsError, PartialCredentialsError):
                     log.info(
-                        f"No AWS credentials found, attempting unsigned access for {remote}"
+                        f"No AWS credentials found, attempting unsigned access for {remote}",
                     )
                     self._create_s3_client(unsigned=True, timeout=timeout)
                 except Exception as e:
                     log.debug(
-                        f"Failed to create signed S3 client: {e}, trying unsigned"
+                        f"Failed to create signed S3 client: {e}, trying unsigned",
                     )
                     self._create_s3_client(unsigned=True, timeout=timeout)
 
@@ -115,7 +118,7 @@ def patch_streaming_for_public_s3():
                     # Access denied with signed request, try unsigned for public buckets
                     if "RequestPayer" not in extra_args:
                         log.info(
-                            f"Access denied with signed request for {remote}, trying unsigned"
+                            f"Access denied with signed request for {remote}, trying unsigned",
                         )
                         self._create_s3_client(unsigned=True, timeout=timeout)
                         try:
@@ -182,7 +185,7 @@ def download_file_from_s3(
         try:
             s3_client.download_file(bucket_name, s3_file_key, str(local_path))
             log.info(
-                f"Successfully downloaded {s3_url} ({description}) to {local_path}"
+                f"Successfully downloaded {s3_url} ({description}) to {local_path}",
             )
             return True
         except Exception as e:
