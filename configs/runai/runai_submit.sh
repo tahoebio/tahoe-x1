@@ -2,5 +2,5 @@
 cd /src/tahoe-x1
 pip install -e . --no-deps
 cd scripts
-composer train.py /src/tahoe-x1/runai/tahoex-70m.yaml
+composer train.py /src/tahoe-x1/configs/test_run.yaml
 ```
