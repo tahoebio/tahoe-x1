@@ -25,8 +25,8 @@ def patch_streaming_for_public_s3():
     buckets.
 
     This patch modifies the streaming library's S3Downloader to automatically
-    retry with unsigned requests when accessing public buckets without AWS
-    credentials.
+    use unsigned requests when AWS credentials are not available, avoiding
+    timeout delays on credential checks.
 
     Note: This monkey patch is required as of mosaicml-streaming v0.13.0 which
     does not natively support automatic fallback to unsigned requests for public
@@ -37,6 +37,7 @@ def patch_streaming_for_public_s3():
     try:
         import urllib.parse
 
+        import boto3
         from boto3.s3.transfer import TransferConfig
         from streaming.base.storage.download import (
             BOTOCORE_CLIENT_ERROR_CODES,
@@ -50,6 +51,34 @@ def patch_streaming_for_public_s3():
 
         S3Downloader._original_download_file_impl = S3Downloader._download_file_impl
 
+        # Detect credential availability once upfront (shared across all instances)
+        _credentials_available = {"checked": False, "available": False}
+
+        def _check_credentials():
+            """Check once if AWS credentials are available."""
+            if _credentials_available["checked"]:
+                return _credentials_available["available"]
+
+            try:
+                # Quick check: try to create a boto3 session
+                session = boto3.Session()
+                credentials = session.get_credentials()
+                _credentials_available["available"] = credentials is not None
+                _credentials_available["checked"] = True
+
+                if _credentials_available["available"]:
+                    log.debug("AWS credentials detected, using signed requests")
+                else:
+                    log.debug("No AWS credentials found, using unsigned requests")
+
+                return _credentials_available["available"]
+
+            except Exception as e:
+                log.debug(f"Error checking credentials: {e}, using unsigned requests")
+                _credentials_available["available"] = False
+                _credentials_available["checked"] = True
+                return False
+
         def patched_download_file_impl(
             self,
             remote: str,
@@ -61,18 +90,18 @@ def patch_streaming_for_public_s3():
 
             # Ensure S3 client exists
             if self._s3_client is None:
-                try:
-                    self._create_s3_client(timeout=timeout)
-                except (NoCredentialsError, PartialCredentialsError):
-                    log.info(
-                        f"No AWS credentials found, attempting unsigned access for {remote}",
-                    )
+                has_credentials = _check_credentials()
+
+                # Directly create unsigned client if no credentials
+                if not has_credentials:
                     self._create_s3_client(unsigned=True, timeout=timeout)
-                except Exception as e:
-                    log.debug(
-                        f"Failed to create signed S3 client: {e}, trying unsigned",
-                    )
-                    self._create_s3_client(unsigned=True, timeout=timeout)
+                else:
+                    # Try signed client first if credentials available
+                    try:
+                        self._create_s3_client(timeout=timeout)
+                    except (NoCredentialsError, PartialCredentialsError):
+                        log.debug("Credentials check was incorrect, using unsigned")
+                        self._create_s3_client(unsigned=True, timeout=timeout)
 
             assert self._s3_client is not None
 
@@ -102,7 +131,7 @@ def patch_streaming_for_public_s3():
                 if "RequestPayer" in extra_args:
                     raise  # Requester-pays buckets must use signed requests
 
-                log.info(f"Retrying {remote} with unsigned client")
+                log.debug(f"Retrying {remote} with unsigned client")
                 self._create_s3_client(unsigned=True, timeout=timeout)
                 _attempt_download()
 
@@ -121,7 +150,7 @@ def patch_streaming_for_public_s3():
                 elif error_code in ["403", "AccessDenied", "InvalidRequest"]:
                     # Access denied with signed request, try unsigned for public buckets
                     if "RequestPayer" not in extra_args:
-                        log.info(
+                        log.debug(
                             f"Access denied with signed request for {remote}, trying unsigned",
                         )
                         self._create_s3_client(unsigned=True, timeout=timeout)
