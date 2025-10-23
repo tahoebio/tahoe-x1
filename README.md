@@ -197,9 +197,9 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID | Config File |
 |------------|------------|----------------|-----------------|----------|-------------|
-| **Tx1-3B** | 3B | 2048  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
-| **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
-| **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
+| **Tx1-3B** | 3B | 2048  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoe_x1-3b-v2-cont-train.yaml` |
+| **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoe_x1-1_3b-merged.yaml` |
+| **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoe_x1-70m-merged.yaml` |
 
 Model weights are also available as safetensor files on our  [🤗 Huggingface model card](https://huggingface.co/tahoebio/Tahoe-x1).
 
