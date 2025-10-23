@@ -131,6 +131,9 @@ source tx1/bin/activate
 
 # Install the package with dependencies
 uv pip install -e . --no-build-isolation-package flash-attn
+
+# Alternatively, install the latest stable release via PyPi
+# uv pip install tahoe-x1 --no-build-isolation-package flash-attn
 ```
 
 **Note**: Native installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
