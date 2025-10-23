@@ -126,8 +126,8 @@ cd tahoe-x1
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create and activate virtual environment
-uv venv
-source .venv/bin/activate
+uv venv tx1
+source tx1/bin/activate
 
 # Install the package with dependencies
 uv pip install -e . --no-build-isolation-package flash-attn
