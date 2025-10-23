@@ -69,7 +69,7 @@ tahoe-x1/
 │   ├── prepare_for_inference.py  # Prepares model for inference
 │   ├── depmap/               # DepMap benchmark scripts
 │   ├── msigdb/               # MSigDB pathway benchmark scripts
-│   ├── state transition/     # State transition prediction scripts
+│   ├── state_transition/     # State transition prediction scripts
 │   ├── data_prep/            # Dataset preparation scripts
 │   └── inference/            # Inference utilities
 ├── tutorials/                 # Jupyter notebook tutorials
@@ -311,7 +311,7 @@ Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. Se
 | **DepMap Essentiality** | Predict broad and context-specific gene dependencies | [`scripts/depmap/`](scripts/depmap/) |
 | **MSigDB Hallmarks** | Recover 50 hallmark pathway memberships from gene embeddings | [`scripts/msigdb/`](scripts/msigdb/) |
 | **Cell-Type Classification** | Classify cell types across 5 tissues (Tabula Sapiens 2.0) | [`cz-benchmarks`](https://github.com/chanzuckerberg/cz-benchmarks) |
-| **Perturbation Prediction** | Predict transcriptional responses in held-out contexts | [`scripts/state transition/`](scripts/state%20transition/) |
+| **Perturbation Prediction** | Predict transcriptional responses in held-out contexts | [`scripts/state_transition/`](scripts/state_transition/) |
 
 
 ### Additional Resources
