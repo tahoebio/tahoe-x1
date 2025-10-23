@@ -1,8 +1,9 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
-"""TahoeX package setup."""
+# SPDX-License-Identifier: Apache-2.0
+"""Tahoe-x1 package setup."""
 
 import os
-import re
+from typing import Any, Mapping
 
 import setuptools
 from setuptools import setup
@@ -12,17 +13,44 @@ _PACKAGE_DIR = "tahoex"
 _REPO_REAL_PATH = os.path.dirname(os.path.realpath(__file__))
 _PACKAGE_REAL_PATH = os.path.join(_REPO_REAL_PATH, _PACKAGE_DIR)
 
-# Read the repo version
-# We can't use `.__version__` from the library since it's not installed yet
-with open(os.path.join(_PACKAGE_REAL_PATH, "__init__.py")) as f:
+# Read the tahoex version
+version_path = os.path.join(_PACKAGE_REAL_PATH, '_version.py')
+with open(version_path, encoding='utf-8') as f:
+    version_globals: dict[str, Any] = {}
+    version_locals: Mapping[str, object] = {}
     content = f.read()
-# regex: '__version__', whitespace?, '=', whitespace, quote, version, quote
-# we put parens around the version so that it becomes elem 1 of the match
-expr = re.compile(
-    r"""^__version__\s*=\s*['"]([0-9]+\.[0-9]+\.[0-9]+(?:\.\w+)?)['"]""",
-    re.MULTILINE,
-)
-repo_version = expr.findall(content)[0]
+    exec(content, version_globals, version_locals)
+    repo_version = str(version_locals['__version__'])
+
+# Use repo README for PyPI description
+with open('README.md', 'r', encoding='utf-8') as fh:
+    long_description = fh.read()
+
+# Hide the content between <!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_BEGIN --> and
+# <!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_END --> tags in the README
+while True:
+    start_tag = '<!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_BEGIN -->'
+    end_tag = '<!-- SETUPTOOLS_LONG_DESCRIPTION_HIDE_END -->'
+    start = long_description.find(start_tag)
+    end = long_description.find(end_tag)
+    if start == -1:
+        assert end == -1, 'there should be a balanced number of start and ends'
+        break
+    else:
+        assert end != -1, 'there should be a balanced number of start and ends'
+        long_description = long_description[:start] + long_description[
+            end + len(end_tag):]
+
+classifiers = [
+    'Development Status :: 4 - Beta',
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Topic :: Scientific/Engineering :: Artificial Intelligence',
+    'Topic :: Scientific/Engineering :: Bio-Informatics',
+]
 
 install_requires = [
     "torchtext>=0.17.1",
@@ -54,7 +82,19 @@ setup(
     name=_PACKAGE_NAME,
     version=repo_version,
     author="Tahoe Therapeutics",
-    description="tahoex",
+    author_email="admin@tahoebio.ai",
+    description="Tahoe-x1: Perturbation trained single-cell foundation models with up to 3 billion parameters",
+    long_description=long_description,
+    long_description_content_type='text/markdown',
+    url="https://github.com/tahoebio/tahoe-x1/",
+    project_urls={
+        'Homepage': 'https://github.com/tahoebio/tahoe-x1',
+        'Documentation': 'https://github.com/tahoebio/tahoe-x1#readme',
+        'Repository': 'https://github.com/tahoebio/tahoe-x1',
+        'Bug Tracker': 'https://github.com/tahoebio/tahoe-x1/issues',
+        'Model Card': 'https://huggingface.co/tahoebio/Tahoe-x1',
+        'Paper': 'http://www.tahoebio.ai/news/tahoe-x1',
+    },
     package_data={
         "tahoex": ["py.typed"],
     },
@@ -67,9 +107,22 @@ setup(
             "scripts*",
             "mcli*",
             "runai*",
+            "gcloud*",
+            "configs*",
         ],
     ),
+    classifiers=classifiers,
     install_requires=install_requires,
     extras_require=extra_deps,
     python_requires=">=3.10",
+    license='Apache-2.0',
+    keywords=[
+        'single-cell',
+        'foundation-model',
+        'genomics',
+        'transcriptomics',
+        'perturbation',
+        'machine-learning',
+        'deep-learning',
+    ],
 )
