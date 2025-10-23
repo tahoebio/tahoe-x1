@@ -139,8 +139,24 @@ uv pip install -e . --no-build-isolation-package flash-attn
 **Note**: Native installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
 
 
+### Quickstart 
 
+This is a quickstart to running the tahoe-x1 model on the Tahoe-100M dataset. 
 
+```bash
+composer scripts/train.py \
+  configs/test_run.yaml
+```
+
+Alternatively, you can pass individual configuration parameters directly from the command line instead of using a config file:
+
+```bash
+composer scripts/train.py \
+  model.d_model=512 \
+  model.n_layers=12 \
+  train_loader.num_workers=8 \
+  max_duration=6ep
+```
 
 ## System Requirements & Training Capabilities
 
