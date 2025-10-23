@@ -219,7 +219,7 @@ Or with command-line arguments:
 
 ```bash
 composer scripts/train.py \
-  --model_name tahoex \
+  --model_name tahoe_x1 \
   --data_path /path/to/data \
   --max_seq_len 2048 \
   --batch_size 32
