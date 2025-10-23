@@ -19,10 +19,10 @@ from tahoex.tokenizer import GeneVocab
 
 
 def load_model(
-        model_dir: str,
-        device: torch.device,
-        return_gene_embeddings: bool = False,
-        use_chem_inf: Optional[bool] = False,
+    model_dir: str,
+    device: torch.device,
+    return_gene_embeddings: bool = False,
+    use_chem_inf: Optional[bool] = False,
 ):
     from tahoex.model.model import ComposerTX
 
@@ -47,7 +47,7 @@ def load_model(
 
     # if model was trained with chemical information, and we don't want to use it for inference
     if use_chem_inf is not None and (
-            not use_chem_inf and collator_config.get("use_chem_token", False)
+        not use_chem_inf and collator_config.get("use_chem_token", False)
     ):
         # we need to modify the model and collator config accordingly
         collator_config["use_chem_token"] = False
@@ -68,14 +68,14 @@ def load_model(
 
 
 def loader_from_adata(
-        adata: AnnData,
-        collator_cfg: DictConfig,
-        vocab: GeneVocab,
-        batch_size: int = 50,
-        max_length: Optional[int] = None,
-        gene_ids: Optional[np.ndarray] = None,
-        num_workers: int = 8,
-        prefetch_factor: int = 48,
+    adata: AnnData,
+    collator_cfg: DictConfig,
+    vocab: GeneVocab,
+    batch_size: int = 50,
+    max_length: Optional[int] = None,
+    gene_ids: Optional[np.ndarray] = None,
+    num_workers: int = 8,
+    prefetch_factor: int = 48,
 ):
     count_matrix = adata.X
     if isinstance(count_matrix, np.ndarray):
@@ -186,6 +186,7 @@ def download_file_from_s3_url(s3_url, local_file_path):
 
 
 def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
+
     conditions_unique = np.unique(conditions)
     condition2idx = {c: np.where(conditions == c)[0] for c in conditions_unique}
 
@@ -199,18 +200,18 @@ def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):
 
     pearson = []
     for cond, t, p in zip(
-            conditions_unique,
-            targets_mean_perturbed_by_condition,
-            preds_mean_perturbed_by_condition,
+        conditions_unique,
+        targets_mean_perturbed_by_condition,
+        preds_mean_perturbed_by_condition,
     ):
         print(cond, pearsonr(t, p))
         pearson.append(pearsonr(t, p)[0])
 
     pearson_delta = []
     for cond, t, p in zip(
-            conditions_unique,
-            targets_mean_perturbed_by_condition,
-            preds_mean_perturbed_by_condition,
+        conditions_unique,
+        targets_mean_perturbed_by_condition,
+        preds_mean_perturbed_by_condition,
     ):
         tm, pm = t, p
         tm -= mean_ctrl
