@@ -67,15 +67,14 @@ extra_deps["dev"] = [
     "packaging>=21,<23",
 ]
 
-extra_deps["gpu"] = [
-    "transformer-engine@git+https://github.com/NVIDIA/TransformerEngine.git@stable",
-]
+# Note: transformer-engine is an optional dependency that must be installed separately
+# Users can install it with: pip install git+https://github.com/NVIDIA/TransformerEngine.git@stable
+# It's not included here because PyPI doesn't allow direct git dependencies
 
 extra_deps["all"] = {
     dep
     for key, deps in extra_deps.items()
     for dep in deps
-    if key not in {"gpu-flash2", "all-cpu"}
 }
 
 setup(
