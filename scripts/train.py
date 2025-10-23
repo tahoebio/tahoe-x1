@@ -7,6 +7,10 @@ import sys
 import warnings
 from typing import Any, Dict, List, Optional, Union
 
+# Suppress megablocks FutureWarnings about deprecated torch.cuda.amp API
+# Must be done before any imports that might use megablocks
+warnings.filterwarnings("ignore", category=FutureWarning, module="megablocks")
+
 import composer
 import torch
 from composer.core.callback import Callback
@@ -37,9 +41,6 @@ from rich.traceback import install
 from streaming.base.util import clean_stale_shared_memory
 
 install()
-
-# Suppress megablocks FutureWarnings about deprecated torch.cuda.amp API
-warnings.filterwarnings("ignore", category=FutureWarning, module="megablocks")
 
 from tahoex.data import build_dataloader
 from tahoex.model import ComposerTX
