@@ -313,14 +313,25 @@ Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. Se
 | **Cell-Type Classification** | Classify cell types across 5 tissues (Tabula Sapiens 2.0) | [`cz-benchmarks`](https://github.com/chanzuckerberg/cz-benchmarks) |
 | **Perturbation Prediction** | Predict transcriptional responses in held-out contexts | [`scripts/state transition/`](scripts/state%20transition/) |
 
-### Technical Report
-
-
 
 ### Additional Resources
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
 
+## Troubleshooting
+
+### Common Issues and Solutions
+
+- **PyTorch/CUDA mismatch**: Ensure PyTorch is installed with the correct CUDA version for your system
+- **Docker permission denied**: Run Docker commands with `sudo` or add your user to the docker group
+- **OOM (Out of Memory)**: Ensure half-precision, flash-attention are enabled, set microbatch_size to auto
+- **S3 access denied**: For public buckets, the code will automatically retry with unsigned requests
+
+
+For additional help, please open an issue on [GitHub](https://github.com/tahoebio/tahoe-x1) with:
+- Your system configuration (OS, GPU, PyTorch version)
+- Complete error message and stack trace
+- Steps to reproduce the issue
 
 ## Acknowledgements
 We thank the developers of the following open-source projects:
