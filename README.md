@@ -23,20 +23,19 @@
 </p>
 <br />
 
-# Tahoe-x1: A Perturbation-Trained Single-Cell Foundation Model
+# Tahoe-x1: Scaling Perturbation-Trained Single-Cell Foundation Models to 3 Billion Parameters
 
-**Tahoe-x1** is a family of transformer-based foundation models for single-cell RNA-seq data developed by Tahoe Therapeutics.
-These models are trained on a large atlas of both observational and perturbative RNAseq profiles and can be used as a general embedding for several downstream applications such as cell type classification, gene essentiality prediction, gene-set membership prediction, 
-and simulating the effect of perturbations.
+[📄 Paper](http://www.tahoebio.ai/news/tahoe-x1) | [🤗 HuggingFace](https://huggingface.co/tahoebio/Tahoe-x1) | [🚀 Getting Started](#installation) | [🧑‍🏫 Tutorials](tutorials/)
+
+**Tahoe-x1 (Tx1)** is a family of perturbation-trained single-cell foundation models with up to 3 billion parameters, developed by Tahoe Therapeutics.
+Tx1 is pretrained on large-scale single-cell transcriptomic datasets including the _Tahoe-100M_ perturbation compendium, and fine-tuned for cancer-relevant tasks.
+Through architectural optimizations and efficient training strategies, Tx1 achieves 3–30× higher compute efficiency than prior implementations while delivering state-of-the-art performance across disease-relevant benchmarks.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="./assets/abstract_logo_dark_mode.png">
   <source media="(prefers-color-scheme: light)" srcset="./assets/abstract_logo_light_mode.png">
   <img src="./assets/abstract_logo_light_mode.png" alt="Abstract Logo">
 </picture>
-
-
-📄 **Preprint**: Coming soon - [Paper](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
 
 ## Table of Contents
 - [Repository Structure](#repository-structure)
@@ -65,15 +64,17 @@ tahoe-x1/
 │   ├── tokenizer/            # Vocabulary building and tokenization functions
 │   ├── data/                 # Data loaders and collators
 │   └── utils/                # Utility functions 
-├── scripts/                   
-│   ├── train.py              # Training script 
+├── scripts/
+│   ├── train.py              # Training script
 │   ├── prepare_for_inference.py  # Prepares model for inference
-│   ├── clustering_tutorial.ipynb  # Cell clustering tutorial
 │   ├── depmap/               # DepMap benchmark scripts
 │   ├── msigdb/               # MSigDB pathway benchmark scripts
-│   ├── state transition/     # State transition prediction scripts
+│   ├── state_transition/     # State transition prediction scripts
 │   ├── data_prep/            # Dataset preparation scripts
 │   └── inference/            # Inference utilities
+├── tutorials/                 # Jupyter notebook tutorials
+│   ├── clustering_tutorial.ipynb  # Cell clustering and UMAP visualization
+│   └── training_tutorial.ipynb    # Training walkthrough
 └── configs/                      
     ├──runai/                 # RunAI configuration files
     ├──mcli/                  # MosaicML platform configuration files
@@ -83,37 +84,20 @@ tahoe-x1/
 
 ## Installation
 
-### Option 1: With uv (Recommended)
+Docker installation provides better reproducibility and avoids dependency conflicts.
+
+### Docker Installation (Recommended)
 
 ```bash
-
-# Clone the repo
+# Clone the repository
 git clone https://github.com/tahoebio/tahoe-x1.git
 cd tahoe-x1
 
-# Install uv if it doesn't exist
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Pull the latest Docker image with all the dependencies pre-installed
+docker pull ghcr.io/tahoebio/tahoe-x1:latest
 
-# Create env
-uv venv
-source .venv/bin/activate
-
-# Install the package
-uv pip install -e . --no-build-isolation-package flash-attn
-```
-
-### Option 2: With Docker
-
-```bash
-
-# Clone the repo
-git clone https://github.com/tahoebio/tahoe-x1.git
-cd tahoe-x1
-
-# Pull the pre-built Docker image
-docker pull ghcr.io/tahoebio/tahoe-x1:1.0.0
-
-# Start a shell with the current directory mounted at /workspace
+# Start an interactive container with GPU support
+# Note that nvidia-container-toolkit is required for this step
 docker run -it --rm \
   --gpus all \
   -v "$(pwd)":/workspace \
@@ -121,24 +105,57 @@ docker run -it --rm \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 \
   /bin/bash
 
-# Install the tahoe-x1 package (the requirements are already present in the container)
+# Inside the container, install the Tahoe-x1 package (dependencies are pre-installed)
 pip install -e . --no-deps
 ```
 
+The Docker image includes all necessary dependencies including PyTorch, CUDA drivers, and flash-attention for optimal performance.
+
+### Native Installation (Alternative)
+
+For direct installation without Docker, we recommend using `uv` for dependency management:
+
+```bash
+# Clone the repository
+git clone https://github.com/tahoebio/tahoe-x1.git
+cd tahoe-x1
+
+# Install uv if not already installed
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create and activate virtual environment
+uv venv
+source .venv/bin/activate
+
+# Install the package with dependencies
+uv pip install -e . --no-build-isolation-package flash-attn
+```
+
+**Note**: Native installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
 
 
 
 
-## Training Infrastructure
 
-The model is trained and tested on:
-- **GPU**: NVIDIA H100 GPUs
-- **CUDA**: Version 12.1 or compatible
-- **Python**: ≥3.10
-- **PyTorch**: 2.5.2
-- **llm-foundry**: v0.17.1 
+## System Requirements & Training Capabilities
 
-Platforms such as MosaicML and RunAI are used for training.
+Tahoe-x1 is built natively on [Composer](https://github.com/mosaicml/composer) and [llm-foundry](https://github.com/mosaicml/llm-foundry), inheriting their full suite of large-scale training capabilities:
+
+### Hardware Requirements
+- **GPU**: NVIDIA Ampere (A100) or newer for FlashAttention support
+- **CUDA**: Version 12.1+
+- **Python**: 3.10+
+
+### Advanced Training Features
+The codebase leverages Composer's state-of-the-art training stack, configurable via YAML:
+- **Automatic micro-batching** for optimal memory utilization
+- **Mixed precision training** with BF16/FP16, plus FP8 support on Hopper (H100) and newer GPUs
+- **Multi-GPU and multi-node** distributed training with FSDP (Fully Sharded Data Parallel)
+- **Gradient accumulation and checkpointing** for training larger models on limited hardware
+- **Advanced optimizers and schedulers** from the LLM training ecosystem
+- **Streaming datasets** for efficient data loading at scale
+
+This infrastructure supports training models from 70M to 3B parameters and can scale to larger architectures.
 
 ### Docker Images
 
@@ -150,7 +167,7 @@ We provide pre-built Docker images for ease of use:
 
 ## Datasets
 
-Tahoe-x1 models are trained on large-scale single-cell RNA-seq datasets. The following datasets are used for training and evaluation:
+Tx1 was pretrained on 266 million single-cell profiles from three major sources. The following datasets were used for training and evaluation:
 
 | Dataset | Description | Usage | Location |
 |---------|-------------|-------|----------|
@@ -179,11 +196,11 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 
 | Model Name | Parameters | Context Length | Checkpoint Path | WandB ID | Config File |
 |------------|------------|----------------|-----------------|----------|-------------|
-| **Tx1-3B** | 3B | 2056  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
+| **Tx1-3B** | 3B | 2048  | `s3://tahoe-hackathon-data/MFM/ckpts/3b/` | [mygjkq5c](https://wandb.ai/vevotx/tahoe-x1/runs/mygjkq5c) | `./configs/mcli/tahoex-3b-v2-cont-train.yaml` |
 | **Tx1-1.3B** | 1.3B | 2048 | `s3://tahoe-hackathon-data/MFM/ckpts/1b/` | [26iormxc](https://wandb.ai/vevotx/tahoe-x1/runs/26iormxc) | `./configs/gcloud/tahoex-1_3b-merged.yaml` |
 | **Tx1-70M** | 70M | 1024 | `s3://tahoe-hackathon-data/MFM/ckpts/70m/` | [ftb65le8](https://wandb.ai/vevotx/tahoe-x1/runs/ftb65le8) | `./configs/gcloud/tahoex-70m-merged.yaml` |
 
-Models are also available on HuggingFace: `tahoebio/TahoeX1`
+Model weights are also available as safetensor files on our  [🤗 Huggingface model card](https://huggingface.co/tahoebio/Tahoe-x1).
 
 ## Training and Fine-tuning
 
@@ -252,7 +269,7 @@ from scripts.inference.predict_embeddings import predict_embeddings
 cfg = {
     "model_name": "Tx1-70m",
     "paths": {
-        "hf_repo_id": "tahoebio/TahoeX1",
+        "hf_repo_id": "tahoebio/Tahoe-x1",
         "hf_model_size": "70m",
         "adata_input": "/path/to/your_data.h5ad",
     },
@@ -281,81 +298,49 @@ Set `return_gene_embeddings: True` in the configuration to extract gene-level re
 ## Tutorials and Benchmarks
 
 ### Tutorials
-- **[scripts/clustering_tutorial.ipynb](scripts/clustering_tutorial.ipynb)**: Cell clustering and UMAP visualization tutorial
+- **[Clustering Tutorial](tutorials/clustering_tutorial.ipynb)**: Cell clustering and UMAP visualization
+- **[Training Tutorial](tutorials/training_tutorial.ipynb)**: Step-by-step guide to training Tahoe-x1 models
 
 
 ### Benchmarks
-Tahoe-x1 models have been extensively evaluated on multiple benchmarks:
 
-#### DepMap Benchmarks
-Three tasks centered around cancer cell line data:
-1. **Tissue of Origin Classification**: Separate cancer cell lines by tissue type
-2. **Gene Essentiality Prediction**: Predict broadly essential vs. inessential genes
-3. **Cell Line-Specific Essentiality**: Predict gene essentiality for specific cell lines
+Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. See our [preprint](http://www.tahoebio.ai/news/tahoe-x1) for detailed results.
 
-📊 See manuscript and [scripts/depmap/](scripts/depmap/README.md) for detailed results and evaluation protocols.
-
-#### MSigDB Pathway Prediction
-Predict gene membership in MSigDB pathway signatures using gene embeddings.
-
-📊 See manuscript and [scripts/msigdb/](scripts/msigdb/README.md) for results and benchmarking pipeline.
-
-#### State Transition 
-
-📊 See manuscript and [scripts/state transition/](scripts/state transition/README.md) for results and post-training protocols.
-
-### Technical Report
-For comprehensive results, analysis, and model comparisons, please refer to our technical report:
-- [Internal Link](https://drive.google.com/drive/u/1/folders/1KeAXZ9zNYh4uHbLL5XUMmreAkHXW4yXo)
-- Public preprint: Coming soon
+| Benchmark | Task | Code Location |
+|-----------|------|---------------|
+| **DepMap Essentiality** | Predict broad and context-specific gene dependencies | [`scripts/depmap/`](scripts/depmap/) |
+| **MSigDB Hallmarks** | Recover 50 hallmark pathway memberships from gene embeddings | [`scripts/msigdb/`](scripts/msigdb/) |
+| **Cell-Type Classification** | Classify cell types across 5 tissues (Tabula Sapiens 2.0) | [`cz-benchmarks`](https://github.com/chanzuckerberg/cz-benchmarks) |
+| **Perturbation Prediction** | Predict transcriptional responses in held-out contexts | [`scripts/state_transition/`](scripts/state_transition/) |
 
 
 ### Additional Resources
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
 
+## Troubleshooting
+
+### Common Issues and Solutions
+
+- **PyTorch/CUDA mismatch**: Ensure PyTorch is installed with the correct CUDA version for your system
+- **Docker permission denied**: Run Docker commands with `sudo` or add your user to the docker group
+- **OOM (Out of Memory)**: Ensure half-precision, flash-attention are enabled, set microbatch_size to auto
+- **S3 access denied**: For public buckets, the code will automatically retry with unsigned requests
 
 
-
-## Developer Guidelines
-
-### Code Style
-We use **Black** for code formatting and **Ruff** for linting to maintain consistency across contributions.
-
-### Pre-commit Hooks
-Set up pre-commit hooks before contributing:
-
-```bash
-pip install pre-commit
-pre-commit install
-pre-commit run --all-files  # Run before committing
-```
-
-### Contribution Workflow
-1. **Do not push directly to `main`** - create a new branch for your changes
-2. Open a pull request for review
-3. Ensure all pre-commit checks pass
-4. Use type annotations and Google-style docstrings for new code
-
-### Type Checking and Documentation
-We encourage the use of:
-- Type annotations for functions and classes
-- Google-style docstrings
-- Future additions will include `pyright` and `pydocstyle` checks
-
-### Infrastructure Access
-For launching training/evaluation runs, ensure you have access to:
-- AWS S3 buckets
-- Weights & Biases (wandb)
-- MosaicML CLI (`mcli`) or RunAI or local gpu
-
+For additional help, please open an issue on [GitHub](https://github.com/tahoebio/tahoe-x1) with:
+- Your system configuration (OS, GPU, PyTorch version)
+- Complete error message and stack trace
+- Steps to reproduce the issue
 
 ## Acknowledgements
-We would like to thank the developers of the following open-source projects:
+We thank the developers of the following open-source projects:
 - **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For inspiring the Tahoe-x1 architecture
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
 - **[streaming](https://github.com/mosaicml/streaming)**: Fast, efficient dataset streaming
-- **[CellxGene](https://cellxgene.cziscience.com/)** and **[scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)** : For providing access to their single cell atlas and benchmarking tools.
+- **[CZ CELLxGENE](https://cellxgene.cziscience.com/)**: Chan Zuckerberg Initiative's single-cell atlas
+- **[Arc scBaseCount](https://github.com/ArcInstitute/arc-virtual-cell-atlas/)**: Arc Institute's virtual cell atlas
+- **[Arc Institute STATE](https://github.com/arcinstitute/state)**: State Transition model for perturbation prediction
 ---
 
 For questions, issues, or collaboration inquiries, please open an issue on [GitHub](https://github.com/tahoebio/tahoe-x1) or write to us at [admin@tahoebio.ai](mailto:admin@tahoebio.ai).
