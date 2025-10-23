@@ -16,10 +16,10 @@ import utils
 from omegaconf import OmegaConf as om
 from tqdm import tqdm
 
-from tahoex.data import CountDataset, DataCollator
-from tahoex.model import ComposerTX
-from tahoex.tasks import get_batch_embeddings
-from tahoex.tokenizer import GeneVocab
+from tahoe_x1.data import CountDataset, DataCollator
+from tahoe_x1.model import ComposerTX
+from tahoe_x1.tasks import get_batch_embeddings
+from tahoe_x1.tokenizer import GeneVocab
 
 # set up logging
 log = logging.getLogger(__name__)
@@ -353,13 +353,13 @@ if __name__ == "__main__":
         "--batch-size",
         type=int,
         default=16,
-        help="Batch size for tahoex.tasks.get_batch_embeddings.",
+        help="Batch size for tahoe_x1.tasks.get_batch_embeddings.",
     )
     parser.add_argument(
         "--max-length",
         type=int,
         default=17000,
-        help="Maximum sequence length for tahoex.tasks.get_batch_embeddings.",
+        help="Maximum sequence length for tahoe_x1.tasks.get_batch_embeddings.",
     )
     args = parser.parse_args()
 

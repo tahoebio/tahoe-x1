@@ -4,8 +4,8 @@ import os
 import wandb
 from omegaconf import OmegaConf as om
 
-from tahoex.tokenizer import GeneVocab
-from tahoex.utils import download_file_from_s3_url
+from tahoe_x1.tokenizer import GeneVocab
+from tahoe_x1.utils import download_file_from_s3_url
 
 model_name = "tx-3b-prod"
 wandb_id = "mygjkq5c"

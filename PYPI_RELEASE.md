@@ -1,10 +1,10 @@
 # PyPI Release Guide for Tahoe-x1
 
-This guide explains how to publish the `tahoex` package to PyPI.
+This guide explains how to publish the `tahoe-x1` package to PyPI.
 
 ## Prerequisites
 
-1. **PyPI Account**: Ensure you have an account on [PyPI](https://pypi.org/) and are added as a maintainer to the `tahoex` organization/project
+1. **PyPI Account**: Ensure you have an account on [PyPI](https://pypi.org/) and are added as a maintainer to the `tahoe-x1` organization/project
 2. **API Token**: Generate an API token from PyPI account settings (recommended over password)
 3. **Build Tools**: Install required build tools:
    ```bash
@@ -15,7 +15,7 @@ This guide explains how to publish the `tahoex` package to PyPI.
 
 ### 1. Update Version
 
-Update the version in `tahoex/_version.py`:
+Update the version in `tahoe_x1/_version.py`:
 ```python
 __version__ = '1.0.0'  # Update to your desired version
 ```
@@ -40,8 +40,8 @@ python -m build
 ```
 
 This creates:
-- `dist/tahoex-1.0.0.tar.gz` (source distribution)
-- `dist/tahoex-1.0.0-py3-none-any.whl` (wheel)
+- `dist/tahoe-x1-1.0.0.tar.gz` (source distribution)
+- `dist/tahoe_x1-1.0.0-py3-none-any.whl` (wheel)
 
 ### 4. Check the Build
 
@@ -66,7 +66,7 @@ You'll be prompted for credentials:
 
 Then test installation from TestPyPI:
 ```bash
-pip install --index-url https://test.pypi.org/simple/ --no-deps tahoex
+pip install --index-url https://test.pypi.org/simple/ --no-deps tahoe_x1
 ```
 
 ### 6. Upload to PyPI
@@ -85,10 +85,10 @@ You'll be prompted for credentials:
 
 Test that the package installs correctly:
 ```bash
-pip install tahoex
+pip install tahoe_x1
 ```
 
-Visit the PyPI page: https://pypi.org/project/tahoex/
+Visit the PyPI page: https://pypi.org/project/tahoe-x1/
 
 ## Using API Tokens
 
@@ -123,7 +123,7 @@ twine upload dist/*
 
 ### Missing Files in Package
 - Check `MANIFEST.in` includes all necessary files
-- Verify with: `tar -tzf dist/tahoex-1.0.0.tar.gz`
+- Verify with: `tar -tzf dist/tahoe-x1-1.0.0.tar.gz`
 
 ### Large Package Size
 - Consider excluding unnecessary files in `pyproject.toml` `[tool.setuptools.packages.find]`
@@ -171,6 +171,6 @@ jobs:
 
 ## Notes
 
-- The package name on PyPI is `tahoex` (import: `import tahoex`)
+- The package name on PyPI is `tahoe-x1` (import: `import tahoe_x1`)
 - Large dependencies (PyTorch, flash-attention) may require users to pre-install
 - Consider providing pre-built wheels for common platforms if compile-time dependencies cause issues

@@ -1,4 +1,4 @@
-output_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025"
+output_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025"
 vocab:
   reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
   use_col: "gene_id"
@@ -14,8 +14,8 @@ huggingface:
   gene_col: "gene_id"
   adata_dir: "/tahoe"
   num_chunks: 10
-  output_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/tahoe_hf_chunks_w_metadata"
-  merged_dataset_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/tahoe_merged_w_metadata"
+  output_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/tahoe_hf_chunks_w_metadata"
+  merged_dataset_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/tahoe_merged_w_metadata"
   split_parameters:
     test_size: 0.01
     seed: 42
@@ -33,7 +33,7 @@ huggingface:
         adata_key: "cell_line"
       columns:
         - "Cell_ID_Cellosaur"
-      path: "/vevo/tahoex/datasets/vevo_merged_jan_2025/cell_gen_dr_a97.csv"
+      path: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/cell_gen_dr_a97.csv"
     - merge_keys:
         metadata_key: "drug"
         adata_key: "drug"
@@ -42,18 +42,18 @@ huggingface:
         - "canonical_smiles"
         - "pubchem_cid"
         - "targets"
-      path: "/vevo/tahoex/datasets/vevo_merged_jan_2025/tahoe_drug_smiles.csv"
+      path: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/tahoe_drug_smiles.csv"
     - merge_keys:
         metadata_key: sample
         adata_key: sample
       columns:
         - "plate"
-      path: "/vevo/tahoex/datasets/vevo_merged_jan_2025/arc-virtual-cell-metadata/sample_metadata.csv"
+      path: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/arc-virtual-cell-metadata/sample_metadata.csv"
   vocab_output_root: ${vocab.output_root}
   vocab_path: ${vocab.output_file}
 
 mds:
-  out_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/tahoe_merged_MDS_v2"
+  out_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/tahoe_merged_MDS_v2"
   root_dir: ${huggingface.merged_dataset_root}
   num_proc: 128
   splits:

@@ -8,7 +8,7 @@ vocabulary:
   remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: tahoex
+  name: tahoe_x1
   d_model: 512
   n_layers: 12
   init_device: cpu
@@ -133,7 +133,7 @@ callbacks:
   runtime_estimator: {}
 loggers:
   wandb:
-    project: tahoex
+    project: tahoe_x1
     log_artifacts: False
 save_folder: "s3://tahoe-hackathon-data/models/{run_name}"
 save_interval: "2000ba"

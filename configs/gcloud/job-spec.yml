@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: vevo-tahoex-single-node
+  name: vevo-tahoe_x1-single-node
   namespace: default
 spec:
   template:
@@ -13,7 +13,7 @@ spec:
       nodeSelector:
         cloud.google.com/gke-accelerator: "nvidia-h100-80gb"
       containers:
-      - name: vevo-tahoex
+      - name: vevo-tahoe_x1
         image: ghcr.io/tahoebio/tahoe-x1:1.0.0
         command: [ "/bin/bash", "-c", "--" ]
         args:

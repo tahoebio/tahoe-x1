@@ -12,9 +12,9 @@ from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from tqdm.auto import tqdm
 
-from tahoex.data import DataCollator
-from tahoex.model import ComposerTX
-from tahoex.tokenizer import GeneVocab
+from tahoe_x1.data import DataCollator
+from tahoe_x1.model import ComposerTX
+from tahoe_x1.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 logging.basicConfig(

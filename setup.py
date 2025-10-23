@@ -8,12 +8,12 @@ import os
 import setuptools
 from setuptools import setup
 
-_PACKAGE_NAME = "tahoex"
-_PACKAGE_DIR = "tahoex"
+_PACKAGE_NAME = "tahoe-x1"
+_PACKAGE_DIR = "tahoe_x1"
 _REPO_REAL_PATH = os.path.dirname(os.path.realpath(__file__))
 _PACKAGE_REAL_PATH = os.path.join(_REPO_REAL_PATH, _PACKAGE_DIR)
 
-# Read the tahoex version using importlib for safer loading
+# Read the tahoe_x1 version using importlib for safer loading
 version_path = os.path.join(_PACKAGE_REAL_PATH, "_version.py")
 spec = importlib.util.spec_from_file_location("_version", version_path)
 version_module = importlib.util.module_from_spec(spec)
@@ -92,7 +92,7 @@ setup(
         "Paper": "http://www.tahoebio.ai/news/tahoe-x1",
     },
     package_data={
-        "tahoex": ["py.typed"],
+        "tahoe_x1": ["py.typed"],
     },
     packages=setuptools.find_packages(
         exclude=[

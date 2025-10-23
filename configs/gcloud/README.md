@@ -44,7 +44,7 @@ It follows the format `VM_NAME.ZONE.c.PROJECT_ID.internal`. You can check that i
 In my case the value was `MASTER_ADDR=h100-cluster-401h.us-central1-a.c.vevo-ml.internal`
 The Node rank is a number from 0-7 and must be changed for each node. The world size is 64 for the 8 nodes.
 The final launch command inside the docker statement should look something like:
-> composer --world_size 64 --node_rank 7 --master_addr h100-cluster-401h.us-central1-a.c.vevo-ml.internal --master_port 29500 train.py ../gcloud/tahoex-1_3b-merged.yaml
+> composer --world_size 64 --node_rank 7 --master_addr h100-cluster-401h.us-central1-a.c.vevo-ml.internal --master_port 29500 train.py ../gcloud/tahoe_x1-1_3b-merged.yaml
 
 The keys for AWS, GITHUB, WANDB need to be populated as well.
 
@@ -57,7 +57,7 @@ docker run --network host --gpus all \
   -e GITHUB_TOKEN=<GITHUB_TOKEN> \
   -e WANDB_API_KEY=<WANDB_API_KEY> \
   -e WANDB_ENTITY="vevotx" \
-  -e WANDB_PROJECT="tahoex" \
+  -e WANDB_PROJECT="tahoe_x1" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 -c "\
@@ -73,7 +73,7 @@ docker run --network host --gpus all \
     fi && \
     pip install -e . --no-deps && \
     cd scripts && \
-    composer --world_size 64 --node_rank <NODE_RANK_0-7> --master_addr <MASTER_ADDR> --master_port 29500 train.py ../gcloud/tahoex-1_3b-merged.yaml"
+    composer --world_size 64 --node_rank <NODE_RANK_0-7> --master_addr <MASTER_ADDR> --master_port 29500 train.py ../gcloud/tahoe_x1-1_3b-merged.yaml"
 ```
 
 I launched the runs in node order, ie master node first, followed by 1-7. 

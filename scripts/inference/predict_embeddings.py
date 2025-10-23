@@ -1,7 +1,7 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """Generate cell and gene embeddings using ``composer.Trainer.predict``.
 
-This script loads a trained :class:`~tahoex.model.ComposerTX` and
+This script loads a trained :class:`~tahoe_x1.model.ComposerTX` and
 produces embeddings for an input AnnData file. Configuration is provided via a
 YAML file.
 
@@ -23,8 +23,8 @@ from composer import Trainer
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
-from tahoex.model import ComposerTX
-from tahoex.utils.util import load_model, loader_from_adata
+from tahoe_x1.model import ComposerTX
+from tahoe_x1.utils.util import load_model, loader_from_adata
 
 log = logging.getLogger(__name__)
 logging.basicConfig(

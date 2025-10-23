@@ -16,7 +16,7 @@ from scipy.sparse import csc_matrix, csr_matrix
 from scipy.stats import pearsonr
 from sklearn.neighbors import kneighbors_graph
 
-from tahoex.tokenizer import GeneVocab
+from tahoe_x1.tokenizer import GeneVocab
 
 
 def load_model(
@@ -25,7 +25,7 @@ def load_model(
     return_gene_embeddings: bool = False,
     use_chem_inf: Optional[bool] = False,
 ):
-    from tahoex.model.model import ComposerTX
+    from tahoe_x1.model.model import ComposerTX
 
     model_config_path = os.path.join(model_dir, "model_config.yml")
     vocab_path = os.path.join(model_dir, "vocab.json")
@@ -93,7 +93,7 @@ def loader_from_adata(
     if max_length is None:
         max_length = len(gene_ids)
 
-    from tahoex.data import CountDataset, DataCollator
+    from tahoe_x1.data import CountDataset, DataCollator
 
     dataset = CountDataset(
         count_matrix,
@@ -170,7 +170,7 @@ def add_file_handler(logger: logging.Logger, log_file_path: Path):
     logger.addHandler(h)
 
 
-from tahoex.utils.s3_utils import download_file_from_s3
+from tahoe_x1.utils.s3_utils import download_file_from_s3
 
 
 def download_file_from_s3_url(s3_url, local_file_path):

@@ -1,5 +1,5 @@
 include README.md
 include LICENSE
 include pyproject.toml
-recursive-include tahoex *.py
-recursive-include tahoex py.typed
+recursive-include tahoe_x1 *.py
+recursive-include tahoe_x1 py.typed

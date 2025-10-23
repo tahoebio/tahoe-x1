@@ -7,7 +7,7 @@ vocabulary:
   remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: tahoex
+  name: tahoe_x1
   d_model: 512
   n_layers: 12
   init_device: cpu
