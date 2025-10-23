@@ -98,12 +98,14 @@ docker pull ghcr.io/tahoebio/tahoe-x1:latest
 
 # Start an interactive container with GPU support
 # Note that nvidia-container-toolkit is required for this step
+# Large SHM is needed to use dataloaders with multiple workers
 docker run -it --rm \
   --gpus all \
+  --shm-size=64g \   # Allocate enough shared memory within container
   -v "$(pwd)":/workspace \
   -w /workspace \
-  ghcr.io/tahoebio/tahoe-x1:latest\
-  /bin/bash
+  ghcr.io/tahoebio/tahoe-x1:latest \
+  /bin/bash     # Start an interactive Bash shell in the container              
 
 # Inside the container, install the Tahoe-x1 package (dependencies are pre-installed)
 pip install -e . --no-deps
