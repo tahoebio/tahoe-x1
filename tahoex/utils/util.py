@@ -1,16 +1,14 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import logging
 from pathlib import Path
-from urllib.parse import urlparse
 
 log = logging.getLogger(__name__)
 import os
+from typing import Optional
 
-import boto3
 import numpy as np
 import pandas as pd
 import torch
-from git import Optional
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from scanpy import AnnData
@@ -172,43 +170,21 @@ def add_file_handler(logger: logging.Logger, log_file_path: Path):
     logger.addHandler(h)
 
 
+from tahoex.utils.s3_utils import download_file_from_s3
+
+
 def download_file_from_s3_url(s3_url, local_file_path):
     """Downloads a file from an S3 URL to the specified local path.
 
-    :param s3_url: S3 URL in the form s3://bucket-name/path/to/file
+    Supports public S3 buckets without credentials (like --no-sign-request).
+
+    :param s3_url: S3 URL in the form
+    s3://bucket-name/path/to/file
     :param local_file_path: Local path where the file will be saved.
     :return: The local path to the downloaded file, or None if download fails.
     """
-    # Validate the S3 URL format
-    assert s3_url.startswith("s3://"), "URL must start with 's3://'"
-
-    # Parse the S3 URL
-    parsed_url = urlparse(s3_url)
-    assert parsed_url.scheme == "s3", "URL scheme must be 's3'"
-
-    bucket_name = parsed_url.netloc
-    s3_file_key = parsed_url.path.lstrip("/")
-
-    # Ensure bucket name and file key are not empty
-    assert bucket_name, "Bucket name cannot be empty"
-    assert s3_file_key, "S3 file key cannot be empty"
-
-    # Ensure the directory for local_file_path exists (if any)
-    local_path = Path(local_file_path)
-    if local_path.parent != Path("."):
-        local_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # Create an S3 client
-    s3 = boto3.client("s3")
-
-    try:
-        # Download the file
-        s3.download_file(bucket_name, s3_file_key, str(local_path))
-        print(f"File downloaded successfully to {local_path}")
-        return str(local_path)
-    except Exception as e:
-        print(f"Error downloading the file from {s3_url}: {e}")
-        return None
+    # Delegate to the new S3 utilities module
+    return download_file_from_s3(s3_url, local_file_path)
 
 
 def calc_pearson_metrics(preds, targets, conditions, mean_ctrl):

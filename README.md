@@ -102,7 +102,7 @@ docker run -it --rm \
   --gpus all \
   -v "$(pwd)":/workspace \
   -w /workspace \
-  ghcr.io/tahoebio/tahoe-x1:1.0.0 \
+  ghcr.io/tahoebio/tahoe-x1:latest\
   /bin/bash
 
 # Inside the container, install the Tahoe-x1 package (dependencies are pre-installed)
