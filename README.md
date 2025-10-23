@@ -56,7 +56,7 @@ This repository follows a similar structure to [llm-foundry](https://github.com/
 
 ```
 tahoe-x1/
-├── tahoex/                    # Core Tahoe-x1 library
+├── tahoe_x1/                    # Core Tahoe-x1 library
 │   ├── model/
 │   │   ├── blocks/           # Building block modules used across models
 │   │   └── model/            # Full architecture subclassed from ComposerModel
