@@ -207,7 +207,7 @@ Model weights are also available as safetensor files on our  [🤗 Huggingface m
 
 ### Training from Scratch
 
-A sample test configuration is available at `configs/test_run.yaml` for quick experimentation.
+You can start with `configs/test_run.yaml`, which is a sample configuration showing how to train the 70M model on the Tahoe100M dataset for a few iterations. Customize this configuration file for your own training runs.
 
 Use the main training script with a YAML configuration file: 
 
