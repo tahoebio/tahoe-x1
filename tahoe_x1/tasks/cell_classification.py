@@ -14,7 +14,7 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import f1_score
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
-from tahoex.utils import download_file_from_s3_url
+from tahoe_x1.utils import download_file_from_s3_url
 
 
 class CellClassification(Callback):
@@ -70,8 +70,8 @@ class CellClassification(Callback):
             )
             use_test_split = True
 
-        # step 2: extract tahoex embeddings
-        from tahoex.tasks import get_batch_embeddings
+        # step 2: extract tahoe_x1 embeddings
+        from tahoe_x1.tasks import get_batch_embeddings
 
         dataset_batch_size = self.dataset_registry[dataset].get(
             "batch_size",

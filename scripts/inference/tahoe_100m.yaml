@@ -1,9 +1,9 @@
 paths:
-  vocab_file: "/tahoe/tahoex/datasets/vevo_merged_jan_2025/vevo_v2_vocab.json"
-  model_config_path: "/tahoe/tahoex/checkpoints/release/tahoex-70m-merged/model_config.yml"
-  collator_config_path: "/tahoe/tahoex/checkpoints/release/tahoex-70m-merged/collator_config.yml"
-  model_file: "/tahoe/tahoex/checkpoints/release/tahoex-70m-merged/best-model.pt"
-  output_dir: "/tahoe/tahoex/datasets/barotaxis/embeddings_tahoe_100m"
+  vocab_file: "/tahoe/tahoe_x1/datasets/vevo_merged_jan_2025/vevo_v2_vocab.json"
+  model_config_path: "/tahoe/tahoe_x1/checkpoints/release/tahoe_x1-70m-merged/model_config.yml"
+  collator_config_path: "/tahoe/tahoe_x1/checkpoints/release/tahoe_x1-70m-merged/collator_config.yml"
+  model_file: "/tahoe/tahoe_x1/checkpoints/release/tahoe_x1-70m-merged/best-model.pt"
+  output_dir: "/tahoe/tahoe_x1/datasets/barotaxis/embeddings_tahoe_100m"
 
 dataset:
   name: "tahoebio/Tahoe-100M"

@@ -13,8 +13,8 @@ from omegaconf import OmegaConf as om
 from safetensors.torch import load_file
 from torch import Tensor, nn
 
-from tahoex.loss import MaskedMseMetric, MaskedSpearmanMetric, masked_mse_loss
-from tahoex.model.blocks import (
+from tahoe_x1.loss import MaskedMseMetric, MaskedSpearmanMetric, masked_mse_loss
+from tahoe_x1.model.blocks import (
     ChemEncoder,
     ContinuousValueEncoder,
     ExprDecoder,
@@ -25,7 +25,7 @@ from tahoex.model.blocks import (
     gene_encoder_defaults,
     init_config_defaults,
 )
-from tahoex.tokenizer import GeneVocab
+from tahoe_x1.tokenizer import GeneVocab
 
 log = logging.getLogger(__name__)
 

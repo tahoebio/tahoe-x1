@@ -8,9 +8,9 @@ from anndata import AnnData
 from omegaconf import DictConfig
 from tqdm.auto import tqdm
 
-from tahoex.model import TXModel
-from tahoex.tokenizer import GeneVocab
-from tahoex.utils.util import loader_from_adata
+from tahoe_x1.model import TXModel
+from tahoe_x1.tokenizer import GeneVocab
+from tahoe_x1.utils.util import loader_from_adata
 
 log = logging.getLogger(__name__)
 

@@ -1,21 +1,21 @@
 global_seed: 777
 seed: ${global_seed}
-device_train_batch_size: 400
-global_train_batch_size: 4800
-device_eval_batch_size: 400
+device_train_batch_size: 56
+global_train_batch_size: 3584
+device_eval_batch_size: 56
 device_train_microbatch_size: "auto"
 vocabulary:
   remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
   local: "vocab.json"
 model:
-  name: tahoex
-  d_model: 512
-  n_layers: 12
+  name: tahoe_x1
+  d_model: 2048
+  n_layers: 24
   init_device: cpu
   expansion_ratio: 4
   standard_scale_outputs: False
   transformer_activation: relu
-  n_heads: 8
+  n_heads: 16
   norm_scheme: "pre"
   use_generative_training: True
   use_cell_conditioned_generation: False
@@ -24,7 +24,7 @@ model:
   attn_config:
     attn_impl: triton
     attn_type: "grouped_query_attention"
-    kv_nheads: 8
+    kv_nheads: 16
     attn_pdrop: 0.0
   norm_config:
     norm_type: "layernorm"
@@ -98,12 +98,12 @@ valid_loader:
   persistent_workers: True
 optimizer:
   name: decoupled_adamw
-  lr: 3.0e-4
+  lr: 1.0e-4
   betas:
     - 0.9
     - 0.95
   eps: 1.0e-08
-  weight_decay: 1.0e-05
+  weight_decay: 1.0e-06
 scheduler:
   name: cosine_with_warmup
   t_warmup: "0.05dur"
@@ -115,8 +115,8 @@ algorithms:
     clipping_threshold: 1.0
   low_precision_layernorm: {}
 precision: amp_bf16
-eval_interval: "1000ba"
-max_duration: "6ep"
+eval_interval: "6000ba"
+max_duration: "8ep"
 fsdp_config:
   sharding_strategy: FULL_SHARD
   mixed_precision: DEFAULT
@@ -133,8 +133,9 @@ callbacks:
   runtime_estimator: {}
 loggers:
   wandb:
-    project: tahoex
+    project: tahoe_x1
     log_artifacts: False
 save_folder: "s3://tahoe-hackathon-data/models/{run_name}"
 save_interval: "2000ba"
-save_num_checkpoints_to_keep: 0
+autoresume: True
+run_name: "tx-v2-1_3b-1024-prod"

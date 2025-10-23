@@ -10,8 +10,8 @@ import scanpy as sc
 import torch
 from omegaconf import OmegaConf as om
 
-from tahoex.tasks import get_batch_embeddings
-from tahoex.utils.util import load_model
+from tahoe_x1.tasks import get_batch_embeddings
+from tahoe_x1.utils.util import load_model
 
 log = logging.getLogger(__name__)
 logging.basicConfig(

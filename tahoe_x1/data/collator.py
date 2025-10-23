@@ -7,8 +7,8 @@ import torch
 from composer.utils import dist
 from transformers import DefaultDataCollator
 
-from tahoex.tokenizer import GeneVocab
-from tahoex.utils import download_file_from_s3_url
+from tahoe_x1.tokenizer import GeneVocab
+from tahoe_x1.utils import download_file_from_s3_url
 
 
 class DataCollator(DefaultDataCollator):

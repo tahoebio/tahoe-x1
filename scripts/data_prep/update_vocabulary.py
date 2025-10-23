@@ -7,7 +7,7 @@ import scanpy as sc
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 
-from tahoex.tokenizer import GeneVocab
+from tahoe_x1.tokenizer import GeneVocab
 
 # Logging setup
 log = logging.getLogger(__name__)

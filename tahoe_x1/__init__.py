@@ -1,4 +1,5 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 from . import data, model, tokenizer, utils
+from ._version import __version__
 
-__version__ = "0.1.2"
+__all__ = ["__version__", "data", "model", "tokenizer", "utils"]

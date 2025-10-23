@@ -1,4 +1,4 @@
-output_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025"
+output_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025"
 vocab:
   reference_adata: "/tahoe/p14/lib_2064.filtered.h5ad"
   use_col: "gene_id"
@@ -13,13 +13,13 @@ huggingface:
   cls_token: "<cls>"
   pad_value: -2
   gene_col: "index" # The adata.var.index is the gene_id
-  adata_dir: "/vevo/tahoex/datasets/scbasecamp/h5ad"
+  adata_dir: "/vevo/tahoe_x1/datasets/scbasecamp/h5ad"
   num_chunks: 10
   filter_cells:
     min_genes: 10
     min_counts: 20
-  output_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/scbasecamp_hf_chunks"
-  merged_dataset_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/scbasecamp_merged"
+  output_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/scbasecamp_hf_chunks"
+  merged_dataset_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/scbasecamp_merged"
   split_parameters:
     test_size: 0.01
     seed: 42
@@ -37,12 +37,12 @@ huggingface:
         - "disease"
         - "perturbation"
         - "cell_line"
-      path: "/vevo/tahoex/datasets/scbasecamp/metadata/sample_metadata.csv"
+      path: "/vevo/tahoe_x1/datasets/scbasecamp/metadata/sample_metadata.csv"
   vocab_output_root: ${vocab.output_root}
   vocab_path: ${vocab.output_file}
 
 mds:
-  out_root: "/vevo/tahoex/datasets/vevo_merged_jan_2025/scbasecamp_merged_MDS"
+  out_root: "/vevo/tahoe_x1/datasets/vevo_merged_jan_2025/scbasecamp_merged_MDS"
   root_dir: ${huggingface.merged_dataset_root}
   num_proc: 128
   splits:

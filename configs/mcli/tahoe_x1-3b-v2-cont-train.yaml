@@ -39,7 +39,7 @@ parameters:
     remote: "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
     local: "vocab.json"
   model:
-    name: tahoex
+    name: tahoe_x1
     d_model: 2560
     n_layers: 32
     init_device: cpu
@@ -181,7 +181,7 @@ parameters:
     runtime_estimator: {}
   loggers:
     wandb:
-      project: tahoex
+      project: tahoe_x1
       log_artifacts: False
   load_path: 's3://tahoe-hackathon-data/MFM/ckpts/tx-3b-prod/ep4-ba104156-rank0.pt'
   load_weights_only: True

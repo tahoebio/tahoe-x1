@@ -3,64 +3,10 @@
 # =============================================================================
 
 [build-system]
-requires = ["setuptools<68.0.0", "wheel"]
+# setuptools<81.0.0 constraint required for compatibility with llm-foundry's build system
+# See: https://github.com/mosaicml/llm-foundry/blob/main/pyproject.toml
+requires = ["setuptools<81.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
-
-[project]
-name = "tahoex"
-version = "0.1.2"
-description = "Tahoe-x1: Perturbation trained virtual cell models from Tahoe Therapeutics"
-readme = "README.md"
-authors = [
-    { name = "Tahoe Therapeutics" },
-]
-requires-python = ">=3.10"
-license = { text = "Proprietary" }
-
-dependencies = [
-    "awscli>=1.32",
-    "llm-foundry[gpu]==0.17.1",
-    "mosaicml-streaming",
-    "ninja",
-    "cmake",
-    "packaging",
-    "torch==2.5.*",
-    "llvmlite",
-    "numba",
-    "natsort",
-    "scanpy",
-    "pynndescent",
-    "umap-learn",
-    "anndata",
-    "h5py",
-]
-
-[project.optional-dependencies]
-dev = [
-    "pre-commit>=3.4.0,<4",
-    "toml>=0.10.2,<0.11",
-    "ipykernel",
-    "packaging>=21,<23",
-]
-
-
-all = [
-    "tahoex[dev]",
-]
-
-[tool.setuptools.packages.find]
-exclude = [
-    ".github*",
-    "envs*",
-    "tutorials*",
-    "tests*",
-    "scripts*",
-    "mcli*",
-    "runai*",
-]
-
-[tool.setuptools.package-data]
-tahoex = ["py.typed"]
 
 # =============================================================================
 # TOOL CONFIGURATIONS
@@ -115,7 +61,7 @@ branch = true
 relative_files = true
 concurrency = ["thread"]
 include = [
-    "tahoex/*"
+    "tahoe_x1/*"
 ]
 
 # Pyright

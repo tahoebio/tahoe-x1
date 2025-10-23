@@ -5,7 +5,7 @@ This folder provides a YAML-driven workflow for generating gene embeddings, buil
 ## Setup
 
 ### Environment Requirements
-- **For embedding generation** (step 2): Use the main TahoeX environment
+- **For embedding generation** (step 2): Use the main Tahoe-x1 environment
 - **For benchmark and visualization** (steps 3-5): Install the MSigDB-specific environment:
 
 ```bash

@@ -1,6 +1,6 @@
 models_dir_path: "/tahoe/data/ckpts/tx/test_rel/"
 dataset_path: "/tahoe/data/msigdb/cellxgene_data/rep_1.h5ad.gz"
-adata_path: "/tahoe/gits/tahoex-release/gene_embs/embs_adata.h5ad.gz"
+adata_path: "/tahoe/gits/tahoe_x1-release/gene_embs/embs_adata.h5ad.gz"
 ensembl_to_gene_path: "/tahoe/gits/shreshth_sandbox/msigdb_notebooks/vevo_v2_ensembl_to_gene_name.json"
 gene_col: feature_name
 n_hvg: null

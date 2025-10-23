@@ -16,7 +16,7 @@ import torch
 from composer.core.callback import Callback
 from llmfoundry.registry import callbacks
 
-from tahoex.tasks import CellClassification, MarginalEssentiality
+from tahoe_x1.tasks import CellClassification, MarginalEssentiality
 
 callbacks.register("cell-classification", func=CellClassification)
 callbacks.register("marginal-essentiality", func=MarginalEssentiality)
@@ -42,10 +42,10 @@ from streaming.base.util import clean_stale_shared_memory
 
 install()
 
-from tahoex.data import build_dataloader
-from tahoex.model import ComposerTX
-from tahoex.tokenizer import GeneVocab
-from tahoex.utils import download_file_from_s3_url
+from tahoe_x1.data import build_dataloader
+from tahoe_x1.model import ComposerTX
+from tahoe_x1.tokenizer import GeneVocab
+from tahoe_x1.utils import download_file_from_s3_url
 
 log = logging.getLogger(__name__)
 
@@ -350,7 +350,7 @@ def main(cfg: DictConfig) -> composer.Trainer:
             # 2022-06-29 11:22:26,152: rank0[822018][MainThread]: INFO: Message here
             format=f"%(asctime)s: rank{dist.get_global_rank()}[%(process)d][%(threadName)s]: %(levelname)s: %(name)s: %(message)s",
         )
-        logging.getLogger("tahoex").setLevel(
+        logging.getLogger("tahoe_x1").setLevel(
             python_log_level.upper(),
         )
         logging.getLogger(__name__).setLevel(python_log_level.upper())  # Train script
