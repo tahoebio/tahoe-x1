@@ -4,7 +4,7 @@ paths:
   adata_output: "./pred_adata.h5ad"
   drug_to_id_path: "drug_to_id_pad.json"
   drug_fps_path: "drug_fps_pad.npy"
-  model_name: "TahoeX"
+  model_name: "Tahoe-x1"
   # gene_output: "./gene_output.npz"
 data:
   cell_type_key: "cell_type" #"OncotreeLineage"
