@@ -52,32 +52,28 @@ def patch_streaming_for_public_s3():
         S3Downloader._original_download_file_impl = S3Downloader._download_file_impl
 
         # Detect credential availability once upfront (shared across all instances)
-        _credentials_available = {"checked": False, "available": False}
-
-        def _check_credentials():
+        # Check immediately when patch is applied, not during first download
+        def _check_credentials_now():
             """Check once if AWS credentials are available."""
-            if _credentials_available["checked"]:
-                return _credentials_available["available"]
-
             try:
-                # Quick check: try to create a boto3 session
+                # Quick check: just look for credential environment variables or files
+                # This is instant and doesn't involve any network calls
                 session = boto3.Session()
                 credentials = session.get_credentials()
-                _credentials_available["available"] = credentials is not None
-                _credentials_available["checked"] = True
 
-                if _credentials_available["available"]:
+                if credentials is not None:
                     log.debug("AWS credentials detected, using signed requests")
+                    return True
                 else:
                     log.debug("No AWS credentials found, using unsigned requests")
-
-                return _credentials_available["available"]
+                    return False
 
             except Exception as e:
                 log.debug(f"Error checking credentials: {e}, using unsigned requests")
-                _credentials_available["available"] = False
-                _credentials_available["checked"] = True
                 return False
+
+        # Check credentials immediately when patch is applied
+        _has_credentials = _check_credentials_now()
 
         def patched_download_file_impl(
             self,
@@ -90,10 +86,8 @@ def patch_streaming_for_public_s3():
 
             # Ensure S3 client exists
             if self._s3_client is None:
-                has_credentials = _check_credentials()
-
-                # Directly create unsigned client if no credentials
-                if not has_credentials:
+                # Directly create unsigned client if no credentials (checked at patch time)
+                if not _has_credentials:
                     self._create_s3_client(unsigned=True, timeout=timeout)
                 else:
                     # Try signed client first if credentials available

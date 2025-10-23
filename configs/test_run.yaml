@@ -62,8 +62,8 @@ train_loader:
   dataset:
     streams:
       cellxgene:
-        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/train/"
-        local: "mds-data-folder/cellxgene/train"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/train/"
+        local: "mds-data-folder/tahoe-100m/train"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: True
@@ -72,14 +72,14 @@ train_loader:
   drop_last: False
   num_workers: 8
   pin_memory: True
-  prefetch_factor: 48
+  prefetch_factor: 4
   persistent_workers: True
 valid_loader:
   dataset:
     streams:
       cellxgene:
-        remote: "s3://tahoe-hackathon-data/MFM/cellxgene_2025_01_21_merged_MDS/valid/"
-        local: "mds-data-folder/cellxgene/val"
+        remote: "s3://tahoe-hackathon-data/MFM/tahoe_100m_MDS_v2/valid/"
+        local: "mds-data-folder/tahoe-100m/val"
     download_timeout: 300
     allow_unsafe_types: True
     shuffle: False
@@ -88,7 +88,7 @@ valid_loader:
   drop_last: False
   num_workers: 8
   pin_memory: True
-  prefetch_factor: 48
+  prefetch_factor: 4
   persistent_workers: True
 optimizer:
   name: decoupled_adamw
@@ -120,15 +120,28 @@ fsdp_config:
   activation_cpu_offload: false
   limit_all_gathers: true
   verbose: true
+
+# Logging
+progress_bar: false
+log_to_console: true
+console_log_interval: 1ba
+
 callbacks:
   speed_monitor:
     window_size: 20
   lr_monitor: {}
   memory_monitor: {}
   runtime_estimator: {}
-loggers:
-  wandb:
-    project: tahoex
-    log_artifacts: False
-save_folder: "s3://tahoe-hackathon-data/MFM/ckpts/{run_name}"
-save_interval: "2000ba"
+
+# loggers:
+#   wandb: {}
+
+# Checkpoint to local filesystem or remote object store
+save_interval: 500ba
+save_num_checkpoints_to_keep: 1  # Important, this cleans up checkpoints saved to DISK
+save_folder: ./{run_name}/checkpoints
+# save_folder: s3://my-bucket/my-folder/{run_name}/checkpoints
+
+# Load from local filesystem or remote object store
+# load_path: ./tahoe-x1/checkpoints/latest-rank{rank}.pt
+# load_path: s3://my-bucket/my-folder/tahoe-x1/checkpoints/latest-rank{rank}.pt
