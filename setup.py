@@ -53,19 +53,12 @@ classifiers = [
 ]
 
 install_requires = [
-    "awscli>=1.32",
-    "llm-foundry[gpu]==0.17.1",
+    "awscli>=1.32",  # For AWS S3 data access authentication
+    "llm-foundry>=0.17.1",
+    "flash-attn>=2.6.3",
     "mosaicml-streaming",
-    "ninja",
-    "cmake",
-    "packaging",
-    "torch==2.5.*",
-    "llvmlite",
-    "numba",
-    "natsort",
+    "torch>=2.5.0",
     "scanpy",
-    "pynndescent",
-    "umap-learn",
     "anndata",
     "h5py",
 ]
