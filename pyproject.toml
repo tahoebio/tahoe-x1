@@ -8,14 +8,41 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tahoex"
-version = "0.1.2"
-description = "Tahoe-x1: Perturbation trained virtual cell models from Tahoe Therapeutics"
+version = "1.0.0"
+description = "Tahoe-x1: Perturbation trained single-cell foundation models with up to 3 billion parameters"
 readme = "README.md"
 authors = [
-    { name = "Tahoe Therapeutics" },
+    { name = "Tahoe Therapeutics", email = "admin@tahoebio.ai" },
 ]
 requires-python = ">=3.10"
-license = { text = "Proprietary" }
+license = { text = "Apache-2.0" }
+keywords = [
+    "single-cell",
+    "foundation-model",
+    "genomics",
+    "transcriptomics",
+    "perturbation",
+    "machine-learning",
+    "deep-learning",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+
+[project.urls]
+Homepage = "https://github.com/tahoebio/tahoe-x1"
+Documentation = "https://github.com/tahoebio/tahoe-x1#readme"
+Repository = "https://github.com/tahoebio/tahoe-x1"
+"Bug Tracker" = "https://github.com/tahoebio/tahoe-x1/issues"
+"Model Card" = "https://huggingface.co/tahoebio/Tahoe-x1"
+"Paper" = "http://www.tahoebio.ai/news/tahoe-x1"
 
 dependencies = [
     "awscli>=1.32",
