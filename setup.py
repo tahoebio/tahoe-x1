@@ -54,13 +54,10 @@ classifiers = [
 
 install_requires = [
     "awscli>=1.32",  # For AWS S3 data access authentication
-    "llm-foundry>=0.17.1",
-    "flash-attn>=2.6.3",
+    "llm-foundry[gpu]>=0.17.1",
     "mosaicml-streaming",
     "torch>=2.5.0",
     "scanpy",
-    "anndata",
-    "h5py",
 ]
 
 extra_deps = {}
