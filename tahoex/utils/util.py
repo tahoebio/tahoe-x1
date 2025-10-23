@@ -4,11 +4,11 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 import os
+from typing import Optional
 
 import numpy as np
 import pandas as pd
 import torch
-from git import Optional
 from omegaconf import DictConfig
 from omegaconf import OmegaConf as om
 from scanpy import AnnData

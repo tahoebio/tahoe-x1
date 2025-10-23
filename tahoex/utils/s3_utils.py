@@ -28,6 +28,10 @@ def patch_streaming_for_public_s3():
     retry with unsigned requests when accessing public buckets without AWS
     credentials.
 
+    Note: This monkey patch is required as of mosaicml-streaming v0.13.0 which
+    does not natively support automatic fallback to unsigned requests for public
+    S3 buckets.
+
     The patch is idempotent and logs whether it was successfully applied.
     """
     try:
@@ -162,21 +166,38 @@ def download_file_from_s3(
         The local path to the downloaded file, or None if download fails
 
     Raises:
-        AssertionError: If the S3 URL format is invalid
+        ValueError: If the S3 URL format is invalid
     """
     # Validate and parse S3 URL
-    assert s3_url.startswith("s3://"), "URL must start with 's3://'"
+    if not s3_url.startswith("s3://"):
+        raise ValueError("URL must start with 's3://'")
     parsed_url = urlparse(s3_url)
-    assert parsed_url.scheme == "s3", "URL scheme must be 's3'"
+    if parsed_url.scheme != "s3":
+        raise ValueError("URL scheme must be 's3'")
 
     bucket_name = parsed_url.netloc
     s3_file_key = parsed_url.path.lstrip("/")
 
-    assert bucket_name, "Bucket name cannot be empty"
-    assert s3_file_key, "S3 file key cannot be empty"
+    if not bucket_name:
+        raise ValueError("Bucket name cannot be empty")
+    if not s3_file_key:
+        raise ValueError("S3 file key cannot be empty")
+
+    # Validate and prepare local path
+    local_path = Path(local_file_path).resolve()
+
+    # Security check: prevent path traversal attacks
+    # Ensure the resolved path doesn't escape the intended directory
+    cwd = Path.cwd()
+    try:
+        # This will raise ValueError if local_path is not relative to cwd
+        local_path.relative_to(cwd)
+    except ValueError:
+        # Path is outside current working directory, which might be intentional
+        # Just log a warning but allow it
+        log.warning(f"Download path {local_path} is outside current directory")
 
     # Ensure local directory exists
-    local_path = Path(local_file_path)
     if local_path.parent != Path("."):
         local_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -188,8 +209,12 @@ def download_file_from_s3(
                 f"Successfully downloaded {s3_url} ({description}) to {local_path}",
             )
             return True
-        except Exception as e:
+        except (ClientError, NoCredentialsError, PartialCredentialsError) as e:
             log.debug(f"Failed to download {s3_url} ({description}): {e}")
+            return False
+        except Exception as e:
+            # Log unexpected exceptions at warning level
+            log.warning(f"Unexpected error downloading {s3_url} ({description}): {e}")
             return False
 
     # Determine download strategy based on use_unsigned parameter
