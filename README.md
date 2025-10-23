@@ -148,10 +148,11 @@ composer scripts/train.py \
   configs/test_run.yaml
 ```
 
-Alternatively, you can pass individual configuration parameters directly from the command line instead of using a config file:
+You can also pass individual configuration parameters directly from the command line
 
 ```bash
 composer scripts/train.py \
+  configs/test_run.yaml \ 
   model.d_model=512 \
   model.n_layers=12 \
   train_loader.num_workers=8 \
