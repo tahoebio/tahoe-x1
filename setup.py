@@ -53,9 +53,21 @@ classifiers = [
 ]
 
 install_requires = [
-    "torchtext>=0.17.1",
     "awscli>=1.32",
-    "llm-foundry[all-flash2]>=0.17.0",
+    "llm-foundry[gpu]==0.17.1",
+    "mosaicml-streaming",
+    "ninja",
+    "cmake",
+    "packaging",
+    "torch==2.5.*",
+    "llvmlite",
+    "numba",
+    "natsort",
+    "scanpy",
+    "pynndescent",
+    "umap-learn",
+    "anndata",
+    "h5py",
 ]
 
 extra_deps = {}
