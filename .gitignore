@@ -161,5 +161,8 @@ figures/
 scripts/perturbation/debug/
 runai/*/
 *.json
+!.commitlintrc.json
+!.release-please-config.json
+!.release-please-manifest.json
 debug_notebooks/
 ckpt/

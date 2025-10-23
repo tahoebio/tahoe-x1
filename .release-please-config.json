@@ -1,0 +1,32 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "package-name": "tahoex",
+      "changelog-sections": [
+        { "type": "feat", "section": "✨ Features", "hidden": false },
+        { "type": "fix", "section": "🐛 Bug Fixes", "hidden": false },
+        { "type": "perf", "section": "⚡ Performance Improvements", "hidden": false },
+        { "type": "docs", "section": "📝 Documentation", "hidden": false },
+        { "type": "style", "section": "💄 Styles", "hidden": true },
+        { "type": "refactor", "section": "♻️ Code Refactoring", "hidden": false },
+        { "type": "test", "section": "✅ Tests", "hidden": true },
+        { "type": "build", "section": "🏗️ Build System", "hidden": false },
+        { "type": "ci", "section": "👷 CI/CD", "hidden": true },
+        { "type": "chore", "section": "🔧 Miscellaneous", "hidden": true }
+      ],
+      "extra-files": [
+        {
+          "type": "python",
+          "path": "tahoex/_version.py",
+          "glob": false
+        }
+      ]
+    }
+  },
+  "bump-minor-pre-major": true,
+  "bump-patch-for-minor-pre-major": false,
+  "draft": false,
+  "prerelease": false,
+  "separate-pull-requests": false
+}

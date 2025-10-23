@@ -1,0 +1,54 @@
+name: Conventional Commits
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check PR title follows conventional commits
+        uses: amannn/action-semantic-pull-request@v5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          # Types allowed in commit messages
+          types: |
+            feat
+            fix
+            docs
+            style
+            refactor
+            perf
+            test
+            build
+            ci
+            chore
+            revert
+          # Allow scopes (optional)
+          requireScope: false
+          # Subject (description) cannot be empty
+          subjectPattern: ^(?![A-Z]).+$
+          subjectPatternError: |
+            The subject "{subject}" found in the PR title doesn't match the configured pattern.
+            Please use lowercase for the subject (after the colon).
+          # Custom message for invalid types
+          validateSingleCommit: false
+          # Allow gitmoji before type
+          headerPattern: '^(?::\w+:|[\u{1F300}-\u{1FAD6}])\s*(\w+)(?:\(([^\)]+)\))?\s*:\s*(.+)$'
+          headerPatternCorrespondence: type, scope, subject
+
+      - name: Check commits in PR follow conventional commits
+        uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: .commitlintrc.json
+          failOnWarnings: false
