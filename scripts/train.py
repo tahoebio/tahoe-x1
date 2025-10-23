@@ -38,6 +38,9 @@ from streaming.base.util import clean_stale_shared_memory
 
 install()
 
+# Suppress megablocks FutureWarnings about deprecated torch.cuda.amp API
+warnings.filterwarnings("ignore", category=FutureWarning, module="megablocks")
+
 from tahoex.data import build_dataloader
 from tahoex.model import ComposerTX
 from tahoex.tokenizer import GeneVocab
