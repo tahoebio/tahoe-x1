@@ -4,6 +4,7 @@ from pathlib import Path
 
 log = logging.getLogger(__name__)
 import os
+
 import numpy as np
 import pandas as pd
 import torch
@@ -177,7 +178,8 @@ def download_file_from_s3_url(s3_url, local_file_path):
 
     Supports public S3 buckets without credentials (like --no-sign-request).
 
-    :param s3_url: S3 URL in the form s3://bucket-name/path/to/file
+    :param s3_url: S3 URL in the form
+    s3://bucket-name/path/to/file
     :param local_file_path: Local path where the file will be saved.
     :return: The local path to the downloaded file, or None if download fails.
     """

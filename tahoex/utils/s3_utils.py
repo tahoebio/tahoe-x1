@@ -1,3 +1,4 @@
+# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 """S3 utilities for handling public and private bucket access.
 
 This module provides utilities for working with S3 buckets, including:
@@ -20,37 +21,50 @@ log = logging.getLogger(__name__)
 
 
 def patch_streaming_for_public_s3():
-    """Patch the streaming library's S3 downloader to gracefully handle public buckets.
+    """Patch the streaming library's S3 downloader to gracefully handle public
+    buckets.
 
-    This patch modifies the streaming library's S3Downloader to automatically retry
-    with unsigned requests when accessing public buckets without AWS credentials.
+    This patch modifies the streaming library's S3Downloader to automatically
+    retry with unsigned requests when accessing public buckets without AWS
+    credentials.
 
     The patch is idempotent and logs whether it was successfully applied.
     """
     try:
-        from streaming.base.storage.download import S3Downloader, BOTOCORE_CLIENT_ERROR_CODES
-        from boto3.s3.transfer import TransferConfig
         import urllib.parse
 
+        from boto3.s3.transfer import TransferConfig
+        from streaming.base.storage.download import (
+            BOTOCORE_CLIENT_ERROR_CODES,
+            S3Downloader,
+        )
+
         # Store original method for potential restoration
-        if hasattr(S3Downloader, '_original_download_file_impl'):
+        if hasattr(S3Downloader, "_original_download_file_impl"):
             log.debug("S3Downloader patch already applied, skipping")
             return
 
         S3Downloader._original_download_file_impl = S3Downloader._download_file_impl
 
-        def patched_download_file_impl(self, remote: str, local: str, timeout: float) -> None:
-            """Download a file from S3, with automatic fallback to unsigned for public buckets."""
+        def patched_download_file_impl(
+            self, remote: str, local: str, timeout: float
+        ) -> None:
+            """Download a file from S3, with automatic fallback to unsigned for
+            public buckets."""
 
             # Ensure S3 client exists
             if self._s3_client is None:
                 try:
                     self._create_s3_client(timeout=timeout)
                 except (NoCredentialsError, PartialCredentialsError):
-                    log.info(f"No AWS credentials found, attempting unsigned access for {remote}")
+                    log.info(
+                        f"No AWS credentials found, attempting unsigned access for {remote}"
+                    )
                     self._create_s3_client(unsigned=True, timeout=timeout)
                 except Exception as e:
-                    log.debug(f"Failed to create signed S3 client: {e}, trying unsigned")
+                    log.debug(
+                        f"Failed to create signed S3 client: {e}, trying unsigned"
+                    )
                     self._create_s3_client(unsigned=True, timeout=timeout)
 
             assert self._s3_client is not None
@@ -100,7 +114,9 @@ def patch_streaming_for_public_s3():
                 elif error_code in ["403", "AccessDenied", "InvalidRequest"]:
                     # Access denied with signed request, try unsigned for public buckets
                     if "RequestPayer" not in extra_args:
-                        log.info(f"Access denied with signed request for {remote}, trying unsigned")
+                        log.info(
+                            f"Access denied with signed request for {remote}, trying unsigned"
+                        )
                         self._create_s3_client(unsigned=True, timeout=timeout)
                         try:
                             _attempt_download()
@@ -125,7 +141,7 @@ def patch_streaming_for_public_s3():
 def download_file_from_s3(
     s3_url: str,
     local_file_path: str,
-    use_unsigned: Optional[bool] = None
+    use_unsigned: Optional[bool] = None,
 ) -> Optional[str]:
     """Download a file from an S3 URL to a local path.
 
@@ -165,7 +181,9 @@ def download_file_from_s3(
         """Attempt download with a specific S3 client."""
         try:
             s3_client.download_file(bucket_name, s3_file_key, str(local_path))
-            log.info(f"Successfully downloaded {s3_url} ({description}) to {local_path}")
+            log.info(
+                f"Successfully downloaded {s3_url} ({description}) to {local_path}"
+            )
             return True
         except Exception as e:
             log.debug(f"Failed to download {s3_url} ({description}): {e}")
