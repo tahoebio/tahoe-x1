@@ -50,7 +50,7 @@ docker run --network host -it --gpus all \
   -e GITHUB_TOKEN=<GITHUB_TOKEN> \
   -e WANDB_API_KEY=<WANDB_API_KEY> \
   -e WANDB_ENTITY="vevotx" \
-  -e WANDB_PROJECT="tahoex" \
+  -e WANDB_PROJECT="tahoe_x1" \
   --mount type=bind,source=/mnt/disks/ssd,target=/src \
   --entrypoint /bin/bash \
   ghcr.io/tahoebio/tahoe-x1:1.0.0 -c "\

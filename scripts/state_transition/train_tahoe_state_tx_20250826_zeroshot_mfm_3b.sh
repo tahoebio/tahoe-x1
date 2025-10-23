@@ -48,7 +48,7 @@ state tx train \
     model.kwargs.cell_set_len=256 \
     model.kwargs.residual_decoder=false \
     model=tahoe_llama_212693232 \
-    wandb.tags="[tahoe,zeroshot,drug_cell_split,tahoex_3b_merged]" \
+    wandb.tags="[tahoe,zeroshot,drug_cell_split,tahoe_x1_3b_merged]" \
     wandb.project="state_tx_tahoe" \
     +wandb.name="$EXPERIMENT_NAME" \
     ++wandb.entity="vevotx" \
