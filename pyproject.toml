@@ -3,6 +3,8 @@
 # =============================================================================
 
 [build-system]
+# setuptools<81.0.0 constraint required for compatibility with llm-foundry's build system
+# See: https://github.com/mosaicml/llm-foundry/blob/main/pyproject.toml
 requires = ["setuptools<81.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
@@ -59,7 +61,7 @@ branch = true
 relative_files = true
 concurrency = ["thread"]
 include = [
-    "tahoex/*"
+    "tahoe_x1/*"
 ]
 
 # Pyright
