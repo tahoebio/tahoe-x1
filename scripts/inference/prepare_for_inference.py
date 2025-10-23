@@ -1,9 +1,9 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import os
 
-import wandb
 from omegaconf import OmegaConf as om
 
+import wandb
 from tahoex.tokenizer import GeneVocab
 from tahoex.utils import download_file_from_s3_url
 
@@ -14,7 +14,7 @@ model_name = "<your_model_name>"  # e.g., "tx-3b-prod"
 wandb_id = "<your_wandb_run_id>"  # e.g., "mygjkq5c" - find this in your WandB run URL
 wandb_project = "<your_wandb_project>"  # e.g., "vevotx/tahoex"
 save_dir = "<your_output_path>"  # e.g., "/tahoe/tahoex/checkpoints/"
-default_vocab_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"  
+default_vocab_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
 # ============================================
 
 api = wandb.Api()
@@ -27,11 +27,8 @@ om.resolve(yaml_cfg)
 model_config = yaml_cfg.pop("model", None)["value"]
 collator_config = yaml_cfg.pop("collator", None)["value"]
 vocab_config = yaml_cfg.pop("vocabulary", None)["value"]
-if vocab_config is None:
-    vocab_remote_url = default_vocab_url
-else:
-    vocab_remote_url = vocab_config["remote"]
 
+vocab_remote_url = default_vocab_url if vocab_config is None else vocab_config["remote"]
 
 download_file_from_s3_url(
     vocab_remote_url,
