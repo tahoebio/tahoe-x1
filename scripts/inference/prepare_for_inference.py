@@ -1,21 +1,35 @@
 # Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
 import os
 
+import wandb
 from omegaconf import OmegaConf as om
 
-import wandb
-from tahoex.tokenizer import GeneVocab
-from tahoex.utils import download_file_from_s3_url
+from tahoe_x1.tokenizer import GeneVocab
+from tahoe_x1.utils import download_file_from_s3_url
 
 # ============================================
 # Configuration - Update these for your model
 # ============================================
 model_name = "<your_model_name>"  # e.g., "tx-3b-prod"
 wandb_id = "<your_wandb_run_id>"  # e.g., "mygjkq5c" - find this in your WandB run URL
-wandb_project = "<your_wandb_project>"  # e.g., "vevotx/tahoex"
-save_dir = "<your_output_path>"  # e.g., "/tahoe/tahoex/checkpoints/"
+wandb_project = "<your_wandb_project>"  # e.g., "vevotx/tahoe_x1"
+save_dir = "<your_output_path>"  # e.g., "/tahoe/tahoe_x1/checkpoints/"
 default_vocab_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
 # ============================================
+
+# Validate configuration
+config_values = {
+    "model_name": model_name,
+    "wandb_id": wandb_id,
+    "wandb_project": wandb_project,
+    "save_dir": save_dir,
+}
+unset_configs = [name for name, value in config_values.items() if value.startswith("<")]
+if unset_configs:
+    raise ValueError(
+        f"Please update the following configuration values before running: {', '.join(unset_configs)}\n"
+        f"Edit the configuration section at the top of {__file__}"
+    )
 
 api = wandb.Api()
 run = api.run(f"{wandb_project}/{wandb_id}")
