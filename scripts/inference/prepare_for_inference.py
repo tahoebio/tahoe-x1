@@ -28,7 +28,7 @@ unset_configs = [name for name, value in config_values.items() if value.startswi
 if unset_configs:
     raise ValueError(
         f"Please update the following configuration values before running: {', '.join(unset_configs)}\n"
-        f"Edit the configuration section at the top of {__file__}"
+        f"Edit the configuration section at the top of {__file__}",
     )
 
 api = wandb.Api()
