@@ -60,7 +60,10 @@ def load_model(
         model_config=model_config,
         collator_config=collator_config,
     )
-    model.load_state_dict(torch.load(ckpt, weights_only=False)["state"]["model"], strict=strict)
+    model.load_state_dict(
+        torch.load(ckpt, weights_only=False)["state"]["model"],
+        strict=strict,
+    )
     model.to(device)
     model.eval()
     log.info(f"Model loaded from {ckpt}")
