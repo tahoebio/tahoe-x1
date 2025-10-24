@@ -15,6 +15,7 @@
 
 
 <p align="center">
+<a href="https://pypi.org/project/tahoe-x1/"><img alt="PyPI" src="https://img.shields.io/pypi/v/tahoe-x1"></a>
 <a href="https://github.com/astral-sh/ruff"><img alt="Linter: Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json"></a>
 <a href="https://github.com/tahoebio/tahoe-x1/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
@@ -37,7 +38,7 @@ Through architectural optimizations and efficient training strategies, Tx1 achie
   <img src="./assets/abstract_logo_light_mode.png" alt="Abstract Logo">
 </picture>
 
-## Table of Contents
+## 📑 Table of Contents
 - [Repository Structure](#repository-structure)
 - [Installation](#installation)
 - [Training Infrastructure](#training-infrastructure)
@@ -50,7 +51,7 @@ Through architectural optimizations and efficient training strategies, Tx1 achie
 - [Acknowledgements](#acknowledgements)
 - [License](#license)
 
-## Repository Structure
+## 📁 Repository Structure
 
 This repository follows a similar structure to [llm-foundry](https://github.com/mosaicml/llm-foundry/tree/main) and imports several utility functions from it.
 
@@ -83,7 +84,7 @@ tahoe-x1/
     └──test_run.yaml          # Sample config file
 ```
 
-## Installation
+## 🚀 Installation
 
 Docker installation provides better reproducibility and avoids dependency conflicts.
 
@@ -160,7 +161,7 @@ composer scripts/train.py \
   max_duration=1000ba
 ```
 
-## System Requirements & Training Capabilities
+## 💻 System Requirements & Training Capabilities
 
 Tahoe-x1 is built natively on [Composer](https://github.com/mosaicml/composer) and [llm-foundry](https://github.com/mosaicml/llm-foundry), inheriting their full suite of large-scale training capabilities:
 
@@ -188,7 +189,7 @@ We provide pre-built Docker images for ease of use:
 |------------|------------|-------------|
 | [`ghcr.io/tahoebio/tahoe-x1:1.0.0`](https://github.com/tahoebio/tahoe-x1/pkgs/container/tahoe-x1) | `mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596` | Current release image for Tahoe-x1 |
 
-## Datasets
+## 📊 Datasets
 
 Tx1 was pretrained on 266 million single-cell profiles from three major sources. The following datasets were used for training and evaluation:
 
@@ -213,7 +214,7 @@ For more information on dataset preparation, see [scripts/data_prep/README.md](s
 
 
 
-## Pre-trained Models
+## 🤖 Pre-trained Models
 
 We provide pre-trained Tahoe-x1 models of various sizes:
 
@@ -225,7 +226,7 @@ We provide pre-trained Tahoe-x1 models of various sizes:
 
 Model weights are also available as safetensor files on our  [🤗 Huggingface model card](https://huggingface.co/tahoebio/Tahoe-x1).
 
-## Training and Fine-tuning
+## 🏋️ Training and Fine-tuning
 
 ### Training from Scratch
 
@@ -286,7 +287,7 @@ python scripts/inference/prepare_for_inference.py
 The script will download the model config from WandB, process the vocabulary, and save inference-ready files to your specified output directory.
 
 
-## Generating Cell and Gene Embeddings
+## 🧬 Generating Cell and Gene Embeddings
 
 ### Quick Start with Inference Script
 
@@ -325,7 +326,7 @@ cell_embeddings = adata.obsm["Tx1-70m"]
 Set `return_gene_embeddings: True` in the configuration to extract gene-level representations.
 
 
-## Tutorials and Benchmarks
+## 📚 Tutorials and Benchmarks
 
 ### Tutorials
 - **[Clustering Tutorial](tutorials/clustering_tutorial.ipynb)**: Cell clustering and UMAP visualization
@@ -348,7 +349,7 @@ Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. Se
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
 
-## Troubleshooting
+## 🔧 Troubleshooting
 
 ### Common Issues and Solutions
 
@@ -363,7 +364,7 @@ For additional help, please open an issue on [GitHub](https://github.com/tahoebi
 - Complete error message and stack trace
 - Steps to reproduce the issue
 
-## Acknowledgements
+## 🙏 Acknowledgements
 We thank the developers of the following open-source projects:
 - **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For inspiring the Tahoe-x1 architecture
 - **[llm-foundry](https://github.com/mosaicml/llm-foundry)**: Efficient training infrastructure for large language models
