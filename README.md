@@ -141,7 +141,7 @@ uv pip install -e . --no-build-isolation-package flash-attn
 
 ### Quickstart 
 
-This is a quickstart to running the tahoe-x1 model on the Tahoe-100M dataset. 
+Launch a Tx1 pre-training run on Tahoe-100M. The dataset will be streamed as needed. No need to wait for download! Play around the various options in the test_config to configure your architecture and hyperparameters.
 
 ```bash
 composer scripts/train.py \
