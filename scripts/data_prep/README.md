@@ -58,3 +58,7 @@ python generate_mds.py <PATH TO DATASET YAML>
 ```
 
 After this step the MDS file can be uploaded to S3. 
+
+
+# Morgan fingerprints generation
+The `generate_fingerprints.py` script generates Morgan fingerprints for the Tahoe100M dataset, which are stored and served to initialize the chemicalEncoder module of Tahoe_X1,  when the `chem_token` option is enabled. 
