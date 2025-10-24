@@ -99,12 +99,14 @@ docker pull ghcr.io/tahoebio/tahoe-x1:latest
 
 # Start an interactive container with GPU support
 # Note that nvidia-container-toolkit is required for this step
+# Large SHM is needed to use dataloaders with multiple workers
 docker run -it --rm \
   --gpus all \
+  --shm-size=64g \   # Allocate enough shared memory within container
   -v "$(pwd)":/workspace \
   -w /workspace \
-  ghcr.io/tahoebio/tahoe-x1:latest\
-  /bin/bash
+  ghcr.io/tahoebio/tahoe-x1:latest \
+  /bin/bash     # Start an interactive Bash shell in the container              
 
 # Inside the container, install the Tahoe-x1 package (dependencies are pre-installed)
 pip install -e . --no-deps
@@ -125,18 +127,38 @@ cd tahoe-x1
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Create and activate virtual environment
-uv venv
-source .venv/bin/activate
+uv venv tx1
+source tx1/bin/activate
 
 # Install the package with dependencies
 uv pip install -e . --no-build-isolation-package flash-attn
+
+# Alternatively, install the latest stable release via PyPi
+# uv pip install tahoe-x1 --no-build-isolation-package flash-attn
 ```
 
 **Note**: Native installation requires compatible CUDA drivers and may encounter dependency conflicts. Docker installation is recommended for the best experience.
 
 
+### Quickstart 
 
+Launch a Tx1 pre-training run on Tahoe-100M. The dataset will be streamed as needed. No need to wait for download! Play around the various options in the test_config to configure your architecture and hyperparameters.
 
+```bash
+composer scripts/train.py \
+  configs/test_run.yaml
+```
+
+You can also pass individual configuration parameters directly from the command line
+
+```bash
+composer scripts/train.py \
+  configs/test_run.yaml \ 
+  model.d_model=512 \
+  model.n_layers=12 \
+  train_loader.num_workers=8 \
+  max_duration=1000ba
+```
 
 ## System Requirements & Training Capabilities
 
