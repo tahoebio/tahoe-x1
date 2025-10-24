@@ -334,6 +334,22 @@ For additional help, please open an issue on [GitHub](https://github.com/tahoebi
 - Complete error message and stack trace
 - Steps to reproduce the issue
 
+## 📄 Citation
+
+If you use Tahoe-x1 in your research, please cite:
+
+```bibtex
+@article{gandhi2025tahoe,
+  title        = {Tahoe-x1: Scaling Perturbation-Trained Single-Cell Foundation Models to 3 Billion Parameters},
+  author       = {Gandhi, Shreshth and Javadi, Farnoosh and Svensson, Valentine and Khan, Umair and Jones, Matthew G. and Yu, Johnny and Merico, Daniele and Goodarzi, Hani and Alidoust, Nima},
+  journal      = {bioRxiv},
+  year         = {2025},
+  doi          = {10.1101/2025.10.23.683759},
+  url          = {https://www.biorxiv.org/content/10.1101/2025.10.23.683759v1},
+  publisher    = {Cold Spring Harbor Laboratory}
+}
+```
+
 ## 🙏 Acknowledgements
 We thank the developers of the following open-source projects:
 - **[scGPT](https://github.com/bowang-lab/scGPT/tree/main)**: For inspiring the Tahoe-x1 architecture
