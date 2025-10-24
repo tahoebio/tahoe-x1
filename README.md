@@ -56,7 +56,7 @@ This repository follows a similar structure to [llm-foundry](https://github.com/
 
 ```
 tahoe-x1/
-├── tahoe_x1/                  # Core Tahoe-x1 library
+├── tahoe_x1/                    # Core Tahoe-x1 library
 │   ├── model/
 │   │   ├── blocks/           # Building block modules used across models
 │   │   └── model/            # Full architecture subclassed from ComposerModel
@@ -66,13 +66,14 @@ tahoe-x1/
 │   └── utils/                # Utility functions 
 ├── scripts/
 │   ├── train.py              # Training script
-│   ├── prepare_for_inference.py  # Prepares model for inference
 │   ├── depmap/               # DepMap benchmark scripts
 │   ├── msigdb/               # MSigDB pathway benchmark scripts
 │   ├── state_transition/     # State transition prediction scripts
 │   ├── data_prep/            # Dataset preparation scripts
 │   └── inference/            # Inference utilities
-├── tutorials/                 # Jupyter notebook tutorials
+|       ├──predict_embeddings.py            # Embedding extraction script
+│       └──prepare_for_inference.py         # Prepares model for inference
+├── tutorials/                # Jupyter notebook tutorials
 │   ├── clustering_tutorial.ipynb  # Cell clustering and UMAP visualization
 │   └── training_tutorial.ipynb    # Training walkthrough
 └── configs/                      
@@ -206,7 +207,7 @@ Model weights are also available as safetensor files on our  [🤗 Huggingface m
 
 ### Training from Scratch
 
-A sample test configuration is available at `configs/test_run.yaml` for quick experimentation.
+You can start with `configs/test_run.yaml`, which is a sample configuration showing how to train the 70M model on the Tahoe100M dataset for a few iterations. Customize this configuration file for your own training runs.
 
 Use the main training script with a YAML configuration file: 
 
@@ -246,14 +247,21 @@ For launching runs on specific platforms such as MosaicML, Google Cloud, or RunA
 
 ### Preparing Models for Inference
 
-Package a trained model with its vocabulary and metadata:
+Package a trained model with its vocabulary and metadata by editing the configuration section in the script:
 
+1. Open `scripts/inference/prepare_for_inference.py` and update the configuration variables:
+   - `model_name`: Your model name (e.g., `"tx-3b-prod"`)
+   - `wandb_id`: Your WandB run ID (e.g., `"mygjkq5c"`)
+   - `wandb_project`: Your WandB project name (e.g., `"vevotx/tahoex"`)
+   - `save_dir`: Output directory path
+   - `default_vocab_url`: S3 URL for vocabulary file (e.g., `"s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"`)
+
+2. Run the script:
 ```bash
-python scripts/prepare_for_inference.py \
-  --model_path /path/to/checkpoint \
-  --vocab_path /path/to/vocab.json \
-  --output_path /path/to/inference_model
+python scripts/inference/prepare_for_inference.py
 ```
+
+The script will download the model config from WandB, process the vocabulary, and save inference-ready files to your specified output directory.
 
 
 ## Generating Cell and Gene Embeddings

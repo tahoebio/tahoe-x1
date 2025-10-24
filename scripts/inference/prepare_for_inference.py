@@ -7,10 +7,32 @@ from omegaconf import OmegaConf as om
 from tahoe_x1.tokenizer import GeneVocab
 from tahoe_x1.utils import download_file_from_s3_url
 
-model_name = "tx-3b-prod"
-wandb_id = "mygjkq5c"
+# ============================================
+# Configuration - Update these for your model
+# ============================================
+model_name = "<your_model_name>"  # e.g., "tx-3b-prod"
+wandb_id = "<your_wandb_run_id>"  # e.g., "mygjkq5c" - find this in your WandB run URL
+wandb_project = "<your_wandb_project>"  # e.g., "vevotx/tahoe_x1"
+save_dir = "<your_output_path>"  # e.g., "/tahoe/tahoe_x1/checkpoints/"
+default_vocab_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
+# ============================================
+
+# Validate configuration
+config_values = {
+    "model_name": model_name,
+    "wandb_id": wandb_id,
+    "wandb_project": wandb_project,
+    "save_dir": save_dir,
+}
+unset_configs = [name for name, value in config_values.items() if value.startswith("<")]
+if unset_configs:
+    raise ValueError(
+        f"Please update the following configuration values before running: {', '.join(unset_configs)}\n"
+        f"Edit the configuration section at the top of {__file__}",
+    )
+
 api = wandb.Api()
-run = api.run(f"vevotx/tahoe-x1/{wandb_id}")
+run = api.run(f"{wandb_project}/{wandb_id}")
 yaml_path = run.file("config.yaml").download(replace=True)
 
 with open("config.yaml") as f:
@@ -19,18 +41,13 @@ om.resolve(yaml_cfg)
 model_config = yaml_cfg.pop("model", None)["value"]
 collator_config = yaml_cfg.pop("collator", None)["value"]
 vocab_config = yaml_cfg.pop("vocabulary", None)["value"]
-if vocab_config is None:
-    vocab_remote_url = "s3://tahoe-hackathon-data/MFM/vevo_v2_vocab.json"
-else:
-    vocab_remote_url = vocab_config["remote"]
 
+vocab_remote_url = default_vocab_url if vocab_config is None else vocab_config["remote"]
 
 download_file_from_s3_url(
     vocab_remote_url,
     local_file_path="vocab.json",
 )
-
-save_dir = f"/tahoe/tahoe_x1/checkpoints/release/{model_name}"  # Change this to the path where you want to save the model
 
 # Step 1 - Add special tokens to the vocab
 vocab = GeneVocab.from_file("vocab.json")
@@ -50,6 +67,7 @@ if collator_config.get("use_junk_tokens", False):
             junk_token = f"<junk{i}>"
             vocab.append_token(junk_token)
 
+save_dir = f"{save_dir}/{model_name}"
 if not os.path.exists(save_dir):
     os.makedirs(save_dir)
 vocab.save_json(f"{save_dir}/vocab.json")
@@ -63,7 +81,7 @@ model_config.use_generative_training = False
 
 ## Step 5: Add precision and wandb ID to config
 model_config["precision"] = yaml_cfg["precision"]["value"]
-model_config["wandb_id"] = f"vevotx/tahoe-x1/{wandb_id}"
+model_config["wandb_id"] = f"{wandb_project}/{wandb_id}"
 
 om.save(config=model_config, f=f"{save_dir}/model_config.yml")
 om.save(config=collator_config, f=f"{save_dir}/collator_config.yml")
