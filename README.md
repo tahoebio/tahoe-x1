@@ -286,66 +286,22 @@ python scripts/inference/prepare_for_inference.py
 
 The script will download the model config from WandB, process the vocabulary, and save inference-ready files to your specified output directory.
 
-
 ## 🧬 Generating Cell and Gene Embeddings
 
-There are two main ways to extract embeddings from the Tahoe-x1 model:
+### Quick Start with Inference Script
 
-### Method A:  `get_batch_embeddings` function
-It provides a direct API for embedding extraction without cloning the repo.
-
-```python
-import numpy as np
-import scanpy as sc
-from tahoe_x1.tasks import get_batch_embeddings
-from tahoe_x1.utils.util import load_model
-
-
-# --- Load model ---
-composer_model, vocab, model_cfg, coll_cfg = load_model(model_dir="/path/to/model_dir", device)
-model = composer_model.model
-
-# --- Load data ---
-adata = sc.read_h5ad(adata_path="/path/to/data.h5ad")
-adata.var["id_in_vocab"] = [vocab.get(g, -1) for g in adata.var[gene_col]]
-valid_genes = adata.var["id_in_vocab"] >= 0
-adata = adata[:, valid_genes]
-gene_ids = adata.var["id_in_vocab"].astype(int)
-
-# --- Extract embeddings ---
-cell_embs, gene_embs = get_batch_embeddings(
-    adata=adata,
-    model=model,
-    vocab=vocab,
-    gene_ids=gene_ids,
-    model_cfg=model_cfg,
-    collator_cfg=coll_cfg,
-    batch_size=32, #configure
-    max_length=2048, #configure
-    return_gene_embeddings=True, #set to False if you only want cell emeddings
-)
-```
-
-
-### Method B): `predict_embeddings.py` script
-A higher-level script via Composer Trainer.predict() which requires cloning the repository.
-
-1. You can configure the `inference/configs/predict.yaml` and run:
-
-```python inference/predict_embeddings.py inference/configs/predict.yaml```
-
-2. Alternatively, you can use this sample code:
+Extract cell embeddings from an AnnData object:
 
 ```python
 from omegaconf import OmegaConf as om
-from inference.predict_embeddings import predict_embeddings
+from scripts.inference.predict_embeddings import predict_embeddings
 
 cfg = {
     "model_name": "Tx1-70m",
     "paths": {
-        "hf_repo_id": "tahoebio/TahoeX1",
+        "hf_repo_id": "tahoebio/Tahoe-x1",
         "hf_model_size": "70m",
-        "adata_input": "/path/to/data.h5ad",
+        "adata_input": "/path/to/your_data.h5ad",
     },
     "data": {
         "cell_type_key": "cell_type",
@@ -353,16 +309,22 @@ cfg = {
     },
     "predict": {
         "seq_len_dataset": 2048,
-        "return_gene_embeddings": False, #set to True if you want gene embeddings
+        "return_gene_embeddings": False,
     }
 }
 
 cfg = om.create(cfg)
 adata = predict_embeddings(cfg)
 
-cell_embs = adata.obsm["Tx1-70m"]
+# Access embeddings
+cell_embeddings = adata.obsm["Tx1-70m"]
 ```
 
+### Extracting Gene Embeddings
+
+Set `return_gene_embeddings: True` in the configuration to extract gene-level representations.
+
+Refer to [inference/README.md](scripts/inference/README.md) for detailed examples on how to extract the embeddings.
 
 ## 📚 Tutorials and Benchmarks
 
@@ -384,6 +346,7 @@ Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. Se
 
 
 ### Additional Resources
+- **Embedding Extraction**: [scripts/inference/README.md](scripts/inference/README.md)
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
 
