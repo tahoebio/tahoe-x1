@@ -156,7 +156,7 @@ composer scripts/train.py \
   model.d_model=512 \
   model.n_layers=12 \
   train_loader.num_workers=8 \
-  max_duration=6ep
+  max_duration=1000ba
 ```
 
 ## System Requirements & Training Capabilities
