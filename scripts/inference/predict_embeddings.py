@@ -69,6 +69,7 @@ def predict_embeddings(cfg: DictConfig) -> None:
         model, vocab, _, coll_cfg = ComposerTX.from_hf(
             hf_repo_id,
             hf_model_size,
+            return_gene_embeddings=return_gene_embeddings,
         )
     print(f"Model is loaded with {model.model.n_layers} transformer layers.")
 

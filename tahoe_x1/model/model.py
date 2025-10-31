@@ -425,7 +425,7 @@ class ComposerTX(ComposerModel):
         cls,
         repo_id: str,
         model_size: str,
-        return_gene_embeddings: bool = True,
+        return_gene_embeddings: Optional[bool] = False,
         use_chem_inf: Optional[bool] = False,
     ):
 
