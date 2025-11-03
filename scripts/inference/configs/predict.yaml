@@ -1,5 +1,7 @@
 paths:
-  model_dir: "/tahoe/data/ckpts/tx/release/tahoe_x1-70m-VQ9aRB"
+  # model_dir: "/tahoe/data/ckpts/TahoeX1/mosaicfm-70m-merged"
+  hf_repo_id: "tahoebio/Tahoe-x1"
+  hf_model_size: "70m"
   adata_input: "/tahoe/data/datasets/benchmark/kim2020_lung/kim_test.h5ad" #"/tahoe/data/datasets/benchmark/CCLE/ccle.h5ad" # "/tahoe/data/datasets/benchmark/tahoe/Tahoe50k_train.h5ad"
   adata_output: "./pred_adata.h5ad"
   drug_to_id_path: "drug_to_id_pad.json"
@@ -14,5 +16,5 @@ predict:
   seq_len_dataset: 2048 #8192
   num_workers: 8
   prefetch_factor: 48 #2
-  return_gene_embeddings: True  # Whether to extract gene embeddings
+  return_gene_embeddings: False  # Whether to extract gene embeddings
   use_chem_inf: False  # Whether to use chemical information for prediction if the model is trained with chemical information
