@@ -1,0 +1,5 @@
+FROM mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596
+
+LABEL org.opencontainers.image.source="https://github.com/tahoebio/tahoe-x1"
+
+RUN pip install --no-cache-dir --no-deps git+https://github.com/jeanfeydy/geomloss.git@v0.2.5
