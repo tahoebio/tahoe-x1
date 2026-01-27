@@ -1,5 +1,9 @@
-FROM mosaicml/llm-foundry:2.2.1_cu121_flash2-813d596
+ARG ROOT_CONTAINER=docker.io/mosaicml/llm-foundry:2.7.0_cu128-latest
+
+FROM $ROOT_CONTAINER
 
 LABEL org.opencontainers.image.source="https://github.com/tahoebio/tahoe-x1"
+
+WORKDIR /app
 
 RUN pip install --no-cache-dir --no-deps git+https://github.com/jeanfeydy/geomloss.git@v0.2.5
