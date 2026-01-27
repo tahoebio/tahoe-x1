@@ -6,4 +6,32 @@ LABEL org.opencontainers.image.source="https://github.com/tahoebio/tahoe-x1"
 
 WORKDIR /app
 
+# Install AWS CLI v2 (not available via pip)
+RUN apt-get update && apt-get install -y --no-install-recommends unzip \
+    && curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
+    && unzip -q awscliv2.zip \
+    && ./aws/install --update \
+    && rm -rf awscliv2.zip aws \
+    && apt-get purge -y unzip && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies not in base image
+# Base image includes: torch, flash-attn, mosaicml, mosaicml-streaming, datasets, huggingface-hub, omegaconf
+# Note: llm-foundry package itself is NOT in the base image but its deps are.
+# We install it separately with --no-deps to avoid pip resolution issues.
+# Note: cellxgene-census is intentionally excluded - it's only needed for data prep scripts
+# and causes complex dependency conflicts. Install separately if needed for data preparation.
+# Note: importlib_metadata<8.0 required to avoid Distribution import error after scanpy install
+RUN pip install --no-cache-dir \
+        "importlib_metadata<8.0" \
+        "scanpy>=1.9.0,<2.0" \
+        "wandb" \
+    && pip install --no-cache-dir --no-deps "llm-foundry>=0.17.1,<1.0"
+
+# Install geomloss for optimal transport (no deps to avoid conflicts)
 RUN pip install --no-cache-dir --no-deps git+https://github.com/jeanfeydy/geomloss.git@v0.2.5
+
+# Verify critical imports work at build time
+# Note: llmfoundry requires GPU to import (via megablocks→stk→triton), so skip it here
+RUN python -c "import geomloss; print('geomloss OK')" && \
+    python -c "import scanpy; print('scanpy OK')" && \
+    python -c "import torch; print(f'torch {torch.__version__} OK')"
