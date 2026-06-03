@@ -286,7 +286,6 @@ python scripts/inference/prepare_for_inference.py
 
 The script will download the model config from WandB, process the vocabulary, and save inference-ready files to your specified output directory.
 
-
 ## 🧬 Generating Cell and Gene Embeddings
 
 ### Quick Start with Inference Script
@@ -325,6 +324,7 @@ cell_embeddings = adata.obsm["Tx1-70m"]
 
 Set `return_gene_embeddings: True` in the configuration to extract gene-level representations.
 
+Refer to [inference/README.md](scripts/inference/README.md) for detailed examples on how to extract the embeddings.
 
 ## 📚 Tutorials and Benchmarks
 
@@ -346,6 +346,7 @@ Tx1 achieves state-of-the-art performance across disease-relevant benchmarks. Se
 
 
 ### Additional Resources
+- **Embedding Extraction**: [scripts/inference/README.md](scripts/inference/README.md)
 - **Data Preparation**: [scripts/data_prep/README.md](scripts/data_prep/README.md)
 - **Platform Usage**: [mcli/README.md](mcli/README.md) and [gcloud/README.md](gcloud/README.md)
 
