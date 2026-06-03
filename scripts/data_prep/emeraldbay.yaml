@@ -1,0 +1,41 @@
+output_root: "/nvme-shared/Data/EmeraldBay_HF"
+
+vocab:
+  base_vocab_path: "/tmp/vevo_v2_vocab.json"
+  extend_vocab: true
+  output_file: "extended_vocab.json"
+
+huggingface:
+  dataset_name: "emeraldbay"
+  gene_col: "gene_id"
+  adata_path: "/nvme-shared/Data/seqrun_26_27_merged/5/qc/generic/adata_clean.h5ad.gz"
+  add_cls_token: false
+  output_root: ${output_root}
+  obs_metadata_columns:
+    - drug
+    - drugname_drugconc
+    - sample
+  cell_line_mapping:
+    csv_path: "/home/shreshth/Barotaxis2/vector_diffusion/scripts/data_prep/cell_gen_ft_a97.csv"
+    source_col: "Cell_ID_Vevo"
+    target_col: "Cell_ID_Cellosaur"
+    adata_col: "cell_line"
+
+metadata:
+  gene_metadata:
+    enabled: true
+  drug_metadata:
+    enabled: true
+    columns:
+      - drug
+      - drugname_drugconc
+  cell_line_metadata:
+    enabled: true
+    csv_path: ${huggingface.cell_line_mapping.csv_path}
+    filter_col: ${huggingface.cell_line_mapping.source_col}
+    drop_columns:
+      - "Created By"
+      - "Last Modified By"
+  summary_statistics:
+    enabled: true
+    parquet_path: "/nvme-shared/Data/seqrun_26_27_merged/5/qc/generic/growth_rate_long.parquet"
