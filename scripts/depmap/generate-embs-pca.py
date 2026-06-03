@@ -1,4 +1,4 @@
-# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025-2026. All rights reserved.
 """Creates principal component and gene loading baseline comparison AnnDatas for
 cell line embeddings, mean gene embeddings, and contextual gene embeddings."""
 

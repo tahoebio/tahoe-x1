@@ -1,4 +1,4 @@
-# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025-2026. All rights reserved.
 python rf.py --base-path ${1} --model-type classifier --emb ${2} --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs ${3} --fold 0
 python rf.py --base-path ${1} --model-type classifier --emb ${2} --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs ${3} --fold 1
 python rf.py --base-path ${1} --model-type classifier --emb ${2} --split-file split-genes-lt5gt70.csv --split-col gene --n-jobs ${3} --fold 2

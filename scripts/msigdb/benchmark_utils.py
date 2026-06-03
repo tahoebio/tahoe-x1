@@ -1,4 +1,4 @@
-# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025-2026. All rights reserved.
 import os
 from typing import Optional
 

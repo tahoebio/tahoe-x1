@@ -1,4 +1,4 @@
-# Copyright (C) Tahoe Therapeutics 2025. All rights reserved.
+# Copyright (C) Tahoe Therapeutics 2025-2026. All rights reserved.
 """S3 utilities for handling public and private bucket access.
 
 This module provides utilities for working with S3 buckets, including:
