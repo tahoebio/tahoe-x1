@@ -289,23 +289,22 @@ The script will download the model config from WandB, process the vocabulary, an
 
 ## 🧬 Generating Cell and Gene Embeddings
 
-### Quick Start with Inference Script
+### Using the inference module
 
 Extract cell embeddings from an AnnData object:
 
 ```python
 from omegaconf import OmegaConf as om
-from scripts.inference.predict_embeddings import predict_embeddings
+from tahoe_x1.inference import predict_embeddings
 
 cfg = {
-    "model_name": "Tx1-70m",
+    "model_name": "tx1",
     "paths": {
         "hf_repo_id": "tahoebio/Tahoe-x1",
         "hf_model_size": "70m",
         "adata_input": "/path/to/your_data.h5ad",
     },
     "data": {
-        "cell_type_key": "cell_type",
         "gene_id_key": "ensembl_id"
     },
     "predict": {
@@ -317,11 +316,29 @@ cfg = {
 cfg = om.create(cfg)
 adata = predict_embeddings(cfg)
 
-# Access embeddings
+# access embeddings
 cell_embeddings = adata.obsm["Tx1-70m"]
 ```
 
-### Extracting Gene Embeddings
+### Using the CLI
+
+After installing the package, you can also use the `tx1 emb` command line interface to extract embeddings.
+
+```bash
+# configuration file
+tx1 emb --config path_to_configuration.yaml
+
+# manual arguments
+tx1 emb --hf-repo tahoebio/Tahoe-x1
+        --model-size 70m
+        --input path_to_adata.h5ad
+        --output path_to_output.h5ad
+        --gene_id_key ensembl_id
+```
+
+See `scripts/inference/configs/predict.yaml` for an example configuration.
+
+### Extracting gene embeddings
 
 Set `return_gene_embeddings: True` in the configuration to extract gene-level representations.
 

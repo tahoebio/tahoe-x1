@@ -107,6 +107,7 @@ setup(
             "configs*",
         ],
     ),
+    py_modules=["tx1_cli"],
     classifiers=classifiers,
     install_requires=install_requires,
     extras_require=extra_deps,
@@ -121,4 +122,9 @@ setup(
         "machine-learning",
         "deep-learning",
     ],
+    entry_points={
+        "console_scripts": [
+            "tx1 = tx1_cli:main",
+        ],
+    },
 )
