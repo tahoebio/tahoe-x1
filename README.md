@@ -21,6 +21,7 @@
         <img alt="License" src="https://img.shields.io/badge/License-Apache%202.0-green.svg">
     </a>
 <a href="https://github.com/psf/black"><img alt="Code style: black" src="https://img.shields.io/badge/code%20style-black-000000.svg"></a>
+<a href="https://bio.rodeo/models/tahoe-x1"><img alt="bio.rodeo openness score" src="https://img.shields.io/endpoint?url=https://bio.rodeo/api/badge/openness/tahoe-x1"></a>
 </p>
 <br />
 
