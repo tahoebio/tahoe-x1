@@ -31,3 +31,12 @@ parquet:
 
 output:
   prefix: "tx-70m-merged"
+  # `plate` is reserved (available to the collator) but intentionally not
+  # persisted here; only these four reserve keys become Parquet columns.
+  metadata_fields:
+    - key: "drug"
+    - key: "sample"
+    - key: "cell_line_id"
+      name: "cell_line"
+    - key: "BARCODE_SUB_LIB_ID"
+      dtype: "string"
