@@ -1,0 +1,63 @@
+paths:
+  # Loads model.safetensors + vocab.json + model_config.yml + collator_config.yml
+  # directly from the public HF Hub repo (ComposerTX.from_hf) -- no WandB or S3
+  # checkpoint staging needed. This is the exact model used to generate the public
+  # tahoebio/Tahoe-x1-embeddings dataset; the embedding column name below matches
+  # the reference dataset's column 1:1.
+  hf_repo_id: "tahoebio/Tahoe-x1"
+  hf_model_size: "3b"
+  # The 3B model was trained with a chemical/drug token (use_chem_token: true,
+  # keep_first_n_tokens: 2). use_chem_inf=true keeps that conditioning at inference
+  # time, matching how the reference embeddings were generated. Set to false to get
+  # chem-agnostic embeddings instead (from_hf's own default).
+  use_chem_inf: true
+  # attn_impl is deliberately left unset: tahoe_x1's _flash_attn_compat shim adapts
+  # llm-foundry's classic flash_attn_varlen_func call onto flash-attn-4's
+  # flash_attn.cute kernel, so the checkpoint's own default ("flash") gets real
+  # Blackwell/B200 acceleration -- benchmarked at ~2.7x the throughput and roughly
+  # half the peak memory of the "torch" fallback at batch_size=32, seqlen=2048.
+  # Uncomment below only for a non-kernel throughput baseline. Note "torch" does not
+  # mask padding and is NOT a correctness reference on padded batches -- see
+  # OPTIMIZATION_REPORT.md section 2.1.
+  # attn_impl: "torch"
+
+  # Under output/, which .gitignore already covers, so run artifacts never show up
+  # as untracked files in the repo.
+  output_dir: "./output/tahoe_100m_3b"
+
+dataset:
+  name: "tahoebio/Tahoe-100M"
+  split: "train"
+  # Streamed, not a "train[:N]" slice: Tahoe-100M is sharded across thousands of files
+  # (4419 as of writing) and a non-streaming slice downloads every one of them before
+  # slicing, however small N is.
+  streaming: True
+  # Bounded smoke run against tahoebio/Tahoe-x1-embeddings before committing to a full
+  # pass. Delete num_cells (keeping streaming: True) for all ~100M cells.
+  num_cells: 5000
+
+data:
+  batch_size: 64
+  max_length: 2048
+  num_workers: 8
+  prefetch_factor: 8
+  reserve_keys:
+    - "BARCODE_SUB_LIB_ID"
+    - "sample"
+    - "cell_line_id"
+    - "plate"
+    - "drug"
+
+parquet:
+  chunk_size: 100000
+
+output:
+  # Matches the reference HF dataset's embedding column name 1:1 for easy comparison.
+  prefix: "mosaicfm-3b-prod-cont-MFMv2"
+  metadata_fields:
+    - key: "drug"
+    - key: "sample"
+    - key: "cell_line_id"
+      name: "cell_line"
+    - key: "BARCODE_SUB_LIB_ID"
+      dtype: "string"

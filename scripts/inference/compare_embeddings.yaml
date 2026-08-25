@@ -1,0 +1,38 @@
+paths:
+  hf_repo_id: "tahoebio/Tahoe-x1"
+  hf_model_size: "3b"
+  use_chem_inf: true
+  # attn_impl left unset -> uses the checkpoint's native "flash", i.e. the real FA4
+  # kernel. See scripts/inference/OPTIMIZATION_REPORT.md.
+
+dataset:
+  name: "tahoebio/Tahoe-100M"
+  split: "train"
+  # 1M cells. Streamed + take()'n, not a "train[:N]" slice -- Tahoe-100M is sharded
+  # across thousands of files and a non-streaming slice downloads all of them
+  # regardless of N. Shrink to e.g. 1000 for a quick smoke test first.
+  num_cells: 1000000
+
+data:
+  batch_size: 64
+  max_length: 2048
+  num_workers: 8
+  prefetch_factor: 8
+
+reference:
+  # Existing public embeddings dataset -- this script validates against it instead of
+  # re-embedding the full 100M-cell corpus.
+  repo_id: "tahoebio/Tahoe-x1-embeddings"
+  embedding_column: "mosaicfm-3b-prod-cont-MFMv2"
+  # Cells are matched by this column, not row position -- the reference README makes
+  # no ordering guarantee between the two datasets.
+  join_key: "BARCODE_SUB_LIB_ID"
+  # Reference data is 64 parquet shards (~1.49M rows each) -- scanned in order, stopping
+  # as soon as every needed barcode is found. 10 shards (~15M rows) is generous headroom
+  # over the 1M cells requested above, in case the two datasets aren't row-aligned.
+  max_shards_to_scan: 10
+
+output:
+  # Optional: per-cell (barcode, cosine_similarity) pairs, for inspecting outliers.
+  # Leave unset to only print the summary stats.
+  save_path: "./output/embedding_validation/cosine_similarities_1m.parquet"

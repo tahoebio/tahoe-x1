@@ -427,6 +427,7 @@ class ComposerTX(ComposerModel):
         model_size: str,
         return_gene_embeddings: bool = False,
         use_chem_inf: bool = False,
+        attn_impl: Optional[str] = None,
     ):
 
         # helper function to download files
@@ -452,6 +453,23 @@ class ComposerTX(ComposerModel):
         model_config = om.load(model_cfg_path)
         if model_config["attn_config"]["attn_impl"] == "triton":
             model_config["attn_config"]["attn_impl"] = "flash"
+            model_config["attn_config"]["use_attn_mask"] = False
+        if attn_impl is not None:
+            # e.g. "torch" to run without a working flash-attn kernel (slower, and
+            # needs no CUDA kernel).
+            #
+            # WARNING: "torch" does not mask padding. The flash path derives padding
+            # from cu_seqlens, but the torch path can only get it from `attn_bias`,
+            # which is built only when use_attn_mask is True -- and that code path is
+            # broken independently of this flag (`_make_mask` returns (B, S, S), which
+            # `blocks.py` then unsqueezes to 5-D and torch attention rejects), so every
+            # shipped config sets it False. Consequence: on a batch containing padded
+            # rows, "torch" attends to the pad positions and its embeddings diverge
+            # sharply from the flash path (measured: cosine ~0.58 mean on a batch with
+            # 28/32 rows padded; ~1.0 only for full-length rows). Use "torch" for
+            # throughput baselines and for fully-unpadded batches, not as a correctness
+            # reference on padded data.
+            model_config["attn_config"]["attn_impl"] = attn_impl
             model_config["attn_config"]["use_attn_mask"] = False
 
         # set up model config for inference
